@@ -248,18 +248,18 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     CONSTRAINT consumer_categories_pkey PRIMARY KEY (id),
     CONSTRAINT consumer_categories_definition_key UNIQUE (definition)
 )""",
-    "loadarea": """CREATE TABLE IF NOT EXISTS public.loadarea
-(
-    id integer,
-    cluster_id integer,
-    area_ha numeric,
-    ags_0 character varying(255) COLLATE pg_catalog."default",
-    zensus_sum integer,
-    geom_centre geometry(Geometry,3035),
-    geom geometry(Geometry,3035),
-    hausabstand numeric,
-    siedlungstyp integer
-)""",
+#     "loadarea": """CREATE TABLE IF NOT EXISTS public.loadarea
+# (
+#     id integer,
+#     cluster_id integer,
+#     area_ha numeric,
+#     ags_0 character varying(255) COLLATE pg_catalog."default",
+#     zensus_sum integer,
+#     geom_centre geometry(Geometry,3035),
+#     geom geometry(Geometry,3035),
+#     hausabstand numeric,
+#     siedlungstyp integer
+# )""",
     "postcode": """CREATE TABLE IF NOT EXISTS public.postcode
 (
     gid integer NOT NULL,
