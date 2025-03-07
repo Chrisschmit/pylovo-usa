@@ -316,7 +316,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
         geom_type varchar,
         within_shopping boolean,
         geom geometry(MultiPoint, 3035),
-        CONSTRAINT transformers_pkey PRIMARY KEY (ogc_fid)
+        CONSTRAINT transformers_pkey PRIMARY KEY (osm_id)
     )""",
     "ways": """CREATE TABLE IF NOT EXISTS public.ways
 (
