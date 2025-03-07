@@ -247,18 +247,6 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     CONSTRAINT consumer_categories_pkey PRIMARY KEY (consumer_category_id),
     CONSTRAINT consumer_categories_definition_key UNIQUE (definition)
 )""",
-    "loadarea": """CREATE TABLE IF NOT EXISTS public.loadarea
-(
-    loadarea_id integer,
-    cluster_id integer,
-    area_ha numeric,
-    ags_0 varchar(255),
-    census_sum integer,
-    geom_center geometry(Geometry,3035),
-    geom geometry(Geometry,3035),
-    house_distance numeric,
-    settlement_type integer
-)""",
     "postcode": """CREATE TABLE IF NOT EXISTS public.postcode
 (
     gid integer NOT NULL,

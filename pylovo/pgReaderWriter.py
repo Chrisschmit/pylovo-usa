@@ -1116,14 +1116,6 @@ class PgReaderWriter:
         kcid = self.cur.fetchone()[0]
         return kcid
 
-    def get_lcid_length(self) -> int:
-        query = """SELECT COUNT(DISTINCT cluster_id) FROM loadarea
-                   WHERE cluster_id <> -1"""
-        self.cur.execute(query)
-        lcid_length = self.cur.fetchone()[0]
-        self.logger.debug(f"selected lcids altogether {lcid_length}.")
-        return lcid_length
-
     def count_no_kmean_buildings(self):
         """
         Counts relative buildings in buildings_tem, which could not be clustered via k-means
