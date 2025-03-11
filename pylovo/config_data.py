@@ -325,7 +325,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     target integer,
     cost double precision,
     reverse_cost double precision,
-    geom geometry(Geometry,3035),
+    geom geometry(Linestring,3035),
     id integer NOT NULL
 )""",
     "ways_result": """CREATE TABLE IF NOT EXISTS public.ways_result
@@ -336,7 +336,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     target integer,
     cost double precision,
     reverse_cost double precision,
-    geom geometry(Geometry,3035),
+    geom geometry(Linestring,3035),
     id integer NOT NULL,
     plz integer
 )""",
@@ -347,7 +347,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     target integer,
     cost double precision,
     reverse_cost double precision,
-    geom geometry(Geometry,3035),
+    geom geometry(Linestring,3035),
     id integer,
     plz integer
 )""",
