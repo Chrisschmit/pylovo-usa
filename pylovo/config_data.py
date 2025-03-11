@@ -86,19 +86,19 @@ CREATE_QUERIES = {
 )""",
     "betriebsmittel": """CREATE TABLE IF NOT EXISTS public.betriebsmittel
 (
-    name character varying(100) COLLATE pg_catalog."default" NOT NULL,
+    name varchar(100) COLLATE pg_catalog."default" NOT NULL,
     s_max_kva integer,
     max_i_a integer,
     r_mohm_per_km integer,
     x_mohm_per_km integer,
     z_mohm_per_km integer,
     kosten_eur integer,
-    typ character varying(50) COLLATE pg_catalog."default",
+    typ varchar(50) COLLATE pg_catalog."default",
     anwendungsgebiet integer,
     CONSTRAINT betriebsmittel_pkey PRIMARY KEY (name)
 )""",
     "building_clusters": """CREATE TABLE IF NOT EXISTS public.building_clusters
-(   version_id character varying(10) NOT NULL, 
+(   version_id varchar(10) NOT NULL, 
     kcid integer NOT NULL,
     bcid bigint NOT NULL,
     plz integer,
@@ -109,7 +109,7 @@ CREATE_QUERIES = {
 )""",
     "lines_result": """
 CREATE TABLE IF NOT EXISTS public.lines_result
-(   version_id character varying(10) NOT NULL, 
+(   version_id varchar(10) NOT NULL, 
     geom geometry(Geometry,3035),
     plz integer,
     bcid integer,
@@ -122,10 +122,10 @@ CREATE TABLE IF NOT EXISTS public.lines_result
 )""",
     "buildings_result": """
 CREATE TABLE IF NOT EXISTS public.buildings_result
-(   version_id character varying(10) NOT NULL, 
-    osm_id character varying(80) COLLATE pg_catalog."default" NOT NULL,
+(   version_id varchar(10) NOT NULL, 
+    osm_id varchar(80) COLLATE pg_catalog."default" NOT NULL,
     area numeric,
-    type character varying(30) COLLATE pg_catalog."default",
+    type varchar(30) COLLATE pg_catalog."default",
     geom geometry(Geometry,3035),
     houses_per_building integer,
     center geometry(Geometry,3035),
@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     lat numeric,
     lon numeric,
     ags integer,
-    name_city character varying(86),
+    name_city varchar(86),
     fed_state integer,
     regio7 integer,
     regio5 integer,
@@ -160,10 +160,10 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     CONSTRAINT sample_set_pkey PRIMARY KEY (classification_id, plz)
     )""",
     "classification_version": """CREATE TABLE IF NOT EXISTS public.classification_version
-    (classification_id character varying(10) NOT NULL,
-    version_comment character varying, 
+    (classification_id varchar(10) NOT NULL,
+    version_comment varchar, 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    classification_region character varying,
+    classification_region varchar,
     CONSTRAINT classification_pkey PRIMARY KEY (classification_id)
     )""",
     "municipal_register": """CREATE TABLE IF NOT EXISTS public.municipal_register     
@@ -173,7 +173,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     lat numeric,
     lon numeric,
     ags integer,
-    name_city character varying(86),
+    name_city varchar(86),
     fed_state integer,
     regio7 integer,
     regio5 integer,
@@ -182,7 +182,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     )""",
     "clustering_parameters": """CREATE TABLE IF NOT EXISTS public.clustering_parameters
     (
-              version_id character varying(10) NOT NULL,
+              version_id varchar(10) NOT NULL,
               plz integer NOT NULL,
               kcid integer NOT NULL ,
               bcid integer NOT NULL,
@@ -222,9 +222,9 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     """,
     "buildings_tem": """CREATE TABLE IF NOT EXISTS public.buildings_tem
 (
-    osm_id character varying(80) COLLATE pg_catalog."default",
+    osm_id varchar(80) COLLATE pg_catalog."default",
     area numeric,
-    type character varying(80) COLLATE pg_catalog."default",
+    type varchar(80) COLLATE pg_catalog."default",
     geom geometry(Geometry,3035),
     houses_per_building integer,
     center geometry(Geometry,3035),
@@ -239,7 +239,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     "consumer_categories": """CREATE TABLE IF NOT EXISTS public.consumer_categories
 (
     id integer NOT NULL,
-    definition character varying(30) COLLATE pg_catalog."default" NOT NULL,
+    definition varchar(30) COLLATE pg_catalog."default" NOT NULL,
     peak_load numeric(10,2),
     yearly_consumption numeric(10,2),
     peak_load_per_m2 numeric(10,2),
@@ -253,7 +253,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     id integer,
     cluster_id integer,
     area_ha numeric,
-    ags_0 character varying(255) COLLATE pg_catalog."default",
+    ags_0 varchar(255) COLLATE pg_catalog."default",
     zensus_sum integer,
     geom_centre geometry(Geometry,3035),
     geom geometry(Geometry,3035),
@@ -264,14 +264,14 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
 (
     gid integer NOT NULL,
     plz int,
-    note character varying(86) COLLATE pg_catalog."default",
+    note varchar(86) COLLATE pg_catalog."default",
     qkm double precision,
     einwohner integer,
     geom geometry(MultiPolygon,3035),
     CONSTRAINT "plz-5stellig_pkey" PRIMARY KEY (gid)
 )""",
     "postcode_result": """CREATE TABLE IF NOT EXISTS public.postcode_result
-(   version_id character varying(10) NOT NULL, 
+(   version_id varchar(10) NOT NULL, 
     id integer NOT NULL,
     siedlungstyp integer,
     geom geometry(MultiPolygon,3035),
@@ -279,17 +279,17 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     CONSTRAINT "postcode_result_pkey" PRIMARY KEY (version_id, id)
 )""",
     "transformer_positions": """CREATE TABLE IF NOT EXISTS public.transformer_positions 
-                    (   version_id character varying(10) NOT NULL, 
+                    (   version_id varchar(10) NOT NULL, 
                         plz integer,
                         kcid integer,
                         bcid integer,
                         geom geometry(Geometry,3035),
-                        ogc_fid character varying(50),
-                        "comment" character varying
+                        ogc_fid varchar(50),
+                        "comment" varchar
                         )
                         """,
     "transformer_classified": """CREATE TABLE IF NOT EXISTS public.transformer_classified 
-                (   version_id character varying(10) NOT NULL, 
+                (   version_id varchar(10) NOT NULL, 
                     plz integer,
                     kcid integer,
                     bcid integer,
@@ -310,10 +310,10 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     "transformers": """CREATE TABLE IF NOT EXISTS public.transformers
     (
         ogc_fid SERIAL,
-        osm_id character varying COLLATE pg_catalog."default",
+        osm_id varchar COLLATE pg_catalog."default",
         area double precision,
-        power character varying COLLATE pg_catalog."default",
-        geom_type character varying COLLATE pg_catalog."default",
+        power varchar COLLATE pg_catalog."default",
+        geom_type varchar COLLATE pg_catalog."default",
         within_shopping boolean,
         geom geometry(MultiPoint, 3035),
         CONSTRAINT transformers_pkey PRIMARY KEY (ogc_fid)
@@ -330,7 +330,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
 )""",
     "ways_result": """CREATE TABLE IF NOT EXISTS public.ways_result
 (
-    version_id character varying(10) NOT NULL,
+    version_id varchar(10) NOT NULL,
     clazz integer,
     source integer,
     target integer,
@@ -353,7 +353,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
 )""",
     "grids": """CREATE TABLE IF NOT EXISTS public.grids
     (
-    version_id character varying(10) NOT NULL,
+    version_id varchar(10) NOT NULL,
     plz integer NOT NULL,
     kcid integer NOT NULL,
     bcid integer NOT NULL,
@@ -362,18 +362,18 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
       )""",
     "version": """CREATE TABLE IF NOT EXISTS public.version
 (
-    version_id character varying(10) NOT NULL,
-    version_comment character varying, 
+    version_id varchar(10) NOT NULL,
+    version_comment varchar, 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    consumer_categories character varying,
-    cable_cost_dict character varying,
-    connection_available_cables character varying,   
-    other_parameters character varying, 
+    consumer_categories varchar,
+    cable_cost_dict varchar,
+    connection_available_cables varchar,   
+    other_parameters varchar, 
     CONSTRAINT version_pkey PRIMARY KEY (version_id)
 )""",
     "grid_parameters": """CREATE TABLE IF NOT EXISTS public.grid_parameters
     (
-    version_id character varying(10) NOT NULL,
+    version_id varchar(10) NOT NULL,
     plz integer NOT NULL,
     trafo_num json,
     cable_length json,
