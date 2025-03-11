@@ -9,7 +9,7 @@ from pylovo.SyngridDatabaseConstructor import SyngridDatabaseConstructor
 
 ### Create constructor class
 sgc = SyngridDatabaseConstructor()
-### Creata database with predefined table structure
+### Create database with predefined table structure
 sgc.create_table(table_name="all")
 ### Add defined csv raw data from CSV_FILE_LIST to the database
 sgc.csv_to_db()
