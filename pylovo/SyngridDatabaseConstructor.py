@@ -191,6 +191,7 @@ class SyngridDatabaseConstructor:
 
         # We read 10% at a time.  (Or pick a chunk size in bytes that works for your environment.)
         chunk_size = max(1, file_size // 100)
+        chars_read = 0
 
         leftover = ""  # Holds any partial statement that didn't end with a semicolon
 
@@ -201,6 +202,10 @@ class SyngridDatabaseConstructor:
                 if not data:
                     # No more data to read
                     break
+
+                chars_read += len(data)
+                progress = round(chars_read * 100 / file_size)
+                print(f"\rProgress: {progress}%", end="", flush=True)
 
                 # Combine leftover from previous read with current chunk
                 combined = leftover + data
@@ -244,7 +249,7 @@ class SyngridDatabaseConstructor:
                         # No statements found. This can happen if combined was empty or whitespace.
                         # Just continue reading next chunk
                         pass
-        print("Inserted all ways into ways_public_2po_4pgr table.")
+        print("\nInserted all ways into ways_public_2po_4pgr table.")
 
     def ways_to_db(self):
         """This function transform the output of osm2po to the ways table, refer to the issue
