@@ -2389,10 +2389,30 @@ class PgReaderWriter:
         insert_query = "INSERT INTO grids VALUES (%s, %s, %s, %s, %s)"
         self.cur.execute(insert_query, vars=(VERSION_ID, plz, kcid, bcid, json_string))
 
-    def read_net(self, plz:int, kcid:int, bcid:int) -> json:
+    def read_net(self, plz: int, kcid: int, bcid: int) -> pp.pandapowerNet:
+        """
+        Reads a pandapower network from the database for the specified grid.
+
+        Args:
+            plz: Postal code ID
+            kcid: Kmeans cluster ID
+            bcid: Building cluster ID
+
+        Returns:
+            A pandapower network object
+
+        Raises:
+            ValueError: If the requested grid does not exist in the database
+        """
         read_query = "SELECT grid FROM grids WHERE version_id = %s AND plz = %s AND kcid = %s AND bcid = %s LIMIT 1"
         self.cur.execute(read_query, vars=(VERSION_ID, plz, kcid, bcid))
-        grid_tuple = self.cur.fetchall()[0]
+
+        result = self.cur.fetchall()
+        if not result:
+            self.logger.error(f"Grid not found for plz={plz}, kcid={kcid}, bcid={bcid}, version_id={VERSION_ID}")
+            raise ValueError(f"Grid not found for plz={plz}, kcid={kcid}, bcid={bcid}")
+
+        grid_tuple = result[0]
         grid_dict = grid_tuple[0]
         grid_json_string = json.dumps(grid_dict)
         net = pp.from_json_string(grid_json_string)
