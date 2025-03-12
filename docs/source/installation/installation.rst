@@ -29,7 +29,8 @@ Database Configuration
 =========================================
 A. External users: Create your database
 ----------------------------------------
-- Install PostgreSQL on your machine.
+- Install `PostgreSQL 16 <https://www.postgresql.org/download/>`_ on your machine and make sure to keep "Stack Builder" checked.
+- Using Stack Builder install **PostGIS 3.4**.
 - Create your database with the appropriate configuration (dbname, user, password, host, port).
 - Create a ``.env`` file in the root directory of the repository with these configurations or adjust the connections parameters in the ``config_data.py``.
 - Your configurations might might look like this:
