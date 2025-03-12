@@ -96,7 +96,7 @@ class PgReaderWriter:
         # else:
         #     print("Incorrect settlement type number specified.")
         #     return
-        application_area_tuple = (1, 2, 3, 4, 5)
+        application_area_tuple = (1, 2, 3, 4, 5) # TODO:check selection
 
         query = """SELECT equipment_data.s_max_kva , cost_eur
             FROM public.equipment_data
