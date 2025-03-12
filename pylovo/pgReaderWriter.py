@@ -757,7 +757,7 @@ class PgReaderWriter:
         connection = [t[0] for t in self.cur.fetchall()]
 
         vertices_query = """ SELECT DISTINCT node, agg_cost FROM pgr_dijkstra(
-                    'SELECT way_id as id, source, target, cost, reverse_cost FROM ways_tem', %(o)s, %(c)s, false) ORDER BY agg_cost;"""
+                    'SELECT way_id as id, source, target, cost, reverse_cost FROM ways_tem'::text, %(o)s, %(c)s::integer[], false) ORDER BY agg_cost;"""
         self.cur.execute(vertices_query, {"o": ont, "c": consumer})
         data = self.cur.fetchall()
         vertice_cost_dict = {
@@ -1227,28 +1227,60 @@ class PgReaderWriter:
         self.logger.debug("pre transformer clusters completed")
 
     def update_building_cluster(
-            self, transformer_id:int, conn_id_list:Union[list, tuple], count:int, kcid:int, lcid:int, sim_load:int
+            self,
+            transformer_id: int,
+            conn_id_list: Union[list, tuple],
+            count: int,
+            kcid: int,
+            lcid: int,
+            sim_load: int
     ) -> None:
-        query = """UPDATE buildings_tem SET bcid = %(count)s WHERE vertice_id = %(t)s;
-                UPDATE buildings_tem SET bcid = %(count)s WHERE connection_point IN %(c)s AND type != 'Transformer';
-                INSERT INTO building_clusters (version_id, plz, kcid, bcid, ont_vertice_id, s_max)
-                    VALUES (%(v)s, %(lc)s, %(k)s, %(count)s, %(t)s, %(l)s);
-                INSERT INTO transformer_positions (version_id, plz, kcid, bcid, geom, ogc_fid, comment)
-                    VALUES (%(v)s, %(lc)s, %(k)s, %(count)s, 
-                    (SELECT center FROM buildings_tem WHERE vertice_id = %(t)s), 
-                    (SELECT osm_id FROM buildings_tem WHERE vertice_id = %(t)s), 'Normal' );"""
-        self.cur.execute(
-            query,
-            {
-                "v": VERSION_ID,
-                "count": count,
-                "c": tuple(conn_id_list),
-                "t": transformer_id,
-                "k": kcid,
-                "lc": lcid,
-                "l": sim_load,
-            },
-        )
+        """
+        Update building cluster information by performing multiple operations:
+          - Update the 'bcid' in 'buildings_tem' where 'vertice_id' matches the transformer_id.
+          - Update the 'bcid' in 'buildings_tem' for rows where 'connection_point' is in the provided list and type is not 'Transformer'.
+          - Insert a new record into 'building_clusters'.
+          - Insert a new record into 'transformer_positions' using subqueries for geometry and OGC ID.
+
+        Args:
+            transformer_id (int): The ID of the transformer.
+            conn_id_list (Union[list, tuple]): A list or tuple of connection point IDs.
+            count (int): The new building cluster identifier.
+            kcid (int): The KCID value.
+            lcid (int): The LCID value.
+            sim_load (int): The simulation load value.
+        """
+        query = """
+            UPDATE buildings_tem 
+            SET bcid = %(count)s 
+            WHERE vertice_id = %(t)s;
+
+            UPDATE buildings_tem 
+            SET bcid = %(count)s 
+            WHERE connection_point IN %(c)s 
+              AND type != 'Transformer';
+
+            INSERT INTO building_clusters (version_id, plz, kcid, bcid, ont_vertice_id, s_max)
+            VALUES (%(v)s, %(lc)s, %(k)s, %(count)s, %(t)s, %(l)s);
+
+            INSERT INTO transformer_positions (version_id, plz, kcid, bcid, geom, ogc_fid, comment)
+            VALUES (
+                %(v)s, %(lc)s, %(k)s, %(count)s,
+                (SELECT center FROM buildings_tem WHERE vertice_id = %(t)s),
+                (SELECT osm_id FROM buildings_tem WHERE vertice_id = %(t)s),
+                'Normal'
+            );
+        """
+        params = {
+            "v": VERSION_ID,
+            "count": count,
+            "c": tuple(conn_id_list),
+            "t": transformer_id,
+            "k": kcid,
+            "lc": lcid,
+            "l": sim_load,
+        }
+        self.cur.execute(query, params)
 
     def connect_unconnected_ways(self) -> None:
         """
