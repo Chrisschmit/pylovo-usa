@@ -386,51 +386,6 @@ class GridGenerator:
         self.logger.info("result analysis finished")
         self.pgr.conn.commit()
 
-    def plot_trafo_on_map(self, save_plots: bool = False) -> None:
-        """trafo types are plotted by their capacity on plotly basemap
-        :param save_plots: option to save the plot, defaults to False
-        :type save_plots: bool
-         """
-
-        net_plot = pp.create_empty_network()
-        cluster_list = self.pgr.get_list_from_plz(self.plz)
-        grid_index = 1
-        set_mapbox_token(
-            "pk.eyJ1IjoidG9uZ3llMTk5NyIsImEiOiJjbDZ4bWo0aXQwdWdsM2VxbGltMHNzZGUyIn0.TFDYpXsPsvxWPdPRdgCNhg"
-        )
-        for kcid, bcid in cluster_list:
-            net = self.pgr.read_net(self.plz, kcid, bcid)
-            for row in net.trafo[["sn_mva", "lv_bus"]].itertuples():
-                trafo_size = round(row.sn_mva * 1e3)
-                trafo_geom = np.array(net.bus_geodata.loc[row.lv_bus, ["x", "y"]])
-                pp.create_bus(
-                    net_plot,
-                    name="Distribution_grid_"
-                         + str(grid_index)
-                         + "<br>"
-                         + "transformer: "
-                         + str(trafo_size)
-                         + "_kVA",
-                    vn_kv=trafo_size,
-                    geodata=trafo_geom,
-                    type="b",
-                )
-                grid_index += 1
-
-        figure = vlevel_plotly(
-            net_plot, on_map=True, colors_dict=PLOT_COLOR_DICT, projection="epsg:4326"
-        )
-
-        if save_plots:
-            savepath_folder = Path(
-                RESULT_DIR, "figures", f"version_{VERSION_ID}", self.plz
-            )
-            savepath_folder.mkdir(parents=True, exist_ok=True)
-            savepath_file = Path(savepath_folder, "trafo_on_map.html")
-            plotly.offline.plot(
-                figure,
-                filename=savepath_file,
-            )
 
     def save_net(self, net, kcid, bcid):
         """

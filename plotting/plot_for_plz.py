@@ -1,12 +1,18 @@
+from plotting.config_plots import ACCESS_TOKEN_PLOTLY
+from pylovo.GridGenerator import GridGenerator
+from pylovo.config_data import *
+from pylovo.config_version import *
+
 import os
 import sys
-
 import pandas as pd
 import plotly.express as px
 from matplotlib import pyplot as plt
-
-from plotting.config_plots import ACCESS_TOKEN_PLOTLY
-from pylovo.GridGenerator import GridGenerator
+import pandapower as pp
+import plotly
+from pandapower.plotting.plotly import vlevel_plotly
+from pandapower.plotting.plotly.mapbox_plot import set_mapbox_token
+from pathlib import Path
 
 sys.path.append(os.path.abspath('..'))
 px.set_mapbox_access_token(ACCESS_TOKEN_PLOTLY)
@@ -145,3 +151,51 @@ def get_trafo_dicts(plz):
                 bus_count_dict[capacity] = [bus_count]
                 cable_length_dict[capacity] = [cable_length]
     return load_count_dict, bus_count_dict, cable_length_dict
+
+def plot_trafo_on_map(plz, save_plots: bool = False) -> None:
+    """trafo types are plotted by their capacity on plotly basemap
+    :param save_plots: option to save the plot, defaults to False
+    :type save_plots: bool
+     """
+
+    net_plot = pp.create_empty_network()
+    gg = GridGenerator(plz=plz)
+    pg = gg.pgr
+    cluster_list = pg.get_list_from_plz(plz)
+    grid_index = 1
+    set_mapbox_token(
+        "pk.eyJ1IjoidG9uZ3llMTk5NyIsImEiOiJjbDZ4bWo0aXQwdWdsM2VxbGltMHNzZGUyIn0.TFDYpXsPsvxWPdPRdgCNhg"
+    )
+    for kcid, bcid in cluster_list:
+        net = pg.read_net(plz, kcid, bcid)
+        for row in net.trafo[["sn_mva", "lv_bus"]].itertuples():
+            trafo_size = round(row.sn_mva * 1e3)
+            trafo_geom = np.array(net.bus_geodata.loc[row.lv_bus, ["x", "y"]])
+            pp.create_bus(
+                net_plot,
+                name="Distribution_grid_"
+                     + str(grid_index)
+                     + "<br>"
+                     + "transformer: "
+                     + str(trafo_size)
+                     + "_kVA",
+                vn_kv=trafo_size,
+                geodata=trafo_geom,
+                type="b",
+            )
+            grid_index += 1
+
+    figure = vlevel_plotly(
+        net_plot, on_map=True, colors_dict=PLOT_COLOR_DICT, projection="epsg:4326"
+    )
+
+    if save_plots:
+        savepath_folder = Path(
+            RESULT_DIR, "figures", f"version_{VERSION_ID}", plz
+        )
+        savepath_folder.mkdir(parents=True, exist_ok=True)
+        savepath_file = Path(savepath_folder, "trafo_on_map.html")
+        plotly.offline.plot(
+            figure,
+            filename=savepath_file,
+        )
