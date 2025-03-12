@@ -2,10 +2,6 @@ import warnings
 from pathlib import Path
 
 import pandapower as pp
-import plotly
-from pandapower.plotting.plotly import vlevel_plotly
-from pandapower.plotting.plotly.mapbox_plot import set_mapbox_token
-
 from pylovo import pgReaderWriter as pg, utils
 from pylovo.config_data import *
 from pylovo.config_version import *
@@ -85,7 +81,7 @@ class GridGenerator:
 
         self.pgr.insert_transformers(self.plz)
         self.logger.info("transformers inserted in to the buildings_tem table")
-        # self.pgr.count_indoor_transformers() #TODO: check why uncommented
+        self.pgr.count_indoor_transformers()
         self.pgr.drop_indoor_transformers()
         self.logger.info("indoor transformers dropped from the buildings_tem table")
 
@@ -192,167 +188,121 @@ class GridGenerator:
                     self.logger.debug("Smax in building_clusters is updated.")
 
     def install_cables(self):
-        """the pandapower network for each cluster (kcid, bcid) is generated and filled with the corresponding
-        bus and line elements"""
+        """
+        Installs electrical cables to connect buildings and transformers in power grid clusters.
+
+        This method creates a pandapower network for each building cluster (kcid, bcid) in the
+        postal code area and connects the buildings with appropriate electrical cables. It follows
+        a branch-by-branch approach, starting from the furthest nodes and working inward toward
+        the transformer.
+
+        The algorithm works as follows:
+        1. Retrieves all clusters (kcid, bcid) for the postal code area
+        2. For each cluster:
+           a. Prepares building and connection data
+           b. Creates an electrical network with pandapower
+           c. Adds buses, transformers, and loads to the network
+           d. Installs cables using a greedy algorithm that:
+              - Starts from the furthest nodes from the transformer
+              - Creates branches with maximum possible load
+              - Selects minimum size cables that can handle the current
+              - Connects branches back to transformer
+        3. Tracks progress and saves the network configurations
+
+        The cable installation prioritizes cost efficiency while ensuring the electrical
+        requirements are met for each branch of the distribution network.
+
+        Returns:
+            None
+        """
+        # Get all clusters for the postal code area
         cluster_list = self.pgr.get_list_from_plz(self.plz)
         ci_count = 0
         ci_process = 0
         main_street_available_cables = CABLE_COST_DICT.keys()
+
         for id in cluster_list:
-            kcid = id[0]
-            bcid = id[1]
+            kcid, bcid = id
             self.logger.debug(f"working on kcid {kcid}, bcid {bcid}")
-            # prepare data
-            (
-                vertices_dict,
-                ont_vertice,
-                vertices_list,
-                buildings_df,
-                consumer_df,
-                consumer_list,
-                connection_nodes,
-            ) = self.pgr.prepare_vertices_list(self.plz, kcid, bcid)
 
-            # Power demand variables
-            Pd, load_units, load_type = self.pgr.get_consumer_simultaneous_load_dict(
-                consumer_list, buildings_df
+            # Get data for this cluster
+            vertices_dict, ont_vertice, vertices_list, buildings_df, consumer_df, consumer_list, connection_nodes = (
+                self.pgr.prepare_vertices_list(self.plz, kcid, bcid)
             )
-
-            # test cable_cost dict
+            Pd, load_units, load_type = self.pgr.get_consumer_simultaneous_load_dict(consumer_list, buildings_df)
             local_length_dict = {c: 0 for c in CABLE_COST_DICT.keys()}
 
-            # create network
+            # Create network and add components
             net = pp.create_empty_network()
-
-            # add std_type:
             self.pgr.create_cable_std_type(net)
-
-            # Add buses and load to network
-
-            # lv mv bus
             self.pgr.create_lvmv_bus(self.plz, kcid, bcid, net)
-
-            # transformer
             self.pgr.create_transformer(self.plz, kcid, bcid, net)
-
-            # connection nodes
             self.pgr.create_connection_bus(connection_nodes, net)
+            self.pgr.create_consumer_bus_and_load(consumer_list, load_units, net, load_type, buildings_df)
 
-            # consumer nodes and load
-            self.pgr.create_consumer_bus_and_load(
-                consumer_list, load_units, net, load_type, buildings_df
-            )
-
-            # Add lines to network
-
-            # consider connection nodes to install bus lines, starts from the furthest node and
-            # forms increasing branches until current limit satisfied
-            # each branch line has a 5 * 1e-6 deviation to see clearly in plotly
-
+            # Install cables branch by branch
             branch_deviation = 0
             connection_node_list = connection_nodes
-            while True:
-                if len(connection_node_list) == 0:
-                    self.logger.debug("main street cable installation finished")
-                    break
+
+            while connection_node_list:
+                # Handle single remaining node case
                 if len(connection_node_list) == 1:
-                    sim_load = utils.simultaneousPeakLoad(
-                        buildings_df, consumer_df, connection_node_list
-                    )
-                    Imax = sim_load / (VN * V_BAND_LOW * np.sqrt(3))  # current in kA
+                    sim_load = utils.simultaneousPeakLoad(buildings_df, consumer_df, connection_node_list)
+                    Imax = sim_load / (VN * V_BAND_LOW * np.sqrt(3))
 
+                    # Install consumer cables
                     local_length_dict = self.pgr.install_consumer_cables(
-                        self.plz,
-                        kcid,
-                        bcid,
-                        branch_deviation,
-                        connection_node_list,
-                        ont_vertice,
-                        vertices_dict,
-                        Pd,
-                        net,
-                        CONNECTION_AVAILABLE_CABLES,
-                        local_length_dict,
+                        self.plz, kcid, bcid, branch_deviation, connection_node_list,
+                        ont_vertice, vertices_dict, Pd, net, CONNECTION_AVAILABLE_CABLES, local_length_dict
                     )
 
+                    # Connect to transformer
                     if connection_node_list[0] == ont_vertice:
-                        cable, count = self.pgr.find_minimal_available_cable(
-                            Imax, net, main_street_available_cables
-                        )
+                        cable, count = self.pgr.find_minimal_available_cable(Imax, net, main_street_available_cables)
                         self.pgr.create_line_ont_to_lv_bus(
                             self.plz, bcid, kcid, connection_node_list[0], branch_deviation, net, cable, count
                         )
                     else:
                         cable, count = self.pgr.find_minimal_available_cable(
-                            Imax,
-                            net,
-                            main_street_available_cables,
-                            vertices_dict[connection_nodes[0]],
+                            Imax, net, main_street_available_cables, vertices_dict[connection_nodes[0]]
                         )
                         length = self.pgr.create_line_start_to_lv_bus(
-                            self.plz,
-                            bcid,
-                            kcid,
-                            connection_node_list[0],
-                            branch_deviation,
-                            net,
-                            vertices_dict,
-                            cable,
-                            count,
-                            ont_vertice,
+                            self.plz, bcid, kcid, connection_node_list[0], branch_deviation,
+                            net, vertices_dict, cable, count, ont_vertice
                         )
                         local_length_dict[cable] += length
 
-                    self.pgr.deviate_bus_geodata(
-                        connection_node_list, branch_deviation, net
-                    )
+                    self.pgr.deviate_bus_geodata(connection_node_list, branch_deviation, net)
                     self.logger.debug("main street cable installation finished")
                     break
 
-                # start with finding the furthest node
+                # Process multiple nodes as branches
                 furthest_node_path_list = self.pgr.find_furthest_node_path_list(
                     connection_node_list, vertices_dict, ont_vertice
                 )
-                # create max_possible load branch
                 branch_node_list, Imax = self.pgr.get_maximum_load_branch(
                     furthest_node_path_list, buildings_df, consumer_df
                 )
+
+                # Install cables for this branch
                 local_length_dict = self.pgr.install_consumer_cables(
-                    self.plz,
-                    bcid,
-                    kcid,
-                    branch_deviation,
-                    branch_node_list,
-                    ont_vertice,
-                    vertices_dict,
-                    Pd,
-                    net,
-                    CONNECTION_AVAILABLE_CABLES,
-                    local_length_dict,
+                    self.plz, bcid, kcid, branch_deviation, branch_node_list,
+                    ont_vertice, vertices_dict, Pd, net, CONNECTION_AVAILABLE_CABLES, local_length_dict
                 )
-                # for available load branch, select the min size cable
+
+                # Select appropriate cable and connect nodes
                 branch_distance = vertices_dict[branch_node_list[0]]
                 cable, count = self.pgr.find_minimal_available_cable(
                     Imax, net, main_street_available_cables, branch_distance
                 )
-                # install cables for this branch, start from drawing outer parts, leave the transformer<->starting node line to next step
-                # important: always draw line start from closer nodes to further nodes, so that the 'line id = line to node' will be unique
-                #           bus line for the branch shall be separately drawn through each connection points
+
                 if len(branch_node_list) >= 2:
                     local_length_dict = self.pgr.create_line_node_to_node(
-                        self.plz,
-                        kcid,
-                        bcid,
-                        branch_node_list,
-                        branch_deviation,
-                        vertices_dict,
-                        local_length_dict,
-                        cable,
-                        ont_vertice,
-                        count,
-                        net,
+                        self.plz, kcid, bcid, branch_node_list, branch_deviation,
+                        vertices_dict, local_length_dict, cable, ont_vertice, count, net
                     )
-                # start node goes directly to transformer along the street
+
+                # Connect branch to transformer
                 branch_start_node = branch_node_list[-1]
                 if branch_start_node == ont_vertice:
                     self.pgr.create_line_ont_to_lv_bus(
@@ -360,29 +310,29 @@ class GridGenerator:
                     )
                 else:
                     length = self.pgr.create_line_start_to_lv_bus(
-                        self.plz,
-                        bcid,
-                        kcid,
-                        branch_start_node,
-                        branch_deviation,
-                        net,
-                        vertices_dict,
-                        cable,
-                        count,
-                        ont_vertice,
+                        self.plz, bcid, kcid, branch_start_node, branch_deviation,
+                        net, vertices_dict, cable, count, ont_vertice
                     )
                     local_length_dict[cable] += length
+
+                # Update processed nodes and visualization
                 for vertice in branch_node_list:
                     connection_node_list.remove(vertice)
-                self.pgr.deviate_bus_geodata(branch_node_list, branch_deviation, net)
 
+                self.pgr.deviate_bus_geodata(branch_node_list, branch_deviation, net)
                 branch_deviation += 1
-                continue
+
+            # Track and report progress
             ci_count += 1
-            if ci_count >= len(cluster_list) / 10:
+            progress_increment = 10  # Report progress in 10% increments
+            progress_threshold = max(1, len(cluster_list) / progress_increment)
+
+            if ci_count >= progress_threshold:
+                ci_process += progress_increment
                 ci_count = 0
-                ci_process += 10
-                self.logger.info(f"{ci_process} % finished")
+                self.logger.info(
+                    f"Cable installation: {min(ci_process, 100)}% complete ({ci_process // progress_increment}/{progress_increment})")
+
             self.save_net(net, kcid, bcid)
 
     def analyse_results(self):
