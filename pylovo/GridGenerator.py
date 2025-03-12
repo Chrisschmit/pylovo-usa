@@ -42,6 +42,15 @@ class GridGenerator:
         self.install_cables()
         self.pgr.save_and_reset_tables(plz=self.plz)
 
+
+    def check_if_results_exist(self):
+        postcode_count = self.pgr.count_postcode_result(self.plz)
+        if postcode_count:
+            raise ResultExistsError(
+                f"The grids for the postcode area {self.plz} is already generated "
+                f"for the version {VERSION_ID}."
+            )
+
     def cache_and_preprocess_static_objects(self):
         """
         Caches static objects (postcode, buildings, transformers) from raw data tables and
@@ -403,14 +412,6 @@ class GridGenerator:
         self.pgr.save_net(self.plz, kcid, bcid, json_string)
 
         self.logger.info(f"Grid with kcid:{kcid} bcid:{bcid} is stored. ")
-
-    def check_if_results_exist(self):
-        postcode_count = self.pgr.count_postcode_result(self.plz)
-        if postcode_count:
-            raise ResultExistsError(
-                f"The grids for the postcode area {self.plz} is already generated "
-                f"for the version {VERSION_ID}."
-            )
 
     def generate_grid_for_multiple_plz(self, df_plz: pd.DataFrame, analyze_grids: bool = False) -> None:
         """generates grid for all plz contained in the column 'plz' of df_samples
