@@ -283,7 +283,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
                         plz integer,
                         kcid integer,
                         bcid integer,
-                        geom geometry(Geometry,3035),
+                        geom geometry(Multipoint,3035),
                         ogc_fid varchar(50),
                         "comment" varchar
                         )
