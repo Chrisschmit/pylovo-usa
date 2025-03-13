@@ -135,8 +135,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     bcid integer,
     kcid integer,
     floors integer,
-    connection_point integer
-    ,
+    connection_point integer,
     CONSTRAINT buildings_result_pkey PRIMARY KEY (version_id, osm_id)
 )""",
     "sample_set": """CREATE TABLE IF NOT EXISTS public.sample_set
@@ -229,7 +228,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     houses_per_building integer,
     center geometry(Point,3035),
     peak_load_in_kw numeric,
-    plz int,
+    plz integer,
     vertice_id bigint,
     bcid integer,
     kcid integer,
