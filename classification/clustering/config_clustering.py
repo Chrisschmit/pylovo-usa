@@ -30,14 +30,14 @@
 # CLASSIFICATION VERSION 4
 # set clustering parameters
 param1 = 'avg_trafo_dis'
-param2 = 'no_house_connections'
-param3 = 'vsw_per_branch'
-param4 = 'no_households'
+param2 = 'no_branches'
+param3 = 'no_house_connections_per_branch'
+param4 = 'max_no_of_households_of_a_branch'
 LIST_OF_CLUSTERING_PARAMETERS = [param1, param2, param3, param4]
 
 # set number of clusters
 N_CLUSTERS_KMEDOID = 5
-N_CLUSTERS_KMEANS = 7
+N_CLUSTERS_KMEANS = 6
 N_CLUSTERS_GMM = 7  # refers to gmm tied
 
 # set threshold values

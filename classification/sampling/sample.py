@@ -131,7 +131,7 @@ def sample_set_to_db(regiostar_samples_result: pd.DataFrame):
     :type regiostar_samples_result: pd.DataFrame
 
     """
-    regiostar_samples_result = regiostar_samples_result.rename(columns={'name_city': 'name'})
+    #regiostar_samples_result = regiostar_samples_result.rename(columns={'name_city': 'name'})
     conn = psycopg2.connect(database=DBNAME, user=USER, password=PASSWORD, host=HOST, port=PORT)
     sqlalchemy_engine = create_engine(
         f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}")
@@ -191,7 +191,7 @@ def get_sample_set() -> pd.DataFrame:
     sqlalchemy_engine = create_engine(
         f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}")
     cur = conn.cursor()
-    query = f"""SELECT plz, pop, area, lat, lon, ags, name, fed_state, regio7, regio5, pop_den
+    query = f"""SELECT plz, pop, area, lat, lon, ags, name_city, fed_state, regio7, regio5, pop_den
     FROM public.sample_set
     WHERE classification_id = '{CLASSIFICATION_VERSION}';"""
     cur.execute(query)

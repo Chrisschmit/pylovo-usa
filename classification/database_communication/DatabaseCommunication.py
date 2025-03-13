@@ -88,7 +88,7 @@ class DatabaseCommunication:
         """
         query = """
                 WITH plz_table(plz) AS (
-                    plz, pop, area, lat, lon, ags, name, regio7, regio5, pop_den
+                    SELECT plz, pop, area, lat, lon, ags, name_city, regio7, regio5, pop_den
                     FROM public.sample_set
                     WHERE classification_id= %(c)s
                     ),
@@ -97,7 +97,7 @@ class DatabaseCommunication:
                     FROM public.clustering_parameters 
                     WHERE version_id = %(v)s AND filtered = false
                     )
-                SELECT c.*, p.pop, p.area, p.lat, p.lon, p.ags, p.name, p.regio7, p.regio5, p.pop_den
+                SELECT c.*, p.pop, p.area, p.lat, p.lon, p.ags, p.name_city, p.regio7, p.regio5, p.pop_den
                 FROM clustering c
                 JOIN plz_table p
                 ON c.plz = p.plz;"""
