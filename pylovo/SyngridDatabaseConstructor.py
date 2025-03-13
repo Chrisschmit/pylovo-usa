@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pandas as pd
 import psycopg2 as pg
+import psycopg2.errors
 import sqlparse
-from sqlalchemy import create_engine
 
 from pylovo.config_data import *
 from pylovo.pgReaderWriter import PgReaderWriter
@@ -28,9 +28,22 @@ class SyngridDatabaseConstructor:
         else:
             self.pgr = PgReaderWriter()
 
+        postgis_versions = ["3.4.2", "3.4.3"]
+        postgis_extension_created = False
+
+        # create extension if not exists for recognition of geom datatypes
         with self.pgr.conn.cursor() as cur:
-            # create extension if not exists for recognition of geom datatypes
-            cur.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
+            for version in postgis_versions:
+                try:
+                    # succeeds if creates postgis with specified version or any postgis version already created
+                    cur.execute(f"CREATE EXTENSION IF NOT EXISTS postgis VERSION '{version}';")
+                    postgis_extension_created = True
+                    break
+                except psycopg2.errors.InvalidParameterValue:
+                    self.pgr.conn.rollback()
+            if not postgis_extension_created:
+                raise Exception(f"Could not create postgis extension from valid versions: {postgis_versions}. "
+                                f"Make sure to have one of the listed installed on your system.")
             cur.execute("CREATE EXTENSION IF NOT EXISTS pgRouting;")
 
     def get_table_name_list(self):

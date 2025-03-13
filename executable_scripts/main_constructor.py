@@ -1,6 +1,7 @@
 """
 This script creates a pylovo database and fills with raw data from referenced files.
 Do not use SyngridDatabaseConstructor unless you want to create a new database.
+Make sure to have PostGIS 3.4 installed, newer versions lead to errors.
 """
 
 from raw_data.municipal_register.join_regiostar_gemeindeverz import create_municipal_register
