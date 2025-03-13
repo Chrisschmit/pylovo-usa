@@ -60,10 +60,11 @@ There are two ways to create the branch:
 2. Create a new branch directly in GitLab from the issue
 
 #### Naming convention for branches
-Naming convention for branches: `type`-`issue-nr`-`short-description`
+Naming convention for branches: `type`/`issue-nr`-`short-description`
 
 ##### `type`
 * feature - used for new features
+* bugfix - used for bug fixes
 * hotfix - used for quick fixes, should be branched from the release branch
 * release - used for preparing a new release, should be branched from the develop branch
 
@@ -76,12 +77,13 @@ The `issueNumber` should be taken from Step 1. Do not use the "#".
 Describe shortly what the branch is about. Usually, the title of the issue.
 
 ##### Other hints
-- Separate words with `-` (minus)
+- Separate type with `/` (slash)
+- Separate other words with `-` (minus)
 - Avoid using capital letters
 - Do not put your name to the branch name, it's a collaborative project
 - Branch names should be precise and informative
 
-Examples of branch names: `feature-42-add-new-ontology-class`, `feature-911-branch-naming-convention`, `hotfix-404-update-api`, `release-v0.10.0`
+Examples of branch names: `feature/42-add-new-ontology-class`, `feature/911-branch-naming-convention`, `hotfix/404-update-api`, `release/v0.10.0`
 
 #### 2.1. Create a new branch
 
@@ -98,7 +100,7 @@ git pull
 
 3. Create a new feature branch:
 ```bash
-git checkout -b feature-1314-my-feature
+git checkout -b feature/1314-my-feature
 ```
 
 ##### Option 2: Create a new branch directly in GitLab from the issue
