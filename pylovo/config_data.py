@@ -66,7 +66,7 @@ CREATE_QUERIES = {
     free_walls numeric(18),
     building_t varchar(80),
     occupants numeric(23, 15),
-    floors numeric(18),
+    floors integer,
     constructi varchar(80),
     refurb_wal numeric(23, 15),
     refurb_roo numeric(23, 15),
