@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     osm_id varchar(80) COLLATE pg_catalog."default" NOT NULL,
     area numeric,
     type varchar(30) COLLATE pg_catalog."default",
-    geom geometry(Multipolygon,3035),
+    geom geometry(MultiPolygon,3035),
     houses_per_building integer,
     center geometry(Point,3035),
     peak_load_in_kw numeric,
@@ -225,7 +225,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     osm_id varchar(80) COLLATE pg_catalog."default",
     area numeric,
     type varchar(80) COLLATE pg_catalog."default",
-    geom geometry(Multipolygon,3035),
+    geom geometry(MultiPolygon,3035),
     houses_per_building integer,
     center geometry(Point,3035),
     peak_load_in_kw numeric,
@@ -283,7 +283,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
                         plz integer,
                         kcid integer,
                         bcid integer,
-                        geom geometry(Multipoint,3035),
+                        geom geometry(MultiPoint,3035),
                         ogc_fid varchar(50),
                         "comment" varchar
                         )
@@ -325,7 +325,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     target integer,
     cost double precision,
     reverse_cost double precision,
-    geom geometry(Linestring,3035),
+    geom geometry(LineString,3035),
     id integer NOT NULL
 )""",
     "ways_result": """CREATE TABLE IF NOT EXISTS public.ways_result
@@ -336,7 +336,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     target integer,
     cost double precision,
     reverse_cost double precision,
-    geom geometry(Linestring,3035),
+    geom geometry(LineString,3035),
     id integer NOT NULL,
     plz integer
 )""",
@@ -347,7 +347,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     target integer,
     cost double precision,
     reverse_cost double precision,
-    geom geometry(Linestring,3035),
+    geom geometry(LineString,3035),
     id integer,
     plz integer
 )""",
