@@ -65,7 +65,7 @@ CREATE_QUERIES = {
     comment varchar(80),
     free_walls integer,
     building_t varchar(80),
-    occupants numeric(23, 15),
+    occupants integer,
     floors integer,
     constructi varchar(80),
     refurb_wal numeric(23, 15),
