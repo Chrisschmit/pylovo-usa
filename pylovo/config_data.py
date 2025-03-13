@@ -63,7 +63,7 @@ CREATE_QUERIES = {
     area numeric(23, 15),
     use varchar(80),
     comment varchar(80),
-    free_walls numeric(18),
+    free_walls integer,
     building_t varchar(80),
     occupants numeric(23, 15),
     floors integer,
@@ -81,7 +81,7 @@ CREATE_QUERIES = {
     area numeric(23, 15),
     use varchar(80),
     comment varchar(80),
-    free_walls numeric(18),
+    free_walls integer,
     geom geometry(MultiPolygon,3035)
 )""",
     "betriebsmittel": """CREATE TABLE IF NOT EXISTS public.betriebsmittel
