@@ -100,7 +100,7 @@ CREATE_QUERIES = {
     "building_clusters": """CREATE TABLE IF NOT EXISTS public.building_clusters
 (   version_id varchar(10) NOT NULL, 
     kcid integer NOT NULL,
-    bcid bigint NOT NULL,
+    bcid integer NOT NULL,
     plz integer,
     s_max bigint,
     model_status integer,
@@ -231,7 +231,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     peak_load_in_kw numeric,
     plz int,
     vertice_id bigint,
-    bcid bigint,
+    bcid integer,
     kcid integer,
     floors integer,
     connection_point integer
