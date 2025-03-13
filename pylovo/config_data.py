@@ -110,7 +110,7 @@ CREATE_QUERIES = {
     "lines_result": """
 CREATE TABLE IF NOT EXISTS public.lines_result
 (   version_id varchar(10) NOT NULL, 
-    geom geometry(Geometry,3035),
+    geom geometry(LineString,3035),
     plz integer,
     bcid integer,
     kcid integer,
