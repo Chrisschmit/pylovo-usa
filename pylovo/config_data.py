@@ -224,7 +224,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     osm_id varchar(80) COLLATE pg_catalog."default",
     area numeric,
     type varchar(80) COLLATE pg_catalog."default",
-    geom geometry(MultiPolygon,3035),
+    geom geometry(Geometry,3035),  -- needs to be geometry as multipoint & multipolygon get inserted here
     houses_per_building integer,
     center geometry(Point,3035),
     peak_load_in_kw numeric,
@@ -282,7 +282,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
                         plz integer,
                         kcid integer,
                         bcid integer,
-                        geom geometry(MultiPoint,3035),
+                        geom geometry(Point,3035),
                         ogc_fid varchar(50),
                         "comment" varchar
                         )
