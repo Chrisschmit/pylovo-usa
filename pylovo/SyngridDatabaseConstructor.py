@@ -249,7 +249,7 @@ class SyngridDatabaseConstructor:
                         # No statements found. This can happen if combined was empty or whitespace.
                         # Just continue reading next chunk
                         pass
-        print("\nInserted all ways into ways_public_2po_4pgr table.")
+        print("\nInserted all ways into public_2po_4pgr table.")
 
     def ways_to_db(self):
         """This function transform the output of osm2po to the ways table, refer to the issue
