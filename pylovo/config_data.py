@@ -86,14 +86,14 @@ CREATE_QUERIES = {
 )""",
     "betriebsmittel": """CREATE TABLE IF NOT EXISTS public.betriebsmittel
 (
-    name varchar(100) COLLATE pg_catalog."default" NOT NULL,
+    name varchar(100) NOT NULL,
     s_max_kva integer,
     max_i_a integer,
     r_mohm_per_km integer,
     x_mohm_per_km integer,
     z_mohm_per_km integer,
     kosten_eur integer,
-    typ varchar(50) COLLATE pg_catalog."default",
+    typ varchar(50),
     anwendungsgebiet integer,
     CONSTRAINT betriebsmittel_pkey PRIMARY KEY (name)
 )""",
@@ -123,9 +123,9 @@ CREATE TABLE IF NOT EXISTS public.lines_result
     "buildings_result": """
 CREATE TABLE IF NOT EXISTS public.buildings_result
 (   version_id varchar(10) NOT NULL, 
-    osm_id varchar(80) COLLATE pg_catalog."default" NOT NULL,
+    osm_id varchar(80) NOT NULL,
     area numeric,
-    type varchar(30) COLLATE pg_catalog."default",
+    type varchar(30),
     geom geometry(MultiPolygon,3035),
     houses_per_building integer,
     center geometry(Point,3035),
@@ -221,9 +221,9 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     """,
     "buildings_tem": """CREATE TABLE IF NOT EXISTS public.buildings_tem
 (
-    osm_id varchar(80) COLLATE pg_catalog."default",
+    osm_id varchar(80),
     area numeric,
-    type varchar(80) COLLATE pg_catalog."default",
+    type varchar(80),
     geom geometry(Geometry,3035),  -- needs to be geometry as multipoint & multipolygon get inserted here
     houses_per_building integer,
     center geometry(Point,3035),
@@ -238,7 +238,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     "consumer_categories": """CREATE TABLE IF NOT EXISTS public.consumer_categories
 (
     id integer NOT NULL,
-    definition varchar(30) COLLATE pg_catalog."default" NOT NULL,
+    definition varchar(30) NOT NULL,
     peak_load numeric(10,2),
     yearly_consumption numeric(10,2),
     peak_load_per_m2 numeric(10,2),
@@ -252,7 +252,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     id integer,
     cluster_id integer,
     area_ha numeric,
-    ags_0 varchar(255) COLLATE pg_catalog."default",
+    ags_0 varchar(255),
     zensus_sum integer,
     geom_centre geometry(Geometry,3035),
     geom geometry(Geometry,3035),
@@ -263,7 +263,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
 (
     gid integer NOT NULL,
     plz int,
-    note varchar(86) COLLATE pg_catalog."default",
+    note varchar(86),
     qkm double precision,
     einwohner integer,
     geom geometry(MultiPolygon,3035),
@@ -309,10 +309,10 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     "transformers": """CREATE TABLE IF NOT EXISTS public.transformers
     (
         ogc_fid SERIAL,
-        osm_id varchar COLLATE pg_catalog."default",
+        osm_id varchar,
         area double precision,
-        power varchar COLLATE pg_catalog."default",
-        geom_type varchar COLLATE pg_catalog."default",
+        power varchar,
+        geom_type varchar,
         within_shopping boolean,
         geom geometry(MultiPoint, 3035),
         CONSTRAINT transformers_pkey PRIMARY KEY (ogc_fid)
