@@ -131,7 +131,6 @@ def sample_set_to_db(regiostar_samples_result: pd.DataFrame):
     :type regiostar_samples_result: pd.DataFrame
 
     """
-    #regiostar_samples_result = regiostar_samples_result.rename(columns={'name_city': 'name'})
     conn = psycopg2.connect(database=DBNAME, user=USER, password=PASSWORD, host=HOST, port=PORT)
     sqlalchemy_engine = create_engine(
         f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}")
