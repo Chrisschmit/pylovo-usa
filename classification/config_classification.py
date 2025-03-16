@@ -1,8 +1,8 @@
-CLASSIFICATION_VERSION = 2
+CLASSIFICATION_VERSION = 1
 VERSION_COMMENT = "set sample with inspected building quality"
 CLASSIFICATION_REGION = 'Bayern'
 NO_OF_CLUSTERS_ALLOWED = range(3, 8)
-N_SAMPLES = 7  # default value
+N_SAMPLES = 100  # default value
 
 # CLASSIFICATION_VERSION = 2
 # VERSION_COMMENT = "classification Germany"
@@ -10,11 +10,11 @@ N_SAMPLES = 7  # default value
 # NO_OF_CLUSTERS_ALLOWED = range(3, 8)
 # N_SAMPLES = 100 # default value
 
-#CLASSIFICATION_VERSION = 4
-#VERSION_COMMENT = "test thesis code handover BRB"
-#CLASSIFICATION_REGION = 'Bayern'
-#NO_OF_CLUSTERS_ALLOWED = range(3, 8)
-#N_SAMPLES = 7
+CLASSIFICATION_VERSION = 4
+VERSION_COMMENT = "test thesis code handover BRB"
+CLASSIFICATION_REGION = 'Bayern'
+NO_OF_CLUSTERS_ALLOWED = range(3, 8)
+N_SAMPLES = 7
 
 REGION_DICT = {1: 'Schleswig-Hohlstein',
                2: 'Hamburg',
