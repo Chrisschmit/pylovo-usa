@@ -60,7 +60,7 @@ CONSUMER_CATEGORIES = pd.DataFrame(
         (12, "AB", PEAK_LOAD_HOUSEHOLD, 0.00, np.nan, np.nan, 0.07),
     ],
     columns=[
-        "id",
+        "consumer_category_id",
         "definition",
         "peak_load",
         "yearly_consumption",

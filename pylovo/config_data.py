@@ -237,14 +237,14 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
 )""",
     "consumer_categories": """CREATE TABLE IF NOT EXISTS public.consumer_categories
 (
-    id integer NOT NULL,
+    consumer_category_id integer NOT NULL,
     definition varchar(30) NOT NULL,
     peak_load numeric(10,2),
     yearly_consumption numeric(10,2),
     peak_load_per_m2 numeric(10,2),
     yearly_consumption_per_m2 numeric(10,2),
     sim_factor numeric(10,2) NOT NULL,
-    CONSTRAINT consumer_categories_pkey PRIMARY KEY (id),
+    CONSTRAINT consumer_categories_pkey PRIMARY KEY (consumer_category_id),
     CONSTRAINT consumer_categories_definition_key UNIQUE (definition)
 )""",
     "loadarea": """CREATE TABLE IF NOT EXISTS public.loadarea
