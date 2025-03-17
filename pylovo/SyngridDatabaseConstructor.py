@@ -265,7 +265,7 @@ class SyngridDatabaseConstructor:
                     cost,
                     reverse_cost,
                     ST_Transform(geom_way, 3035) as geom,
-                    id
+                    way_id
             FROM public_2po_4pgr"""
         cur = self.pgr.conn.cursor()
         cur.execute(query)

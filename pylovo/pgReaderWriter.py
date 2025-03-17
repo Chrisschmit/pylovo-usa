@@ -67,31 +67,31 @@ class PgReaderWriter:
         self.logger.debug("Consumer categories fetched.")
         return cc_df
 
-    def get_siedlungstyp_from_plz(self, plz) -> int:
+    def get_settlement_type_from_plz(self, plz) -> int:
         """
         Args:
             plz:
-        Returns: Siedlungstyp: 1=Stadt, 2=Dorf, 3=Land
+        Returns: Settlement type: 1=City, 2=Village, 3=Rural
         """
-        siedlung_query = """SELECT siedlungstyp FROM public.postcode_result
-            WHERE id = %(p)s 
+        settlement_query = """SELECT settlement_type FROM public.postcode_result
+            WHERE postcode_result_id = %(p)s 
             LIMIT 1; """
-        self.cur.execute(siedlung_query, {"p": plz})
-        siedlungstyp = self.cur.fetchone()[0]
+        self.cur.execute(settlement_query, {"p": plz})
+        settlement_type = self.cur.fetchone()[0]
 
-        return siedlungstyp
+        return settlement_type
 
-    def get_transformator_data(self, siedlungstyp : int = None) -> tuple[np.array, dict]:
+    def get_transformator_data(self, settlement_type : int = None) -> tuple[np.array, dict]:
         """
         Args:
-            siedlungstyp: 1=Stadt, 2=Dorf, 3=Land
-        Returns: Übliche Transformatorkapazitäten und Kosten abhängig vom Siedlungstyp
+            Settlement type: 1=City, 2=Village, 3=Rural
+        Returns: Typical transformer capacities and costs depending on the settlement type
         """
-        # if siedlungstyp == 1:
+        # if settlement_type == 1:
         #     anwendungsgebiet_tuple = (1, 2, 3)
-        # elif siedlungstyp == 2:
+        # elif settlement_type == 2:
         #     anwendungsgebiet_tuple = (2, 3, 4)
-        # elif siedlungstyp == 3:
+        # elif settlement_type == 3:
         #     anwendungsgebiet_tuple = (3, 4, 5)
         # else:
         #     print("Incorrect settlement type number specified.")
@@ -757,7 +757,7 @@ class PgReaderWriter:
         connection = [t[0] for t in self.cur.fetchall()]
 
         vertices_query = """ SELECT DISTINCT node, agg_cost FROM pgr_dijkstra(
-                    'SELECT id, source, target, cost, reverse_cost FROM ways_tem', %(o)s, %(c)s, false) ORDER BY agg_cost;"""
+                    'SELECT way_id, source, target, cost, reverse_cost FROM ways_tem', %(o)s, %(c)s, false) ORDER BY agg_cost;"""
         self.cur.execute(vertices_query, {"o": ont, "c": consumer})
         data = self.cur.fetchall()
         vertice_cost_dict = {
@@ -777,11 +777,11 @@ class PgReaderWriter:
     def get_path_to_bus(self, vertice:int, ont: int) -> list:
         """routing problem: find the shortest path from vertice to the ont (ortsnetztrafo)"""
         query = """SELECT node FROM pgr_Dijkstra(
-                    'SELECT id, source, target, cost, reverse_cost FROM ways_tem', %(v)s, %(o)s, false);"""
+                    'SELECT way_id, source, target, cost, reverse_cost FROM ways_tem', %(v)s, %(o)s, false);"""
         """query = WITH
                     dijkstra AS(
                         SELECT * FROM pgr_Dijkstra(
-                                        'SELECT id, source, target, cost, reverse_cost FROM ways_tem', %(v)s, %(o)s, false)
+                                        'SELECT way_id, source, target, cost, reverse_cost FROM ways_tem', %(v)s, %(o)s, false)
                     ),
                         get_geom AS(
                             SELECT dijkstra. *,
@@ -790,7 +790,7 @@ class PgReaderWriter:
                                     WHEN dijkstra.node = ways.source THEN geom
                                     ELSE ST_Reverse(geom)
                                 END AS route_geom
-                            FROM dijkstra JOIN ways ON(edge=id)
+                            FROM dijkstra JOIN ways ON(edge=way_id)
                             ORDER BY seq)
                         SELECT seq, cost,
                         degrees(ST_azimuth(ST_StartPoint(route_geom), ST_EndPoint(route_geom))) AS azimuth,
@@ -818,7 +818,7 @@ class PgReaderWriter:
     def get_node_geom(self, vid:int):
         query = """SELECT ST_X(ST_Transform(the_geom,4326)), ST_Y(ST_Transform(the_geom,4326)) 
                     FROM ways_tem_vertices_pgr
-                    WHERE id = %(id)s;"""
+                    WHERE way_id = %(id)s;"""
         self.cur.execute(query, {"id": vid})
         geo = self.cur.fetchone()
 
@@ -887,7 +887,7 @@ class PgReaderWriter:
         # Creates a distance matrix from the buildings in the loadarea cluster or smaller in the building cluster
 
         costmatrix_query = """SELECT * FROM pgr_dijkstraCostMatrix(
-                            'SELECT id, source, target, cost, reverse_cost FROM public.ways_tem',
+                            'SELECT way_id, source, target, cost, reverse_cost FROM public.ways_tem',
                             (SELECT array_agg(DISTINCT b.connection_point) FROM (SELECT * FROM buildings_tem 
                             WHERE kcid = %(k)s
                             AND bcid ISNULL
@@ -907,7 +907,7 @@ class PgReaderWriter:
         # Creates a distance matrix from the buildings in the loadarea cluster or smaller in the building cluster
 
         costmatrix_query = """SELECT * FROM pgr_dijkstraCostMatrix(
-                            'SELECT id, source, target, cost, reverse_cost FROM public.ways_tem',
+                            'SELECT way_id, source, target, cost, reverse_cost FROM public.ways_tem',
                             (SELECT array_agg(DISTINCT b.connection_point) FROM (SELECT * FROM buildings_tem 
                                 WHERE kcid = %(k)s
                                 AND bcid = %(b)s 
@@ -1008,7 +1008,7 @@ class PgReaderWriter:
         :param note:
         :return:
         """
-        sdl = self.get_siedlungstyp_from_plz(plz)
+        sdl = self.get_settlement_type_from_plz(plz)
         transformer_capacities, _ = self.get_transformator_data(sdl)
 
         if note == 0:
@@ -1161,7 +1161,7 @@ class PgReaderWriter:
         consumer_list = [t[0] for t in self.cur.fetchall()]
 
         cost_query = """SELECT * FROM pgr_dijkstraCost(
-                'SELECT id, source, target, cost, reverse_cost FROM ways_tem',
+                'SELECT way_id, source, target, cost, reverse_cost FROM ways_tem',
                 %(cl)s,%(tl)s,
                 false);"""
         cost_df = pd.read_sql_query(
@@ -1367,11 +1367,11 @@ class PgReaderWriter:
         :param plz:
         :return:
         """
-        query = """INSERT INTO postcode_result (version_id, id, geom) 
+        query = """INSERT INTO postcode_result (version_id, postcode_result_id, geom) 
                     SELECT %(v)s as version_id, plz, geom FROM postcode 
                     WHERE plz = %(p)s
                     LIMIT 1 
-                    ON CONFLICT (version_id,id) DO NOTHING;"""
+                    ON CONFLICT (version_id,postcode_result_id) DO NOTHING;"""
 
         self.cur.execute(query, {"v": VERSION_ID, "p": plz})
 
@@ -1382,7 +1382,7 @@ class PgReaderWriter:
         """
         query = """SELECT COUNT(*) FROM postcode_result
                     WHERE version_id = %(v)s
-                    AND id::INT = %(p)s"""
+                    AND postcode_result_id::INT = %(p)s"""
         self.cur.execute(query, {"v": VERSION_ID, "p": plz})
         return int(self.cur.fetchone()[0])
 
@@ -1397,9 +1397,9 @@ class PgReaderWriter:
         self.cur.execute(query, {"v": VERSION_ID, "p": plz})
         return int(self.cur.fetchone()[0])
 
-    def set_loadarea_cluster_siedlungstyp(self, plz:int) -> None:
+    def set_loadarea_cluster_settlement_type(self, plz:int) -> None:
         """
-        Sets hausabstand and siedlungstyp for the given plz in table postcode_result
+        Sets house_distance and settlement_type for the given plz in table postcode_result
         :param plz:
         :return:
         """
@@ -1424,16 +1424,16 @@ class PgReaderWriter:
         avg_dis = int(sum(distance) / len(distance))
 
         query = """ UPDATE postcode_result
-                    SET hausabstand = %(avg)s 
+                    SET house_distance = %(avg)s 
                     WHERE version_id = %(v)s 
-                    AND id = %(p)s;
+                    AND postcode_result_id = %(p)s;
                     UPDATE postcode_result
-                    SET siedlungstyp = (CASE
-                    WHEN hausabstand < 25 THEN 3
-                    WHEN 25 <= hausabstand AND hausabstand < 45 THEN 2
+                    SET settlement_type = (CASE
+                    WHEN house_distance < 25 THEN 3
+                    WHEN 25 <= house_distance AND house_distance < 45 THEN 2
                     ELSE 1 END)
                     WHERE version_id = %(v)s 
-                    AND id = %(p)s;"""
+                    AND postcode_result_id = %(p)s;"""
         self.cur.execute(query, {"v": VERSION_ID, "avg": avg_dis, "p": plz})
 
     def set_building_peak_load(self) -> int:
@@ -1481,7 +1481,7 @@ class PgReaderWriter:
         query = """INSERT INTO buildings_tem (osm_id, area, type, geom, center, floors)
                 SELECT osm_id, area, building_t, geom, ST_Centroid(geom), floors::int FROM res
                 WHERE ST_Contains((SELECT post.geom FROM postcode_result as post WHERE version_id = %(v)s
-                AND id = %(plz)s LIMIT 1), ST_Centroid(res.geom));
+                AND postcode_result_id = %(plz)s LIMIT 1), ST_Centroid(res.geom));
                 UPDATE buildings_tem SET plz = %(plz)s WHERE plz ISNULL;"""
         self.cur.execute(query, {"v": VERSION_ID, "plz": plz})
 
@@ -1499,7 +1499,7 @@ class PgReaderWriter:
                 SELECT osm_id, area, use, geom, ST_Centroid(geom) FROM oth AS o 
                 WHERE o.use in ('Commercial', 'Public')
                 AND ST_Contains((SELECT post.geom FROM postcode_result as post WHERE version_id = %(v)s
-                    AND  id = %(plz)s), ST_Centroid(o.geom));;
+                    AND  postcode_result_id = %(plz)s), ST_Centroid(o.geom));;
             UPDATE buildings_tem SET plz = %(plz)s WHERE plz ISNULL;
             UPDATE buildings_tem SET floors = 1 WHERE floors ISNULL;"""
         self.cur.execute(query, {"v": VERSION_ID, "plz": plz})
@@ -1544,7 +1544,7 @@ class PgReaderWriter:
         :return:
         """
         component_query = """SELECT component,node FROM pgr_connectedComponents(
-                'SELECT id, source, target, cost, reverse_cost FROM ways_tem');"""
+                'SELECT way_id, source, target, cost, reverse_cost FROM ways_tem');"""
         self.cur.execute(component_query)
         data = self.cur.fetchall()
         component = np.asarray([i[0] for i in data])
@@ -1568,7 +1568,7 @@ class PgReaderWriter:
         query = """INSERT INTO ways_tem
             SELECT * FROM ways AS w 
             WHERE ST_Intersects(w.geom,(SELECT geom FROM postcode_result WHERE version_id = %(v)s
-                    AND  id = %(p)s));
+                    AND  way_id = %(p)s));
             SELECT COUNT(*) FROM ways_tem;"""
         self.cur.execute(query, {"v": VERSION_ID, "p": plz})
         count = self.cur.fetchone()[0]
@@ -1653,10 +1653,10 @@ class PgReaderWriter:
         buildings = self.get_buildings_from_kc(kcid)
         # Hole die Verbraucherkategorien
         consumer_cat_df = self.get_consumer_categories()
-        # Siedlungstyp (1,2,3)
-        siedlungstyp = self.get_siedlungstyp_from_plz(plz)
+        # Settlement type (1,2,3)
+        settlement_type = self.get_settlement_type_from_plz(plz)
         # Transformatordaten
-        transformer_capacities, _ = self.get_transformator_data(siedlungstyp)
+        transformer_capacities, _ = self.get_transformator_data(settlement_type)
         double_trans = np.multiply(transformer_capacities[2:4], 2)
 
         # Distance Matrix von Verbrauchern in einem Load Area Cluster
@@ -1796,7 +1796,7 @@ class PgReaderWriter:
                 SELECT osm_id, geom 
                 --FROM transformers WHERE ST_Within(geom, (SELECT geom FROM postcode_result LIMIT 1)) IS FALSE;
                 FROM transformers as t
-                    WHERE ST_Within(t.geom, (SELECT geom FROM postcode_result WHERE id = %(p)s AND version_id = %(v)s)); --IS FALSE;
+                    WHERE ST_Within(t.geom, (SELECT geom FROM postcode_result WHERE postcode_result_id = %(p)s AND version_id = %(v)s)); --IS FALSE;
             UPDATE buildings_tem SET plz = %(p)s WHERE plz ISNULL;
             UPDATE buildings_tem SET center = ST_Centroid(geom) WHERE center ISNULL;
             UPDATE buildings_tem SET type = 'Transformer' WHERE type ISNULL;
@@ -2435,9 +2435,9 @@ class PgReaderWriter:
         :param plz:
         :return:
         """
-        query = """INSERT INTO postcode_result (version_id, id, siedlungstyp, geom, hausabstand) 
+        query = """INSERT INTO postcode_result (version_id, postcode_result_id, settlement_type, geom, house_distance) 
                     VALUES(%(v)s, %(p)s::INT, null, ST_Multi(ST_Transform(ST_GeomFromGeoJSON(%(shape)s), 3035)), null)
-                    ON CONFLICT (version_id,id) DO NOTHING;"""
+                    ON CONFLICT (version_id,postcode_result_id) DO NOTHING;"""
 
         self.cur.execute(query, {"v": VERSION_ID, "p": plz, "shape": shape})
 
@@ -2508,7 +2508,7 @@ class PgReaderWriter:
             self.conn.commit()
 
         query = """DELETE FROM postcode_result
-        WHERE version_id = %(v)s AND id = %(p)s;"""
+        WHERE version_id = %(v)s AND postcode_result_id = %(p)s;"""
         self.cur.execute(query, {"v": version_id, "p": int(plz)})
         self.conn.commit()
 

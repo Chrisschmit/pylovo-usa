@@ -2,7 +2,7 @@ INSERT INTO public.postcode (gid,
                              plz,
                              note,
                              qkm,
-                             einwohner,
+                             population,
                              geom)
 VALUES (9994,
         '10004',

@@ -253,11 +253,11 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     cluster_id integer,
     area_ha numeric,
     ags_0 varchar(255),
-    zensus_sum integer,
-    geom_centre geometry(Geometry,3035),
+    census_sum integer,
+    geom_center geometry(Geometry,3035),
     geom geometry(Geometry,3035),
-    hausabstand numeric,
-    siedlungstyp integer
+    house_distance numeric,
+    settlement_type integer
 )""",
     "postcode": """CREATE TABLE IF NOT EXISTS public.postcode
 (
@@ -265,17 +265,18 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     plz int,
     note varchar(86),
     qkm double precision,
-    einwohner integer,
+    population integer,
     geom geometry(MultiPolygon,3035),
     CONSTRAINT "plz-5stellig_pkey" PRIMARY KEY (gid)
 )""",
     "postcode_result": """CREATE TABLE IF NOT EXISTS public.postcode_result
-(   version_id varchar(10) NOT NULL, 
-    id integer NOT NULL,
-    siedlungstyp integer,
+(   
+    version_id varchar(10) NOT NULL,
+    postcode_result_id integer NOT NULL,
+    settlement_type integer,
     geom geometry(MultiPolygon,3035),
-    hausabstand numeric,
-    CONSTRAINT "postcode_result_pkey" PRIMARY KEY (version_id, id)
+    house_distance numeric,
+    CONSTRAINT "postcode_result_pkey" PRIMARY KEY (version_id, postcode_result_id)
 )""",
     "transformer_positions": """CREATE TABLE IF NOT EXISTS public.transformer_positions 
                     (   version_id varchar(10) NOT NULL, 
@@ -325,7 +326,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     cost double precision,
     reverse_cost double precision,
     geom geometry(LineString,3035),
-    id integer NOT NULL
+    way_id integer NOT NULL
 )""",
     "ways_result": """CREATE TABLE IF NOT EXISTS public.ways_result
 (
@@ -336,7 +337,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     cost double precision,
     reverse_cost double precision,
     geom geometry(LineString,3035),
-    id integer NOT NULL,
+    way_id integer NOT NULL,
     plz integer
 )""",
     "ways_tem": """CREATE TABLE IF NOT EXISTS public.ways_tem
@@ -347,7 +348,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     cost double precision,
     reverse_cost double precision,
     geom geometry(LineString,3035),
-    id integer,
+    way_id integer,
     plz integer
 )""",
     "grids": """CREATE TABLE IF NOT EXISTS public.grids

@@ -26,7 +26,7 @@ def join_regiostar_plz(plz_pop: pd.DataFrame, plz_ags: pd.DataFrame, regiostar: 
     plz_pop_ags_regio = plz_pop_ags.merge(regiostar, left_on="ags", right_on="mun_code")
     plz_pop_ags_regio = plz_pop_ags_regio.drop(
         columns=["note", "ort", "landkreis", "bundesland", "mun_code", "pop", "area", "pop_den"])
-    plz_pop_ags_regio = plz_pop_ags_regio.rename(columns={"einwohner": "pop", "qkm": "area"})
+    plz_pop_ags_regio = plz_pop_ags_regio.rename(columns={"population": "pop", "qkm": "area"})
     plz_pop_ags_regio["pop_den"] = plz_pop_ags_regio["pop"] / plz_pop_ags_regio["area"]
     return plz_pop_ags_regio
 
