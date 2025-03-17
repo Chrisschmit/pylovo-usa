@@ -1,4 +1,4 @@
-name,s_max_kva,max_i_a,r_mohm_per_km,x_mohm_per_km,z_mohm_per_km,kosten_eur,typ,anwendungsgebiet
+name,s_max_kva,max_i_a,r_mohm_per_km,x_mohm_per_km,z_mohm_per_km,cost_eur,typ,anwendungsgebiet
 Tr_100,100,,,,,2000,Transformer,1
 Tr_160,160,,,,,3000,Transformer,2
 Tr_250,250,,,,,5000,Transformer,3

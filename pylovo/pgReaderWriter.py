@@ -98,7 +98,7 @@ class PgReaderWriter:
         #     return
         anwendungsgebiet_tuple = (1, 2, 3, 4, 5)
 
-        query = """SELECT betriebsmittel.s_max_kva , kosten_eur
+        query = """SELECT betriebsmittel.s_max_kva , cost_eur
             FROM public.betriebsmittel
             WHERE typ = 'Transformer' AND anwendungsgebiet IN %(tuple)s
             ORDER BY s_max_kva;"""
@@ -1096,7 +1096,7 @@ class PgReaderWriter:
         return {"ont_vertice_id": info[0][0], "s_max": info[0][1]}
 
     def get_cables(self,  anw: tuple) -> pd.DataFrame:
-        query = """SELECT name, max_i_a, r_mohm_per_km, x_mohm_per_km, z_mohm_per_km, kosten_eur FROM betriebsmittel
+        query = """SELECT name, max_i_a, r_mohm_per_km, x_mohm_per_km, z_mohm_per_km, cost_eur FROM betriebsmittel
                     WHERE typ = 'Kabel' AND anwendungsgebiet IN %(a)s ORDER BY max_i_a DESC; """
         cables_df = pd.read_sql_query(query, self.conn, params={"a": anw})
         self.logger.debug(f"{len(cables_df)} different cable types are imported...")

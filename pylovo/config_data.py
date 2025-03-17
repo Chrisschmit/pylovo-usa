@@ -92,7 +92,7 @@ CREATE_QUERIES = {
     r_mohm_per_km integer,
     x_mohm_per_km integer,
     z_mohm_per_km integer,
-    kosten_eur integer,
+    cost_eur integer,
     typ varchar(50),
     anwendungsgebiet integer,
     CONSTRAINT betriebsmittel_pkey PRIMARY KEY (name)
