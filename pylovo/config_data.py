@@ -249,7 +249,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
 )""",
     "loadarea": """CREATE TABLE IF NOT EXISTS public.loadarea
 (
-    id integer,
+    loadarea_id integer,
     cluster_id integer,
     area_ha numeric,
     ags_0 varchar(255),
