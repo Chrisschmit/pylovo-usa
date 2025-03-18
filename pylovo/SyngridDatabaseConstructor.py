@@ -166,6 +166,7 @@ class SyngridDatabaseConstructor:
                     self.pgr.conn.commit()
             # read and write
             df = pd.read_csv(file_path, index_col=False)
+            df = df.rename(columns={"einwohner": "population"})
             df.to_sql(
                 name=table_name,
                 con=self.pgr.sqla_engine,
@@ -265,7 +266,7 @@ class SyngridDatabaseConstructor:
                     cost,
                     reverse_cost,
                     ST_Transform(geom_way, 3035) as geom,
-                    way_id
+                    id AS way_id
             FROM public_2po_4pgr"""
         cur = self.pgr.conn.cursor()
         cur.execute(query)

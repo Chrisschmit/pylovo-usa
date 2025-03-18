@@ -54,5 +54,6 @@ def create_municipal_register() -> None:
     The data is written do the database table 'municipal_register'.
     """
     plz_einwohner, plz_zuordnung, regiostar = import_tables()
+    plz_einwohner = plz_einwohner.rename(columns={"einwohner": "population"})
     regiostar_plz = join_regiostar_plz(plz_einwohner, plz_zuordnung, regiostar)
     municipal_register_to_db(regiostar_plz)
