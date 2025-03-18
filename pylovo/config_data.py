@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     CONSTRAINT buildings_result_pkey PRIMARY KEY (version_id, osm_id)
 )""",
     "sample_set": """CREATE TABLE IF NOT EXISTS public.sample_set
-    (classification_id numeric,
+    (classification_id varchar(10) NOT NULL,
     plz integer,
     pop numeric,
     area numeric,
