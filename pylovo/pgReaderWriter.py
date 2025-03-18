@@ -1568,7 +1568,7 @@ class PgReaderWriter:
         query = """INSERT INTO ways_tem
             SELECT * FROM ways AS w 
             WHERE ST_Intersects(w.geom,(SELECT geom FROM postcode_result WHERE version_id = %(v)s
-                    AND  way_id = %(p)s));
+                    AND  postcode_result_id = %(p)s));
             SELECT COUNT(*) FROM ways_tem;"""
         self.cur.execute(query, {"v": VERSION_ID, "p": plz})
         count = self.cur.fetchone()[0]

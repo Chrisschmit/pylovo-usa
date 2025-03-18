@@ -178,7 +178,7 @@ begin
         FROM public.ways_tem
         loop
             --Finde Hausanschluss -> new_line
-            SELECT geom, clazz, id
+            SELECT geom, clazz, way_id
             INTO old_street
             FROM public.ways_tem as w
             WHERE ST_Intersects(ST_LineSubstring(way.geom, 0.01, 0.99), w.geom) -- begrenzen
