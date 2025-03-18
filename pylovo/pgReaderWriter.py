@@ -757,7 +757,7 @@ class PgReaderWriter:
         connection = [t[0] for t in self.cur.fetchall()]
 
         vertices_query = """ SELECT DISTINCT node, agg_cost FROM pgr_dijkstra(
-                    'SELECT way_id, source, target, cost, reverse_cost FROM ways_tem', %(o)s, %(c)s, false) ORDER BY agg_cost;"""
+                    'SELECT way_id as id, source, target, cost, reverse_cost FROM ways_tem', %(o)s, %(c)s, false) ORDER BY agg_cost;"""
         self.cur.execute(vertices_query, {"o": ont, "c": consumer})
         data = self.cur.fetchall()
         vertice_cost_dict = {
@@ -777,7 +777,7 @@ class PgReaderWriter:
     def get_path_to_bus(self, vertice:int, ont: int) -> list:
         """routing problem: find the shortest path from vertice to the ont (ortsnetztrafo)"""
         query = """SELECT node FROM pgr_Dijkstra(
-                    'SELECT way_id, source, target, cost, reverse_cost FROM ways_tem', %(v)s, %(o)s, false);"""
+                    'SELECT way_id as id, source, target, cost, reverse_cost FROM ways_tem', %(v)s, %(o)s, false);"""
         """query = WITH
                     dijkstra AS(
                         SELECT * FROM pgr_Dijkstra(
@@ -818,7 +818,7 @@ class PgReaderWriter:
     def get_node_geom(self, vid:int):
         query = """SELECT ST_X(ST_Transform(the_geom,4326)), ST_Y(ST_Transform(the_geom,4326)) 
                     FROM ways_tem_vertices_pgr
-                    WHERE way_id = %(id)s;"""
+                    WHERE id = %(id)s;"""
         self.cur.execute(query, {"id": vid})
         geo = self.cur.fetchone()
 
@@ -887,7 +887,7 @@ class PgReaderWriter:
         # Creates a distance matrix from the buildings in the loadarea cluster or smaller in the building cluster
 
         costmatrix_query = """SELECT * FROM pgr_dijkstraCostMatrix(
-                            'SELECT way_id, source, target, cost, reverse_cost FROM public.ways_tem',
+                            'SELECT way_id as id, source, target, cost, reverse_cost FROM public.ways_tem',
                             (SELECT array_agg(DISTINCT b.connection_point) FROM (SELECT * FROM buildings_tem 
                             WHERE kcid = %(k)s
                             AND bcid ISNULL
@@ -907,7 +907,7 @@ class PgReaderWriter:
         # Creates a distance matrix from the buildings in the loadarea cluster or smaller in the building cluster
 
         costmatrix_query = """SELECT * FROM pgr_dijkstraCostMatrix(
-                            'SELECT way_id, source, target, cost, reverse_cost FROM public.ways_tem',
+                            'SELECT way_id as id, source, target, cost, reverse_cost FROM public.ways_tem',
                             (SELECT array_agg(DISTINCT b.connection_point) FROM (SELECT * FROM buildings_tem 
                                 WHERE kcid = %(k)s
                                 AND bcid = %(b)s 
@@ -1161,7 +1161,7 @@ class PgReaderWriter:
         consumer_list = [t[0] for t in self.cur.fetchall()]
 
         cost_query = """SELECT * FROM pgr_dijkstraCost(
-                'SELECT way_id, source, target, cost, reverse_cost FROM ways_tem',
+                'SELECT way_id as id, source, target, cost, reverse_cost FROM ways_tem',
                 %(cl)s,%(tl)s,
                 false);"""
         cost_df = pd.read_sql_query(
@@ -1544,7 +1544,7 @@ class PgReaderWriter:
         :return:
         """
         component_query = """SELECT component,node FROM pgr_connectedComponents(
-                'SELECT way_id, source, target, cost, reverse_cost FROM ways_tem');"""
+                'SELECT way_id as id, source, target, cost, reverse_cost FROM ways_tem');"""
         self.cur.execute(component_query)
         data = self.cur.fetchall()
         component = np.asarray([i[0] for i in data])
@@ -1772,7 +1772,7 @@ class PgReaderWriter:
         connection_query = """ SELECT public.draw_home_connections(); """
         self.cur.execute(connection_query)
 
-        topology_query = """select pgr_createTopology('ways_tem', 0.01, the_geom:='geom', clean:=true) """
+        topology_query = """select pgr_createTopology('ways_tem', 0.01, id:='way_id', the_geom:='geom', clean:=true) """
         self.cur.execute(topology_query)
 
         # add_buildings_query = '''SELECT public.add_buildings();'''
