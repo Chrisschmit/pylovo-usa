@@ -13,8 +13,7 @@ from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler
 from sklearn_extra.cluster import KMedoids
 
-from classification.clustering.config_clustering import *
-from classification.config_classification import REGIO7_REGIO5_GEM_DICT
+from classification.config_loader import *
 from plotting.config_plots import *
 
 

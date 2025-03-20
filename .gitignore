@@ -6,11 +6,9 @@ classification/results
 tutorials/.ipynb_checkpoints/
 log.txt
 
-# Ignore all Jupyter notebooks and generated plots and images in classification/examples/
-classification/examples/**/*.ipynb
+# Ignore all generated plots and images in classification/examples/
 classification/examples/**/*.pdf
 classification/examples/**/*.png
-
 
 ### Default .gitignore file for Python projects
 
