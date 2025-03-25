@@ -9,9 +9,9 @@ MIN_DISTANCE_BETWEEN_TRAFOS = 8
 VOLTAGE_THRESHOLD = 110000
 EPSG = 32633
 
-SUBSTATIONS_GEOJSON = os.path.normpath(os.path.abspath('./raw_data/transformer_query/substations_bayern.geojson'))
-SHOPPING_MALL_GEOJSON = os.path.normpath(os.path.abspath('./raw_data/transformer_query/shopping_mall_bayern.geojson'))
-OUTPUT_GEOJSON = os.path.normpath(os.path.abspath('./raw_data/transformer_query/substations_bayern_processed.geojson'))
+SUBSTATIONS_GEOJSON = os.path.normpath(os.path.abspath('./raw_data/transformer_data/substations_bayern.geojson'))
+SHOPPING_MALL_GEOJSON = os.path.normpath(os.path.abspath('./raw_data/transformer_data/shopping_mall_bayern.geojson'))
+OUTPUT_GEOJSON = os.path.normpath(os.path.abspath('./raw_data/transformer_data/substations_bayern_processed.geojson'))
 
 # timing of the script
 start_time = time.time()
