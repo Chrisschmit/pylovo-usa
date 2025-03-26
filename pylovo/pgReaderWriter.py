@@ -88,22 +88,22 @@ class PgReaderWriter:
         Returns: Typical transformer capacities and costs depending on the settlement type
         """
         # if settlement_type == 1:
-        #     anwendungsgebiet_tuple = (1, 2, 3)
+        #     application_area_tuple = (1, 2, 3)
         # elif settlement_type == 2:
-        #     anwendungsgebiet_tuple = (2, 3, 4)
+        #     application_area_tuple = (2, 3, 4)
         # elif settlement_type == 3:
-        #     anwendungsgebiet_tuple = (3, 4, 5)
+        #     application_area_tuple = (3, 4, 5)
         # else:
         #     print("Incorrect settlement type number specified.")
         #     return
-        anwendungsgebiet_tuple = (1, 2, 3, 4, 5)
+        application_area_tuple = (1, 2, 3, 4, 5)
 
-        query = """SELECT betriebsmittel.s_max_kva , cost_eur
-            FROM public.betriebsmittel
-            WHERE typ = 'Transformer' AND anwendungsgebiet IN %(tuple)s
+        query = """SELECT equipment_data.s_max_kva , cost_eur
+            FROM public.equipment_data
+            WHERE typ = 'Transformer' AND application_area IN %(tuple)s
             ORDER BY s_max_kva;"""
 
-        self.cur.execute(query, {"tuple": anwendungsgebiet_tuple})
+        self.cur.execute(query, {"tuple": application_area_tuple})
         data = self.cur.fetchall()
         capacities = [i[0] for i in data]
         transformer2cost = {i[0]: i[1] for i in data}
@@ -1096,8 +1096,8 @@ class PgReaderWriter:
         return {"ont_vertice_id": info[0][0], "s_max": info[0][1]}
 
     def get_cables(self,  anw: tuple) -> pd.DataFrame:
-        query = """SELECT name, max_i_a, r_mohm_per_km, x_mohm_per_km, z_mohm_per_km, cost_eur FROM betriebsmittel
-                    WHERE typ = 'Kabel' AND anwendungsgebiet IN %(a)s ORDER BY max_i_a DESC; """
+        query = """SELECT name, max_i_a, r_mohm_per_km, x_mohm_per_km, z_mohm_per_km, cost_eur FROM equipment_data
+                    WHERE typ = 'Cable' AND application_area IN %(a)s ORDER BY max_i_a DESC; """
         cables_df = pd.read_sql_query(query, self.conn, params={"a": anw})
         self.logger.debug(f"{len(cables_df)} different cable types are imported...")
         return cables_df
