@@ -12,13 +12,11 @@ import sqlparse
 from pylovo.config_data import *
 from pylovo.pgReaderWriter import PgReaderWriter
 from pylovo.utils import query_overpass_for_geojson
-from raw_data.preprocessing_scripts.process_trafos import process_trafos
+from raw_data.preprocessing_scripts.process_trafos import process_trafos, SUBSTATIONS_GEOJSON, SHOPPING_MALL_GEOJSON, \
+    OUTPUT_GEOJSON, OVERPASS_URL, FETCH_API_DURING_DB_CONSTRUCTION
 
 # uncomment for automated building import of buildings in regiostar_samples
 # from raw_data.import_building_data import OGR_FILE_LIST
-
-
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 
 
 class SyngridDatabaseConstructor:
@@ -130,18 +128,26 @@ class SyngridDatabaseConstructor:
         """Call the overpass api for transformer data and populate the transformers table.
 
         """
-        overpass_query_bayern_file = os.path.join(".", "raw_data", "transformer_data", "substations_bayern_query_1.txt")
-        overpass_query_mall_file = os.path.join(".", "raw_data", "transformer_data", "shopping_mall_query_1.txt")
-        with open(overpass_query_bayern_file, "r") as f:
-            overpass_query_bayern = f.read()
-        with open(overpass_query_mall_file, "r") as f:
-            overpass_query_mall = f.read()
+        in_file = OUTPUT_GEOJSON
 
-        geojson_bayern = query_overpass_for_geojson(OVERPASS_URL, overpass_query_bayern)
-        geojson_mall = query_overpass_for_geojson(OVERPASS_URL, overpass_query_mall)
+        if FETCH_API_DURING_DB_CONSTRUCTION:
+            overpass_query_bayern_file = os.path.join(".", "raw_data", "transformer_data", "substations_bayern_query_1.txt")
+            overpass_query_mall_file = os.path.join(".", "raw_data", "transformer_data", "shopping_mall_query_1.txt")
+            with open(overpass_query_bayern_file, "r") as f:
+                overpass_query_bayern = f.read()
+            with open(overpass_query_mall_file, "r") as f:
+                overpass_query_mall = f.read()
 
-        in_file = os.path.join(".", "raw_data", "transformer_data", "substations_bayern_processed.geojson")
-        process_trafos(json.dumps(geojson_bayern), json.dumps(geojson_mall), in_file)
+            geojson_bayern = query_overpass_for_geojson(OVERPASS_URL, overpass_query_bayern)
+            geojson_mall = query_overpass_for_geojson(OVERPASS_URL, overpass_query_mall)
+
+            # save resulting GeoJSON-s
+            with open(SUBSTATIONS_GEOJSON, "w") as f:
+                json.dump(geojson_bayern, f, indent=2)
+            with open(SHOPPING_MALL_GEOJSON, "w") as f:
+                json.dump(geojson_mall, f, indent=2)
+
+            process_trafos(SUBSTATIONS_GEOJSON, SHOPPING_MALL_GEOJSON, in_file)
 
         out_file = os.path.join(".", "raw_data", "transformer_data", "substations_bayern_processed_3035.geojson")
 

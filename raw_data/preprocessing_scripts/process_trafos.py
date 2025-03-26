@@ -4,6 +4,10 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
+
+OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+
+FETCH_API_DURING_DB_CONSTRUCTION = False
 AREA_THRESHOLD = 60
 MIN_DISTANCE_BETWEEN_TRAFOS = 8
 VOLTAGE_THRESHOLD = 110000
@@ -14,17 +18,17 @@ SHOPPING_MALL_GEOJSON = os.path.normpath(os.path.abspath('./raw_data/transformer
 OUTPUT_GEOJSON = os.path.normpath(os.path.abspath('./raw_data/transformer_data/substations_bayern_processed.geojson'))
 
 
-def process_trafos(substations_geojson: str, shopping_mall_geojson: str, output_path_geojson: str):
+def process_trafos(substations_path_geojson: str, shopping_mall_path_geojson: str, output_path_geojson: str):
     """Process trafo data and output it as GeoJSON into output_geojson.
 
     Args:
-        substations_geojson (str): GeoJSON string or GeoJSON filepath of substations data
-        shopping_mall_geojson (str): GeoJSON string or GeoJSON filepath of shopping mall data
+        substations_path_geojson (str): GeoJSON filepath of substations data
+        shopping_mall_path_geojson (str): GeoJSON filepath of shopping mall data
         output_path_geojson (str): GeoJSON path of output geojson
 
     """
     # Import geojson of substations/trafos. Trafos of "Deutsche Bahn" and historic trafos have already been deleted.
-    gdf_substations = gpd.read_file(substations_geojson)
+    gdf_substations = gpd.read_file(substations_path_geojson)
     print('start:')
     print(len(gdf_substations))
 
@@ -71,7 +75,7 @@ def process_trafos(substations_geojson: str, shopping_mall_geojson: str, output_
     print(len(gdf_substations))
 
     # 5. how many trafos are there in / next to mall?
-    gdf_shopping = gpd.read_file(shopping_mall_geojson)
+    gdf_shopping = gpd.read_file(shopping_mall_path_geojson)
     gdf_shopping = gdf_shopping.to_crs(EPSG)
     union_of_shopping = gdf_shopping.geometry.unary_union
     gdf_substations['within_shopping'] = gdf_substations.within(union_of_shopping)
@@ -86,9 +90,10 @@ def process_trafos(substations_geojson: str, shopping_mall_geojson: str, output_
     gdf_substations.dropna(axis='columns', inplace=True)
 
     # transform column id into osm_id as is used for buildings
-    gdf_substations['id'] = gdf_substations['id'].map(lambda x: x.lstrip('way/node/'))
+    gdf_substations['id'] = gdf_substations['id'].map(lambda x: str(x).lstrip('way/node/'))
     gdf_substations.rename(columns={"id": "osm_id"}, inplace=True)
-    gdf_substations.drop('@id', axis=1, inplace=True)
+    if "@id" in gdf_substations:
+        gdf_substations.drop('@id', axis=1, inplace=True)
 
     # export geojson
     gdf_substations.to_file(output_path_geojson, driver='GeoJSON')

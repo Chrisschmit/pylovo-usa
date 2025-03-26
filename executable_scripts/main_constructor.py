@@ -22,14 +22,12 @@ def main():
     sgc.csv_to_db()
 
     ### Add transformer data from geojson to the database
-    print("### QUERY TRANSFORMERS AND INSERT THEM INTO DB ### (>40min)")
+    print("### QUERY TRANSFORMERS AND INSERT THEM INTO DB (~40 min if fetching fresh data from API) ###")
     sgc.transformers_to_db(sgc)
 
     ### Create table with data from osm
-    print("### POPULATE public_2po_4pgr TABLE ###")
-    start_time = time.time()
+    print("### POPULATE public_2po_4pgr TABLE (~30 min) ###")
     sgc.create_public_2po_table()
-    print("--- %s seconds ---" % (time.time() - start_time))
 
     ### Transform these data into our ways table
     print("### PROCESS WAYS AND INSERTING THEM INTO ways TABLE ###")
