@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 import psycopg2 as pg
+import psycopg2.errors
 import sqlparse
 
 from pylovo.config_data import *
@@ -27,6 +28,10 @@ class SyngridDatabaseConstructor:
         else:
             self.pgr = PgReaderWriter()
 
+        postgis_versions = ["3.4.2", "3.4.3"]
+        postgis_extension_created = False
+
+        # create extension if not exists for recognition of geom datatypes
         with self.pgr.conn.cursor() as cur:
             # create extension if not exists for recognition of geom datatypes
             cur.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
