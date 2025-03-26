@@ -2604,6 +2604,25 @@ class PgReaderWriter:
             self.cur.execute(query, {"v": version_id})
             self.conn.commit()
         self.logger.info(f"Version {version_id} deleted from all tables")
+    
+    def delete_classification_version_from_related_tables(self, classification_id: str) -> None:
+        """
+        Deletes all rows with the given classification_id from related tables:
+        transformer_classified, sample_set, and classification_version.
+
+        :param classification_id: ID of the classification version to delete
+        """
+        tables = [
+            "transformer_classified",
+            "sample_set",
+            "classification_version"
+        ]
+
+        for table in tables:
+            query = f"DELETE FROM {table} WHERE classification_id = %(cid)s;"
+            self.cur.execute(query, {"cid": classification_id})
+            self.conn.commit()
+
 
     def get_clustering_parameters_for_plz_list(self, plz_tuple: tuple) -> pd.DataFrame:
         """get clustering parameter for multiple plz"""
