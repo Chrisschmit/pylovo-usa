@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     CONSTRAINT buildings_result_pkey PRIMARY KEY (version_id, osm_id)
 )""",
     "sample_set": """CREATE TABLE IF NOT EXISTS public.sample_set
-    (classification_id varchar(10) NOT NULL,
+    (classification_id integer NOT NULL,
     plz integer,
     pop numeric,
     area numeric,
@@ -159,7 +159,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     CONSTRAINT sample_set_pkey PRIMARY KEY (classification_id, plz)
     )""",
     "classification_version": """CREATE TABLE IF NOT EXISTS public.classification_version
-    (classification_id varchar(10) NOT NULL,
+    (classification_id integer NOT NULL,
     version_comment varchar, 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     classification_region varchar,
@@ -288,7 +288,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
                     kmeans_representative_grid bool,
                     gmm_clusters integer,
                     gmm_representative_grid bool,
-                    classification_id varchar(10)
+                    classification_id integer NOT NULL
                     )
                     """,
     "ags_log": """CREATE TABLE IF NOT EXISTS public.ags_log

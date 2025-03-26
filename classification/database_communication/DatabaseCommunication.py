@@ -69,7 +69,7 @@ class DatabaseCommunication:
                 FROM clustering c
                 JOIN plz_table p
                 ON c.plz = p.plz;"""
-        params = {"v": VERSION_ID, "c": str(CLASSIFICATION_VERSION)}
+        params = {"v": VERSION_ID, "c": CLASSIFICATION_VERSION}
         df_query = pd.read_sql_query(query, con=self.conn, params=params, )
         columns = CLUSTERING_PARAMETERS
         df_parameter = pd.DataFrame(df_query, columns=columns)
@@ -101,7 +101,7 @@ class DatabaseCommunication:
                 FROM clustering c
                 JOIN plz_table p
                 ON c.plz = p.plz;"""
-        params = {"v": VERSION_ID, "c": str(CLASSIFICATION_VERSION)}
+        params = {"v": VERSION_ID, "c": CLASSIFICATION_VERSION}
         df_query = pd.read_sql_query(query, con=self.conn, params=params, )
         return df_query
 
