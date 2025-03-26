@@ -163,7 +163,7 @@ begin
                            old_street.geom, interpolate_point.geom))
             FROM public.ways_tem;
             --  second half
-            INSERT INTO public.ways_tem (id, clazz, geom)
+            INSERT INTO public.ways_tem (way_id, clazz, geom)
             SELECT Max(way_id) + 1,
                    old_street.clazz,
                    ST_LineSubstring(old_street.geom, ST_LineLocatePoint(
