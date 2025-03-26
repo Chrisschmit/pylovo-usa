@@ -142,7 +142,7 @@ begin
 
             -- check whether the intersection of ST_Buffer(way.geom,0.1) , old_street.geom is a line
             -- this is necessary for the next SELECT statement with ST_LineInterpolatePoint()-function
-            IF ST_Intersection(ST_Buffer(way.geom, 0.1), old_street.geom) != 'ST_LineString' THEN
+            IF ST_Geometrytype(ST_Intersection(ST_Buffer(way.geom, 0.1), old_street.geom)) != 'ST_LineString' THEN
                 RAISE NOTICE 'Value: %', old_street.geom;
                 continue;
             END IF;
