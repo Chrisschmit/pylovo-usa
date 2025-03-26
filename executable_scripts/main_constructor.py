@@ -6,7 +6,6 @@ Make sure to have PostGIS 3.4 installed, newer versions lead to errors.
 
 from raw_data.municipal_register.join_regiostar_gemeindeverz import create_municipal_register
 from pylovo.SyngridDatabaseConstructor import SyngridDatabaseConstructor
-import time
 
 
 def main():
