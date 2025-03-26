@@ -172,7 +172,7 @@ class DatabaseCommunication:
         df_transformers_classified = pd.merge(df_transformer_positions, df_parameters_of_grids, how='right',
                                               left_on=['version_id', 'plz', 'kcid', 'bcid'],
                                               right_on=['version_id', 'plz', 'kcid', 'bcid'])
-        df_transformers_classified.drop(columns=['plz', 'kcid', 'bcid'], inplace=True)
+        
 
         # add classification id
         df_transformers_classified['classification_id'] = CLASSIFICATION_VERSION
