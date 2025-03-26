@@ -127,6 +127,9 @@ class SyngridDatabaseConstructor:
 
 
     def transformers_to_db(self, sgc):
+        """Call the overpass api for transformer data and populate the transformers table.
+
+        """
         overpass_query_bayern_file = os.path.join(".", "raw_data", "transformer_data", "substations_bayern_query_1.txt")
         overpass_query_mall_file = os.path.join(".", "raw_data", "transformer_data", "shopping_mall_query_1.txt")
         with open(overpass_query_bayern_file, "r") as f:

@@ -6,20 +6,45 @@ Make sure to have PostGIS 3.4 installed, newer versions lead to errors.
 
 from raw_data.municipal_register.join_regiostar_gemeindeverz import create_municipal_register
 from pylovo.SyngridDatabaseConstructor import SyngridDatabaseConstructor
+import time
 
-### Create constructor class
-sgc = SyngridDatabaseConstructor()
-### Create database with predefined table structure
-sgc.create_table(table_name="all")
-### Add defined csv raw data from CSV_FILE_LIST to the database
-sgc.csv_to_db()
-### Add transformer data from geojson to the database
-sgc.transformers_to_db(sgc)
-### Create table with data from osm
-sgc.create_public_2po_table()
-### Transform these data into our ways table
-sgc.ways_to_db()
-### Add additional required sql functions to the database
-sgc.dump_functions()
-### Create table with entries of all German municipalities and cities
-create_municipal_register()
+
+def main():
+    ### Create constructor class
+    sgc = SyngridDatabaseConstructor()
+
+    ### Create database with predefined table structure
+    print("### CREATE ALL TABLES ###")
+    sgc.create_table(table_name="all")
+
+    ### Add defined csv raw data from CSV_FILE_LIST to the database
+    print("### POPULATE DB WITH CSV RAW DATA ###")
+    sgc.csv_to_db()
+
+    ### Add transformer data from geojson to the database
+    print("### QUERY TRANSFORMERS AND INSERT THEM INTO DB ### (>40min)")
+    sgc.transformers_to_db(sgc)
+
+    ### Create table with data from osm
+    print("### POPULATE public_2po_4pgr TABLE ###")
+    start_time = time.time()
+    sgc.create_public_2po_table()
+    print("--- %s seconds ---" % (time.time() - start_time))
+
+    ### Transform these data into our ways table
+    print("### PROCESS WAYS AND INSERTING THEM INTO ways TABLE ###")
+    sgc.ways_to_db()
+
+    ### Add additional required sql functions to the database
+    print("### DUMP NECESSARY FUNCTIONS INTO DB ###")
+    sgc.dump_functions()
+
+    ### Create table with entries of all German municipalities and cities
+    print("### FILL municipal_register TABLE ###")
+    create_municipal_register()
+
+    print("### DONE ###")
+
+
+if __name__ == "__main__":
+    main()
