@@ -33,7 +33,7 @@ def check_if_classification_version_exists():
     cur = conn.cursor()
     count_query = f"""SELECT COUNT(*) 
             FROM classification_version 
-            WHERE "classification_id" = '{CLASSIFICATION_VERSION}'"""
+            WHERE "classification_id" = {CLASSIFICATION_VERSION}"""
     cur.execute(count_query)
     version_exists = cur.fetchone()[0]
     if version_exists:
@@ -44,7 +44,7 @@ def check_if_classification_version_exists():
     else:
         # create new version
         insert_query = f"""INSERT INTO classification_version (classification_id, version_comment, classification_region) VALUES
-        ('{CLASSIFICATION_VERSION}', '{VERSION_COMMENT}', '{CLASSIFICATION_REGION}')"""
+        ({CLASSIFICATION_VERSION}, '{VERSION_COMMENT}', '{CLASSIFICATION_REGION}')"""
         cur.execute(insert_query)
         print(cur.statusmessage)
         conn.commit()
@@ -192,7 +192,7 @@ def get_sample_set() -> pd.DataFrame:
     cur = conn.cursor()
     query = f"""SELECT plz, pop, area, lat, lon, ags, name_city, fed_state, regio7, regio5, pop_den
     FROM public.sample_set
-    WHERE classification_id = '{CLASSIFICATION_VERSION}';"""
+    WHERE classification_id = {CLASSIFICATION_VERSION};"""
     cur.execute(query)
     sample_set = cur.fetchall()
     df_sample_set = pd.DataFrame(sample_set, columns=MUNICIPAL_REGISTER)

@@ -1,52 +1,3 @@
-CREATE FUNCTION public.categorize_loadareas() RETURNS void
-    LANGUAGE plpgsql
-AS
-$$
-declare
-    cls          integer; -- cluster_id
-    avg_distance float; -- avg. distance per cluster
-begin
-    --iterate each loadarea cluster
-    for cls in
-        SELECT DISTINCT cluster_id
-        FROM public.loadarea
-        WHERE cluster_id <> -1
-        order by cluster_id
-        loop
-            WITH some_buildings AS (SELECT osm_id, center
-                                    FROM public.buildings TABLESAMPLE SYSTEM(5)
-                                    WHERE plz = cls)
-
-               , closest_distances AS (SELECT s.osm_id, c.dist as dist
-                                       FROM some_buildings as s
-                                                LEFT JOIN LATERAL (
-                                           SELECT ST_Distance(s.center, b.center) as dist
-                                           FROM public.buildings as b
-                                           WHERE ST_DWithin(s.center, b.center, 1000)
-                                             AND s.osm_id <> b.osm_id
-                                           ORDER BY s.center <-> b.center
-                                           LIMIT 10) as c
-                                                          ON TRUE)
-
-
-            SELECT AVG(dist)
-            INTO avg_distance
-            FROM closest_distances;
-
-            UPDATE public.loadarea
-            SET hausabstand = avg_distance
-            WHERE cluster_id = cls;
-
-            RAISE NOTICE 'avg. distance: %', avg_distance;
-            RAISE NOTICE 'cluster: %', cls;
-        end loop;
-
-
-end;
-$$;
-
-
-
 --
 -- Name: draw_home_connections(); Type: FUNCTION; Schema: public; Owner: postgres
 --
@@ -103,8 +54,8 @@ begin
             IF ST_Distance(ST_StartPoint(old_street.geom), old_street.connection_point) < 0.1 THEN
 
                 new_line.geom := ST_Makeline(building.center, ST_StartPoint(old_street.geom));
-                INSERT INTO public.ways_tem (id, clazz, geom)
-                SELECT Max(id) + 1,
+                INSERT INTO public.ways_tem (way_id, clazz, geom)
+                SELECT Max(way_id) + 1,
                        new_line.clazz,
                        new_line.geom
                 FROM public.ways_tem;
@@ -113,16 +64,16 @@ begin
             ELSEIF ST_Distance(ST_EndPoint(old_street.geom), old_street.connection_point) < 0.1 THEN
 
                 new_line.geom := ST_Makeline(building.center, ST_EndPoint(old_street.geom));
-                INSERT INTO public.ways_tem (id, clazz, geom)
-                SELECT Max(id) + 1,
+                INSERT INTO public.ways_tem (way_id, clazz, geom)
+                SELECT Max(way_id) + 1,
                        new_line.clazz,
                        new_line.geom
                 FROM public.ways_tem;
                 --raise notice '>0.99';
                 continue;
             ELSE
-                INSERT INTO public.ways_tem (id, clazz, geom)
-                SELECT Max(id) + 1,
+                INSERT INTO public.ways_tem (way_id, clazz, geom)
+                SELECT Max(way_id) + 1,
                        new_line.clazz,
                        new_line.geom
                 FROM public.ways_tem;
@@ -133,19 +84,19 @@ begin
             --old_street clazz ungültig machen
             DELETE
             FROM public.ways_tem
-            WHERE id = old_street.id;
+            WHERE way_id = old_street.way_id;
 
             -- INSERT new streets as two part of old street
             -- 	first half
-            INSERT INTO public.ways_tem (id, clazz, geom)
-            SELECT Max(id) + 1, --unique id guarenteed
+            INSERT INTO public.ways_tem (way_id, clazz, geom)
+            SELECT Max(way_id) + 1, --unique id guarenteed
                    103,
                    ST_LineSubstring(old_street.geom, 0, ST_LineLocatePoint(
                            old_street.geom, old_street.connection_point))
             FROM public.ways_tem;
             --  second half
-            INSERT INTO public.ways_tem (id, clazz, geom)
-            SELECT Max(id) + 1,
+            INSERT INTO public.ways_tem (way_id, clazz, geom)
+            SELECT Max(way_id) + 1,
                    103,
                    ST_LineSubstring(old_street.geom, ST_LineLocatePoint(
                            old_street.geom, old_street.connection_point), 1)
@@ -174,15 +125,15 @@ declare
 begin
     -- Iterating buildings
     for way in
-        SELECT geom, clazz, id
+        SELECT geom, clazz, way_id
         FROM public.ways_tem
         loop
             --Finde Hausanschluss -> new_line
-            SELECT geom, clazz, id
+            SELECT geom, clazz, way_id
             INTO old_street
             FROM public.ways_tem as w
             WHERE ST_Intersects(ST_LineSubstring(way.geom, 0.01, 0.99), w.geom) -- begrenzen
-              AND w.id != way.id
+              AND w.way_id != way.way_id
             LIMIT 1;
 
             IF NOT FOUND THEN
@@ -191,7 +142,7 @@ begin
 
             -- check whether the intersection of ST_Buffer(way.geom,0.1) , old_street.geom is a line
             -- this is necessary for the next SELECT statement with ST_LineInterpolatePoint()-function
-            IF ST_Intersection(ST_Buffer(way.geom, 0.1), old_street.geom) != 'ST_LineString' THEN
+            IF ST_Geometrytype(ST_Intersection(ST_Buffer(way.geom, 0.1), old_street.geom)) != 'ST_LineString' THEN
                 RAISE NOTICE 'Value: %', old_street.geom;
                 continue;
             END IF;
@@ -201,19 +152,19 @@ begin
 
             DELETE
             FROM public.ways_tem
-            WHERE id = old_street.id;
+            WHERE way_id = old_street.way_id;
 
             -- INSERT new streets as two part of old street
             -- 	first half
-            INSERT INTO public.ways_tem (id, clazz, geom)
-            SELECT Max(id) + 1, --unique id guarenteed
+            INSERT INTO public.ways_tem (way_id, clazz, geom)
+            SELECT Max(way_id) + 1, --unique id guarenteed
                    old_street.clazz,
                    ST_LineSubstring(old_street.geom, 0, ST_LineLocatePoint(
                            old_street.geom, interpolate_point.geom))
             FROM public.ways_tem;
             --  second half
-            INSERT INTO public.ways_tem (id, clazz, geom)
-            SELECT Max(id) + 1,
+            INSERT INTO public.ways_tem (way_id, clazz, geom)
+            SELECT Max(way_id) + 1,
                    old_street.clazz,
                    ST_LineSubstring(old_street.geom, ST_LineLocatePoint(
                            old_street.geom, interpolate_point.geom), 1)
@@ -221,17 +172,17 @@ begin
 
             DELETE
             FROM public.ways_tem
-            WHERE id = way.id;
+            WHERE way_id = way.way_id;
 
-            INSERT INTO public.ways_tem (id, clazz, geom)
-            SELECT Max(id) + 1, --unique id guarenteed
+            INSERT INTO public.ways_tem (way_id, clazz, geom)
+            SELECT Max(way_id) + 1, --unique id guarenteed
                    way.clazz,
                    ST_LineSubstring(way.geom, 0, ST_LineLocatePoint(
                            way.geom, interpolate_point.geom))
             FROM public.ways_tem;
             --  second half
-            INSERT INTO public.ways_tem (id, clazz, geom)
-            SELECT Max(id) + 1,
+            INSERT INTO public.ways_tem (way_id, clazz, geom)
+            SELECT Max(way_id) + 1,
                    way.clazz,
                    ST_LineSubstring(way.geom, ST_LineLocatePoint(
                            way.geom, interpolate_point.geom), 1)

@@ -60,8 +60,8 @@ class GridGenerator:
         self.pgr.remove_duplicate_buildings()
         self.logger.info("duplicate buildings removed from buildings_tem")
 
-        self.pgr.set_loadarea_cluster_siedlungstyp(self.plz)
-        self.logger.info("hausabstand and siedlungstyp in postcode_result")
+        self.pgr.set_loadarea_cluster_settlement_type(self.plz)
+        self.logger.info("house_distance and settlement_type in postcode_result")
 
         unloadcount = self.pgr.set_building_peak_load()
         self.logger.info(

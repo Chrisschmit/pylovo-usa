@@ -24,7 +24,7 @@ class SyngridDatabaseConstructor:
 
     def __init__(self, pgr=None):
         if pgr:
-            self.pgr = pgr 
+            self.pgr = pgr
         else:
             self.pgr = PgReaderWriter()
 
@@ -33,18 +33,12 @@ class SyngridDatabaseConstructor:
 
         # create extension if not exists for recognition of geom datatypes
         with self.pgr.conn.cursor() as cur:
-            for version in postgis_versions:
-                try:
-                    # succeeds if creates postgis with specified version or any postgis version already created
-                    cur.execute(f"CREATE EXTENSION IF NOT EXISTS postgis VERSION '{version}';")
-                    postgis_extension_created = True
-                    break
-                except psycopg2.errors.InvalidParameterValue:
-                    self.pgr.conn.rollback()
-            if not postgis_extension_created:
-                raise Exception(f"Could not create postgis extension from valid versions: {postgis_versions}. "
-                                f"Make sure to have one of the listed installed on your system.")
+            # create extension if not exists for recognition of geom datatypes
+            cur.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
+            print("CREATE EXTENSION postgis")
             cur.execute("CREATE EXTENSION IF NOT EXISTS pgRouting;")
+            print("CREATE EXTENSION pgRouting")
+
 
     def get_table_name_list(self):
         with self.pgr.conn.cursor() as cur:
@@ -166,6 +160,7 @@ class SyngridDatabaseConstructor:
                     self.pgr.conn.commit()
             # read and write
             df = pd.read_csv(file_path, index_col=False)
+            df = df.rename(columns={"einwohner": "population"})
             df.to_sql(
                 name=table_name,
                 con=self.pgr.sqla_engine,
@@ -191,6 +186,7 @@ class SyngridDatabaseConstructor:
 
         # We read 10% at a time.  (Or pick a chunk size in bytes that works for your environment.)
         chunk_size = max(1, file_size // 100)
+        chars_read = 0
 
         leftover = ""  # Holds any partial statement that didn't end with a semicolon
 
@@ -201,6 +197,10 @@ class SyngridDatabaseConstructor:
                 if not data:
                     # No more data to read
                     break
+
+                chars_read += len(data)
+                progress = round(chars_read * 100 / file_size)
+                print(f"\rProgress: {progress}%", end="", flush=True)
 
                 # Combine leftover from previous read with current chunk
                 combined = leftover + data
@@ -244,7 +244,7 @@ class SyngridDatabaseConstructor:
                         # No statements found. This can happen if combined was empty or whitespace.
                         # Just continue reading next chunk
                         pass
-        print("Inserted all ways into ways_public_2po_4pgr table.")
+        print("\nInserted all ways into public_2po_4pgr table.")
 
     def ways_to_db(self):
         """This function transform the output of osm2po to the ways table, refer to the issue
@@ -260,7 +260,7 @@ class SyngridDatabaseConstructor:
                     cost,
                     reverse_cost,
                     ST_Transform(geom_way, 3035) as geom,
-                    id
+                    id AS way_id
             FROM public_2po_4pgr"""
         cur = self.pgr.conn.cursor()
         cur.execute(query)
