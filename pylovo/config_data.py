@@ -98,7 +98,8 @@ CREATE_QUERIES = {
     CONSTRAINT equipment_data_pkey PRIMARY KEY (name)
 )""",
     "building_clusters": """CREATE TABLE IF NOT EXISTS public.building_clusters
-(   version_id varchar(10) NOT NULL, 
+(
+    version_id varchar(10) NOT NULL, 
     kcid integer NOT NULL,
     bcid integer NOT NULL,
     plz integer,
@@ -109,7 +110,8 @@ CREATE_QUERIES = {
 )""",
     "lines_result": """
 CREATE TABLE IF NOT EXISTS public.lines_result
-(   version_id varchar(10) NOT NULL, 
+(
+    version_id varchar(10) NOT NULL, 
     geom geometry(LineString,3035),
     plz integer,
     bcid integer,
@@ -122,7 +124,8 @@ CREATE TABLE IF NOT EXISTS public.lines_result
 )""",
     "buildings_result": """
 CREATE TABLE IF NOT EXISTS public.buildings_result
-(   version_id varchar(10) NOT NULL, 
+(
+    version_id varchar(10) NOT NULL, 
     osm_id varchar(80) NOT NULL,
     area numeric,
     type varchar(30),
@@ -139,7 +142,8 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     CONSTRAINT buildings_result_pkey PRIMARY KEY (version_id, osm_id)
 )""",
     "sample_set": """CREATE TABLE IF NOT EXISTS public.sample_set
-    (classification_id integer NOT NULL,
+(
+    classification_id integer NOT NULL,
     plz integer,
     pop numeric,
     area numeric,
@@ -157,16 +161,18 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     count numeric,
     perc numeric,
     CONSTRAINT sample_set_pkey PRIMARY KEY (classification_id, plz)
-    )""",
+)""",
     "classification_version": """CREATE TABLE IF NOT EXISTS public.classification_version
-    (classification_id integer NOT NULL,
+(
+    classification_id integer NOT NULL,
     version_comment varchar, 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     classification_region varchar,
     CONSTRAINT classification_pkey PRIMARY KEY (classification_id)
-    )""",
+)""",
     "municipal_register": """CREATE TABLE IF NOT EXISTS public.municipal_register     
-    (plz integer,
+(
+    plz integer,
     pop numeric,
     area numeric,
     lat numeric,
@@ -178,47 +184,46 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     regio5 integer,
     pop_den numeric,
     CONSTRAINT municipal_register_pkey PRIMARY KEY (plz, ags)
-    )""",
+)""",
     "clustering_parameters": """CREATE TABLE IF NOT EXISTS public.clustering_parameters
-    (
-              version_id varchar(10) NOT NULL,
-              plz integer NOT NULL,
-              kcid integer NOT NULL ,
-              bcid integer NOT NULL,
-
-              no_connection_buses integer,
-              no_branches integer,
-
-              no_house_connections integer,
-              no_house_connections_per_branch numeric,
-              no_households integer,
-              no_household_equ numeric,
-              no_households_per_branch numeric,
-              max_no_of_households_of_a_branch numeric,
-              house_distance_km numeric,
-
-              transformer_mva numeric,
-              osm_trafo bool,
-
-              max_trafo_dis numeric,
-              avg_trafo_dis numeric,
-
-              cable_length_km numeric,
-              cable_len_per_house numeric,
-
-              max_power_mw numeric,
-              simultaneous_peak_load_mw numeric,
-
-              resistance numeric,
-              reactance numeric,
-              ratio numeric,
-              vsw_per_branch numeric,
-              max_vsw_of_a_branch numeric,
-              
-              filtered boolean,
-              CONSTRAINT clustering_parameters_pkey PRIMARY KEY (version_id, plz, bcid, kcid)
-    )
-    """,
+(
+    version_id varchar(10) NOT NULL,
+    plz integer NOT NULL,
+    kcid integer NOT NULL ,
+    bcid integer NOT NULL,
+    
+    no_connection_buses integer,
+    no_branches integer,
+    
+    no_house_connections integer,
+    no_house_connections_per_branch numeric,
+    no_households integer,
+    no_household_equ numeric,
+    no_households_per_branch numeric,
+    max_no_of_households_of_a_branch numeric,
+    house_distance_km numeric,
+    
+    transformer_mva numeric,
+    osm_trafo bool,
+    
+    max_trafo_dis numeric,
+    avg_trafo_dis numeric,
+    
+    cable_length_km numeric,
+    cable_len_per_house numeric,
+    
+    max_power_mw numeric,
+    simultaneous_peak_load_mw numeric,
+    
+    resistance numeric,
+    reactance numeric,
+    ratio numeric,
+    vsw_per_branch numeric,
+    max_vsw_of_a_branch numeric,
+    
+    filtered boolean,
+    CONSTRAINT clustering_parameters_pkey PRIMARY KEY (version_id, plz, bcid, kcid)
+)""",
     "buildings_tem": """CREATE TABLE IF NOT EXISTS public.buildings_tem
 (
     osm_id varchar(80),
@@ -267,45 +272,46 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     CONSTRAINT "postcode_result_pkey" PRIMARY KEY (version_id, postcode_result_id)
 )""",
     "transformer_positions": """CREATE TABLE IF NOT EXISTS public.transformer_positions 
-                    (   version_id varchar(10) NOT NULL, 
-                        plz integer,
-                        kcid integer,
-                        bcid integer,
-                        geom geometry(Point,3035),
-                        ogc_fid varchar(50),
-                        "comment" varchar
-                        )
-                        """,
+(   
+    version_id varchar(10) NOT NULL, 
+    plz integer,
+    kcid integer,
+    bcid integer,
+    geom geometry(Point,3035),
+    ogc_fid varchar(50),
+    "comment" varchar
+)""",
     "transformer_classified": """CREATE TABLE IF NOT EXISTS public.transformer_classified 
-                (   version_id varchar(10) NOT NULL, 
-                    plz integer,
-                    kcid integer,
-                    bcid integer,
-                    geom geometry(Geometry,3035),
-                    kmedoid_clusters integer,
-                    kmedoid_representative_grid bool,
-                    kmeans_clusters integer,
-                    kmeans_representative_grid bool,
-                    gmm_clusters integer,
-                    gmm_representative_grid bool,
-                    classification_id integer NOT NULL
-                    )
-                    """,
+(
+    version_id varchar(10) NOT NULL, 
+    plz integer,
+    kcid integer,
+    bcid integer,
+    geom geometry(Geometry,3035),
+    kmedoid_clusters integer,
+    kmedoid_representative_grid bool,
+    kmeans_clusters integer,
+    kmeans_representative_grid bool,
+    gmm_clusters integer,
+    gmm_representative_grid bool,
+    classification_id integer NOT NULL
+)""",
     "ags_log": """CREATE TABLE IF NOT EXISTS public.ags_log
-                (   ags bigint NOT NULL, 
-                    CONSTRAINT "ags_pkey" PRIMARY KEY (ags))
-                    """,
+(   
+    ags bigint NOT NULL, 
+    CONSTRAINT "ags_pkey" PRIMARY KEY (ags)
+)""",
     "transformers": """CREATE TABLE IF NOT EXISTS public.transformers
-    (
-        ogc_fid SERIAL,
-        osm_id varchar,
-        area double precision,
-        power varchar,
-        geom_type varchar,
-        within_shopping boolean,
-        geom geometry(MultiPoint, 3035),
-        CONSTRAINT transformers_pkey PRIMARY KEY (osm_id)
-    )""",
+(
+    ogc_fid SERIAL,
+    osm_id varchar,
+    area double precision,
+    power varchar,
+    geom_type varchar,
+    within_shopping boolean,
+    geom geometry(MultiPoint, 3035),
+    CONSTRAINT transformers_pkey PRIMARY KEY (osm_id)
+)""",
     "ways": """CREATE TABLE IF NOT EXISTS public.ways
 (
     clazz integer,
@@ -340,7 +346,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     plz integer
 )""",
     "grids": """CREATE TABLE IF NOT EXISTS public.grids
-    (
+(
     version_id varchar(10) NOT NULL,
     plz integer NOT NULL,
     kcid integer NOT NULL,
@@ -360,7 +366,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     CONSTRAINT version_pkey PRIMARY KEY (version_id)
 )""",
     "grid_parameters": """CREATE TABLE IF NOT EXISTS public.grid_parameters
-    (
+(
     version_id varchar(10) NOT NULL,
     plz integer NOT NULL,
     trafo_num json,
@@ -371,5 +377,5 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     max_distance_per_trafo json,
     avg_distance_per_trafo json,
     CONSTRAINT parameters_pkey PRIMARY KEY (version_id, plz)
-     )""",
+)""",
 }
