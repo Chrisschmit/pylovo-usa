@@ -7,7 +7,6 @@ import pandas as pd
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 
-FETCH_API_DURING_DB_CONSTRUCTION = False
 AREA_THRESHOLD = 60
 MIN_DISTANCE_BETWEEN_TRAFOS = 8
 VOLTAGE_THRESHOLD = 110000
