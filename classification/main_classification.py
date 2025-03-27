@@ -22,21 +22,30 @@ def save_yaml(filepath, data):
 
 
 def run_script(script_name):
-    """Runs a Python script inside the classification module and captures output and errors."""
-    result = subprocess.run(["python", "-m", f"classification.{script_name}"], capture_output=True, text=True)
+    """Runs a Python script inside the classification module, streams output"""
+    process = subprocess.Popen(
+        ["python", "-m", f"classification.{script_name}"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True
+    )
 
-    # Print standard output 
-    if result.stdout:
-        print(result.stdout)
+    output_lines = []
 
-    # Print standard error (exceptions, errors, tracebacks)
-    if result.stderr:
-        print(f"\nError in {script_name}:\n{result.stderr.strip()}")
+    for line in process.stdout:
+        print(line, end="")  # Always print logs live
 
-        # Stop execution
+        # Only store output if it's not prepare_data_for_clustering
+        if script_name != "prepare_data_for_clustering":
+            output_lines.append(line)
+
+    process.wait()
+
+    if process.returncode != 0:
+        print(f"\nError while running {script_name}. Exit code: {process.returncode}")
         sys.exit(1)
 
-    return result.stdout
+    return "".join(output_lines) if script_name != "prepare_data_for_clustering" else None
 
 
 def get_user_confirmation():
