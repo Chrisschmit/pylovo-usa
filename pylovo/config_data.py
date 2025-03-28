@@ -352,8 +352,12 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     kcid integer NOT NULL,
     bcid integer NOT NULL,
     grid json NOT NULL,
-    CONSTRAINT grids_pkey PRIMARY KEY (version_id, plz, kcid, bcid)
-      )""",
+    CONSTRAINT grids_pkey PRIMARY KEY (version_id, plz, kcid, bcid),
+    CONSTRAINT fk_grids_building_clusters
+        FOREIGN KEY (version_id, plz, kcid, bcid)
+        REFERENCES public.building_clusters (version_id, plz, kcid, bcid)
+        ON DELETE CASCADE
+)""",
     "version": """CREATE TABLE IF NOT EXISTS public.version
 (
     version_id varchar(10) NOT NULL,
