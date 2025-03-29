@@ -399,4 +399,10 @@ class GridGenerator:
                     self.analyse_results()
             except ResultExistsError:
                 print('Grids for this PLZ have already been generated.')
+            except Exception as e:
+                self.logger.error(f"Error during grid generation for PLZ {self.plz}: {e}")
+                self.logger.info(f"Skipped PLZ {self.plz} due to generation error.")
+                self.pgr.conn.rollback() # rollback the transaction
+                self.pgr.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION),self.plz)  # delete from sample set
+                continue
             print('-------------------- end', self.plz, '-----------------------------')
