@@ -1991,16 +1991,17 @@ class PgReaderWriter:
                 AND a.ctid <> b.ctid;"""
         self.cur.execute(query)
 
-        # Save results
+        # Save building results
         query = f"""
                 INSERT INTO buildings_result 
-                    SELECT '{VERSION_ID}' as version_id, * FROM buildings_tem WHERE peak_load_in_kw != 0 AND peak_load_in_kw != -1;
-                INSERT INTO ways_result
-                    SELECT '{VERSION_ID}' as version_id, * FROM ways_tem;"""
+                    SELECT '{VERSION_ID}' as version_id, * FROM buildings_tem WHERE peak_load_in_kw != 0 AND peak_load_in_kw != -1;"""
         self.cur.execute(query)
 
-        # Set PLZ in ways_result
-        query = f"""UPDATE ways_result SET plz = %(p)s WHERE plz ISNULL;"""
+        # Save ways results
+        query = f"""INSERT INTO ways_result
+                    SELECT '{VERSION_ID}' as version_id, clazz, source, target, cost, reverse_cost, geom, way_id,
+                    %(p)s as plz FROM ways_tem;"""
+
         self.cur.execute(query, vars={"p": plz})
 
         # Clear temporary tables

@@ -371,7 +371,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     geom geometry(LineString,3035),
     way_id integer NOT NULL,
     plz integer,
-    CONSTRAINT pk_ways_result PRIMARY KEY (version_id, way_id),
+    CONSTRAINT pk_ways_result PRIMARY KEY (version_id, way_id, plz),
     CONSTRAINT fk_ways_result_version_id
         FOREIGN KEY (version_id)
         REFERENCES public.version (version_id)
