@@ -58,8 +58,7 @@ MUNICIPAL_REGISTER = ['plz', 'pop', 'area', 'lat', 'lon', 'ags', 'name_city', 'f
 CREATE_QUERIES = {
     "res": """CREATE TABLE IF NOT EXISTS public.res
 (
-    ogc_fid integer,
-    osm_id varchar(80),
+    osm_id varchar PRIMARY KEY,
     area numeric(23, 15),
     use varchar(80),
     comment varchar(80),
@@ -76,8 +75,7 @@ CREATE_QUERIES = {
 )""",
     "oth": """CREATE TABLE IF NOT EXISTS public.oth
 (
-    ogc_fid integer,
-    osm_id varchar(80),
+    osm_id varchar PRIMARY KEY,
     area numeric(23, 15),
     use varchar(80),
     comment varchar(80),
@@ -86,7 +84,7 @@ CREATE_QUERIES = {
 )""",
     "equipment_data": """CREATE TABLE IF NOT EXISTS public.equipment_data
 (
-    name varchar(100) NOT NULL,
+    name varchar(100) PRIMARY KEY,
     s_max_kva integer,
     max_i_a integer,
     r_mohm_per_km integer,
@@ -94,8 +92,25 @@ CREATE_QUERIES = {
     z_mohm_per_km integer,
     cost_eur integer,
     typ varchar(50),
-    application_area integer,
-    CONSTRAINT equipment_data_pkey PRIMARY KEY (name)
+    application_area integer
+)""",
+    "version": """CREATE TABLE IF NOT EXISTS public.version
+(
+    version_id varchar(10) PRIMARY KEY,
+    version_comment varchar, 
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    consumer_categories varchar,
+    cable_cost_dict varchar,
+    connection_available_cables varchar,   
+    other_parameters varchar
+)""",
+    "classification_version": """CREATE TABLE IF NOT EXISTS public.classification_version
+(
+    classification_id integer NOT NULL,
+    version_comment varchar, 
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    classification_region varchar,
+    CONSTRAINT classification_pkey PRIMARY KEY (classification_id)
 )""",
     "building_clusters": """CREATE TABLE IF NOT EXISTS public.building_clusters
 (
@@ -106,12 +121,16 @@ CREATE_QUERIES = {
     s_max bigint,
     model_status integer,
     ont_vertice_id bigint,
-    CONSTRAINT building_clusters_pkey PRIMARY KEY (version_id, kcid, bcid, plz)
+    CONSTRAINT building_clusters_pkey PRIMARY KEY (version_id, kcid, bcid, plz),
+    CONSTRAINT fk_building_clusters_version_id
+        FOREIGN KEY (version_id)
+        REFERENCES public.version (version_id)
+        ON DELETE CASCADE
 )""",
     "lines_result": """
 CREATE TABLE IF NOT EXISTS public.lines_result
 (
-    version_id varchar(10) NOT NULL, 
+    version_id varchar(10) NOT NULL,
     geom geometry(LineString,3035),
     plz integer,
     bcid integer,
@@ -120,13 +139,17 @@ CREATE TABLE IF NOT EXISTS public.lines_result
     std_type varchar(15),
     from_bus integer,
     to_bus integer,
-    length_km numeric
+    length_km numeric,
+    CONSTRAINT fk_lines_result_version_id
+        FOREIGN KEY (version_id)
+        REFERENCES public.version (version_id)
+        ON DELETE CASCADE
 )""",
     "buildings_result": """
 CREATE TABLE IF NOT EXISTS public.buildings_result
 (
-    version_id varchar(10) NOT NULL, 
-    osm_id varchar(80) NOT NULL,
+    version_id varchar(10) NOT NULL,
+    osm_id varchar NOT NULL,
     area numeric,
     type varchar(30),
     geom geometry(MultiPolygon,3035),
@@ -139,7 +162,11 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     kcid integer,
     floors integer,
     connection_point integer,
-    CONSTRAINT buildings_result_pkey PRIMARY KEY (version_id, osm_id)
+    CONSTRAINT buildings_result_pkey PRIMARY KEY (version_id, osm_id),
+    CONSTRAINT fk_buildings_result_version_id
+        FOREIGN KEY (version_id)
+        REFERENCES public.version (version_id)
+        ON DELETE CASCADE
 )""",
     "sample_set": """CREATE TABLE IF NOT EXISTS public.sample_set
 (
@@ -160,15 +187,11 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     perc_bin numeric,
     count numeric,
     perc numeric,
-    CONSTRAINT sample_set_pkey PRIMARY KEY (classification_id, plz)
-)""",
-    "classification_version": """CREATE TABLE IF NOT EXISTS public.classification_version
-(
-    classification_id integer NOT NULL,
-    version_comment varchar, 
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    classification_region varchar,
-    CONSTRAINT classification_pkey PRIMARY KEY (classification_id)
+    CONSTRAINT sample_set_pkey PRIMARY KEY (classification_id, plz),
+    CONSTRAINT fk_sample_set_classification_id
+        FOREIGN KEY (classification_id)
+        REFERENCES public.classification_version (classification_id)
+        ON DELETE CASCADE
 )""",
     "municipal_register": """CREATE TABLE IF NOT EXISTS public.municipal_register     
 (
@@ -222,11 +245,15 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     max_vsw_of_a_branch numeric,
     
     filtered boolean,
-    CONSTRAINT clustering_parameters_pkey PRIMARY KEY (version_id, plz, bcid, kcid)
+    CONSTRAINT clustering_parameters_pkey PRIMARY KEY (version_id, plz, bcid, kcid),
+    CONSTRAINT fk_clustering_parameters_version_id
+        FOREIGN KEY (version_id)
+        REFERENCES public.version (version_id)
+        ON DELETE CASCADE
 )""",
     "buildings_tem": """CREATE TABLE IF NOT EXISTS public.buildings_tem
 (
-    osm_id varchar(80),
+    osm_id varchar,
     area numeric,
     type varchar(80),
     geom geometry(Geometry,3035),  -- needs to be geometry as multipoint & multipolygon get inserted here
@@ -242,25 +269,23 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
 )""",
     "consumer_categories": """CREATE TABLE IF NOT EXISTS public.consumer_categories
 (
-    consumer_category_id integer NOT NULL,
-    definition varchar(30) NOT NULL,
+    consumer_category_id integer PRIMARY KEY,
+    definition varchar(30) UNIQUE NOT NULL,
     peak_load numeric(10,2),
     yearly_consumption numeric(10,2),
     peak_load_per_m2 numeric(10,2),
     yearly_consumption_per_m2 numeric(10,2),
-    sim_factor numeric(10,2) NOT NULL,
-    CONSTRAINT consumer_categories_pkey PRIMARY KEY (consumer_category_id),
-    CONSTRAINT consumer_categories_definition_key UNIQUE (definition)
+    sim_factor numeric(10,2) NOT NULL
 )""",
     "postcode": """CREATE TABLE IF NOT EXISTS public.postcode
 (
-    gid integer NOT NULL,
+    postcode_id integer NOT NULL,
     plz int,
     note varchar(86),
     qkm double precision,
     population integer,
     geom geometry(MultiPolygon,3035),
-    CONSTRAINT "plz-5stellig_pkey" PRIMARY KEY (gid)
+    CONSTRAINT "plz-5stellig_pkey" PRIMARY KEY (postcode_id)
 )""",
     "postcode_result": """CREATE TABLE IF NOT EXISTS public.postcode_result
 (   
@@ -269,17 +294,25 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     settlement_type integer,
     geom geometry(MultiPolygon,3035),
     house_distance numeric,
-    CONSTRAINT "postcode_result_pkey" PRIMARY KEY (version_id, postcode_result_id)
+    CONSTRAINT "postcode_result_pkey" PRIMARY KEY (version_id, postcode_result_id),
+    CONSTRAINT fk_postcode_result_version_id
+        FOREIGN KEY (version_id)
+        REFERENCES public.version (version_id)
+        ON DELETE CASCADE
 )""",
     "transformer_positions": """CREATE TABLE IF NOT EXISTS public.transformer_positions 
-(   
+(
     version_id varchar(10) NOT NULL, 
     plz integer,
     kcid integer,
     bcid integer,
     geom geometry(Point,3035),
     ogc_fid varchar(50),
-    "comment" varchar
+    "comment" varchar,
+    CONSTRAINT fk_transformer_positions_version_id
+        FOREIGN KEY (version_id)
+        REFERENCES public.version (version_id)
+        ON DELETE CASCADE
 )""",
     "transformer_classified": """CREATE TABLE IF NOT EXISTS public.transformer_classified 
 (
@@ -294,23 +327,28 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     kmeans_representative_grid bool,
     gmm_clusters integer,
     gmm_representative_grid bool,
-    classification_id integer NOT NULL
+    classification_id integer NOT NULL,
+    CONSTRAINT fk_transformer_classified_version_id
+        FOREIGN KEY (version_id)
+        REFERENCES public.version (version_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_transformer_classified_classification_id
+        FOREIGN KEY (classification_id)
+        REFERENCES public.classification_version (classification_id)
+        ON DELETE CASCADE
 )""",
     "ags_log": """CREATE TABLE IF NOT EXISTS public.ags_log
-(   
-    ags bigint NOT NULL, 
-    CONSTRAINT "ags_pkey" PRIMARY KEY (ags)
+(
+    ags bigint PRIMARY KEY
 )""",
     "transformers": """CREATE TABLE IF NOT EXISTS public.transformers
 (
-    ogc_fid SERIAL,
-    osm_id varchar,
+    osm_id varchar PRIMARY KEY,
     area double precision,
     power varchar,
     geom_type varchar,
     within_shopping boolean,
-    geom geometry(MultiPoint, 3035),
-    CONSTRAINT transformers_pkey PRIMARY KEY (osm_id)
+    geom geometry(MultiPoint, 3035)
 )""",
     "ways": """CREATE TABLE IF NOT EXISTS public.ways
 (
@@ -320,7 +358,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     cost double precision,
     reverse_cost double precision,
     geom geometry(LineString,3035),
-    way_id integer NOT NULL
+    way_id integer PRIMARY KEY
 )""",
     "ways_result": """CREATE TABLE IF NOT EXISTS public.ways_result
 (
@@ -332,7 +370,12 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     reverse_cost double precision,
     geom geometry(LineString,3035),
     way_id integer NOT NULL,
-    plz integer
+    plz integer,
+    CONSTRAINT pk_ways_result PRIMARY KEY (version_id, way_id),
+    CONSTRAINT fk_ways_result_version_id
+        FOREIGN KEY (version_id)
+        REFERENCES public.version (version_id)
+        ON DELETE CASCADE
 )""",
     "ways_tem": """CREATE TABLE IF NOT EXISTS public.ways_tem
 (
@@ -358,17 +401,6 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
         REFERENCES public.building_clusters (version_id, plz, kcid, bcid)
         ON DELETE CASCADE
 )""",
-    "version": """CREATE TABLE IF NOT EXISTS public.version
-(
-    version_id varchar(10) NOT NULL,
-    version_comment varchar, 
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    consumer_categories varchar,
-    cable_cost_dict varchar,
-    connection_available_cables varchar,   
-    other_parameters varchar, 
-    CONSTRAINT version_pkey PRIMARY KEY (version_id)
-)""",
     "grid_parameters": """CREATE TABLE IF NOT EXISTS public.grid_parameters
 (
     version_id varchar(10) NOT NULL,
@@ -380,6 +412,10 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     sim_peak_load_per_trafo json,
     max_distance_per_trafo json,
     avg_distance_per_trafo json,
-    CONSTRAINT parameters_pkey PRIMARY KEY (version_id, plz)
+    CONSTRAINT parameters_pkey PRIMARY KEY (version_id, plz),
+    CONSTRAINT fk_grid_parameters_version_id
+        FOREIGN KEY (version_id)
+        REFERENCES public.version (version_id)
+        ON DELETE CASCADE
 )""",
 }
