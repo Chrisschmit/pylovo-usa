@@ -254,8 +254,8 @@ class GridGenerator:
 
                     local_length_dict = self.pgr.install_consumer_cables(
                         self.plz,
-                        kcid,
                         bcid,
+                        kcid,
                         branch_deviation,
                         connection_node_list,
                         ont_vertice,
