@@ -320,7 +320,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     plz integer,
     kcid integer,
     bcid integer,
-    geom geometry(Geometry,3035),
+    geom geometry(Point,3035),
     kmedoid_clusters integer,
     kmedoid_representative_grid bool,
     kmeans_clusters integer,
