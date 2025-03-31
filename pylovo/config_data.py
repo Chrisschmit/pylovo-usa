@@ -140,9 +140,9 @@ CREATE TABLE IF NOT EXISTS public.lines_result
     from_bus integer,
     to_bus integer,
     length_km numeric,
-    CONSTRAINT fk_lines_result_version_id
-        FOREIGN KEY (version_id)
-        REFERENCES public.version (version_id)
+    CONSTRAINT fk_lines_result_building_clusters
+        FOREIGN KEY (version_id, plz, kcid, bcid)
+        REFERENCES public.building_clusters (version_id, plz, kcid, bcid)
         ON DELETE CASCADE
 )""",
     "buildings_result": """
@@ -163,9 +163,9 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     floors integer,
     connection_point integer,
     CONSTRAINT buildings_result_pkey PRIMARY KEY (version_id, osm_id),
-    CONSTRAINT fk_buildings_result_version_id
-        FOREIGN KEY (version_id)
-        REFERENCES public.version (version_id)
+    CONSTRAINT fk_buildings_result_building_clusters
+        FOREIGN KEY (version_id, plz, kcid, bcid)
+        REFERENCES public.building_clusters (version_id, plz, kcid, bcid)
         ON DELETE CASCADE
 )""",
     "sample_set": """CREATE TABLE IF NOT EXISTS public.sample_set
@@ -246,9 +246,9 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     
     filtered boolean,
     CONSTRAINT clustering_parameters_pkey PRIMARY KEY (version_id, plz, bcid, kcid),
-    CONSTRAINT fk_clustering_parameters_version_id
-        FOREIGN KEY (version_id)
-        REFERENCES public.version (version_id)
+    CONSTRAINT fk_clustering_parameters_building_clusters
+        FOREIGN KEY (version_id, plz, kcid, bcid)
+        REFERENCES public.building_clusters (version_id, plz, kcid, bcid)
         ON DELETE CASCADE
 )""",
     "buildings_tem": """CREATE TABLE IF NOT EXISTS public.buildings_tem
@@ -309,9 +309,9 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     geom geometry(Point,3035),
     ogc_fid varchar(50),
     "comment" varchar,
-    CONSTRAINT fk_transformer_positions_version_id
-        FOREIGN KEY (version_id)
-        REFERENCES public.version (version_id)
+    CONSTRAINT fk_lines_result_building_clusters
+        FOREIGN KEY (version_id, plz, kcid, bcid)
+        REFERENCES public.building_clusters (version_id, plz, kcid, bcid)
         ON DELETE CASCADE
 )""",
     "transformer_classified": """CREATE TABLE IF NOT EXISTS public.transformer_classified 
@@ -328,13 +328,13 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     gmm_clusters integer,
     gmm_representative_grid bool,
     classification_id integer NOT NULL,
-    CONSTRAINT fk_transformer_classified_version_id
-        FOREIGN KEY (version_id)
-        REFERENCES public.version (version_id)
-        ON DELETE CASCADE,
     CONSTRAINT fk_transformer_classified_classification_id
         FOREIGN KEY (classification_id)
         REFERENCES public.classification_version (classification_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_transformer_classified_building_clusters
+        FOREIGN KEY (version_id, plz, kcid, bcid)
+        REFERENCES public.building_clusters (version_id, plz, kcid, bcid)
         ON DELETE CASCADE
 )""",
     "ags_log": """CREATE TABLE IF NOT EXISTS public.ags_log
