@@ -122,6 +122,7 @@ def process_trafos():
     gdf_substations.dropna(axis='columns', inplace=True)
 
     # transform column id into osm_id as is used for buildings
+    gdf_substations['id'] = gdf_substations.apply(lambda row: f"{row['type']}/{row['id']}", axis=1)
     gdf_substations.rename(columns={"id": "osm_id"}, inplace=True)
     if "@id" in gdf_substations:
         gdf_substations.drop('@id', axis=1, inplace=True)
