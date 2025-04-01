@@ -21,8 +21,8 @@ def main():
     sgc.csv_to_db()
 
     ### Add transformer data from geojson to the database
-    print("### QUERY TRANSFORMERS AND INSERT THEM INTO DB (~50 min if fetching fresh data from API) ###")
-    sgc.transformers_to_db(sgc)
+    print("### QUERY TRANSFORMERS AND INSERT THEM INTO DB (~50 min if processing new trafo data) ###")
+    sgc.transformers_to_db()
 
     ### Create table with data from osm
     print("### POPULATE public_2po_4pgr TABLE (~30 min) ###")

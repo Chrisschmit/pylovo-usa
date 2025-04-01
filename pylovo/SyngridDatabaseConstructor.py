@@ -2,7 +2,6 @@ import subprocess
 import time
 import warnings
 from pathlib import Path
-import json
 
 import pandas as pd
 import psycopg2 as pg
@@ -11,9 +10,9 @@ import sqlparse
 
 from pylovo.config_data import *
 from pylovo.pgReaderWriter import PgReaderWriter
-from pylovo.utils import query_overpass_for_geojson
-from raw_data.preprocessing_scripts.process_trafos import process_trafos, SUBSTATIONS_GEOJSON, SHOPPING_MALL_GEOJSON, \
-    OUTPUT_GEOJSON, OVERPASS_URL
+from raw_data.preprocessing_scripts.process_trafos import process_trafos, TRAFOS_PROCESSED_GEOJSON_PATH, TRAFOS_PROCESSED_3035_GEOJSON_PATH, \
+    fetch_trafos, RELATION_ID, EPSG
+
 
 # uncomment for automated building import of buildings in regiostar_samples
 # from raw_data.import_building_data import OGR_FILE_LIST
@@ -124,34 +123,19 @@ class SyngridDatabaseConstructor:
             print(f"{file_name} is successfully imported to db in {int(et - st)} s")
 
 
-    def transformers_to_db(self, sgc):
+    def transformers_to_db(self):
         """Call the overpass api for transformer data and populate the transformers table.
 
         """
-        update_trafos = os.path.isfile(OUTPUT_GEOJSON)
+        update_trafos = not os.path.isfile(TRAFOS_PROCESSED_GEOJSON_PATH)
 
         if update_trafos:
-            print(f"{OUTPUT_GEOJSON} does not exist -> fetch transformer data from API and process it")
-            overpass_query_bayern_file = os.path.join(".", "raw_data", "transformer_data", "substations_bayern_query_1.txt")
-            overpass_query_mall_file = os.path.join(".", "raw_data", "transformer_data", "shopping_mall_query_1.txt")
-            with open(overpass_query_bayern_file, "r") as f:
-                overpass_query_bayern = f.read()
-            with open(overpass_query_mall_file, "r") as f:
-                overpass_query_mall = f.read()
+            print(f"{TRAFOS_PROCESSED_GEOJSON_PATH} does not exist -> fetch transformer data from API and process it")
+            fetch_trafos(RELATION_ID)
+            process_trafos()
 
-            geojson_bayern = query_overpass_for_geojson(OVERPASS_URL, overpass_query_bayern)
-            geojson_mall = query_overpass_for_geojson(OVERPASS_URL, overpass_query_mall)
-
-            # save resulting GeoJSON-s
-            with open(SUBSTATIONS_GEOJSON, "w") as f:
-                json.dump(geojson_bayern, f, indent=2)
-            with open(SHOPPING_MALL_GEOJSON, "w") as f:
-                json.dump(geojson_mall, f, indent=2)
-
-            process_trafos(SUBSTATIONS_GEOJSON, SHOPPING_MALL_GEOJSON, OUTPUT_GEOJSON)
-
-        in_file = OUTPUT_GEOJSON
-        out_file = os.path.join(".", "raw_data", "transformer_data", "substations_bayern_processed_3035.geojson")
+        in_file = TRAFOS_PROCESSED_GEOJSON_PATH
+        out_file = TRAFOS_PROCESSED_3035_GEOJSON_PATH
 
         if update_trafos or not os.path.isfile(out_file):
             # Convert the GeoJSON file to EPSG:3035 and write to a new file
@@ -159,7 +143,7 @@ class SyngridDatabaseConstructor:
                 [
                     "ogr2ogr",
                     "-f", "GeoJSON",
-                    "-s_srs", "EPSG:32633",
+                    "-s_srs", f"EPSG:{str(EPSG)}",
                     "-t_srs", "EPSG:3035",
                     out_file,  # output
                     in_file  # input
@@ -173,7 +157,7 @@ class SyngridDatabaseConstructor:
                 "table_name": "transformers"
             }
         ]
-        sgc.ogr_to_db(trafo_dict)
+        self.ogr_to_db(trafo_dict)
 
     def csv_to_db(self):
 

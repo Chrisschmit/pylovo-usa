@@ -3,31 +3,64 @@ import os
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+import json
 
+from pylovo.utils import query_overpass_for_geojson
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+RELATION_ID_BASE = 3600000000  # do not change
+
+# change relation id to desired location according to docs
+RELATION_ID = 2145268
+# Bavaria --> 2145268
 
 AREA_THRESHOLD = 60
 MIN_DISTANCE_BETWEEN_TRAFOS = 8
 VOLTAGE_THRESHOLD = 110000
 EPSG = 32633
 
-SUBSTATIONS_GEOJSON = os.path.normpath(os.path.abspath('./raw_data/transformer_data/substations_bayern.geojson'))
-SHOPPING_MALL_GEOJSON = os.path.normpath(os.path.abspath('./raw_data/transformer_data/shopping_mall_bayern.geojson'))
-OUTPUT_GEOJSON = os.path.normpath(os.path.abspath('./raw_data/transformer_data/substations_bayern_processed.geojson'))
+SUBSTATIONS_QUERY_PATH = os.path.join(".", "raw_data", "transformer_data", "substations_query.txt")
+SHOPPING_MALL_QUERY_PATH = os.path.join(".", "raw_data", "transformer_data", "shopping_mall_query.txt")
+
+SUBSTATIONS_GEOJSON_PATH = os.path.join(".", "raw_data", "transformer_data", "fetched_trafos", "substations.geojson")
+SHOPPING_MALL_GEOJSON_PATH = os.path.join(".", "raw_data", "transformer_data", "fetched_trafos", "shopping_mall.geojson")
+
+TRAFOS_PROCESSED_GEOJSON_PATH = os.path.join(".", "raw_data", "transformer_data", "processed_trafos", "trafos_processed.geojson")
+TRAFOS_PROCESSED_3035_GEOJSON_PATH = os.path.join(".", "raw_data", "transformer_data", "processed_trafos", "trafos_processed_3035.geojson")
 
 
-def process_trafos(substations_path_geojson: str, shopping_mall_path_geojson: str, output_path_geojson: str):
-    """Process trafo data and output it as GeoJSON into output_geojson.
+def fetch_trafos(relation_id: int):
+    """Fetch trafos from OSM bound by area defined by given relation_id
 
     Args:
-        substations_path_geojson (str): GeoJSON filepath of substations data
-        shopping_mall_path_geojson (str): GeoJSON filepath of shopping mall data
-        output_path_geojson (str): GeoJSON path of output geojson
+        relation_id (int): relation_id of area to fetch trafos from
+
+    """
+    with open(SUBSTATIONS_QUERY_PATH, "r") as f:
+        overpass_query_substations = f.read()
+    with open(SHOPPING_MALL_QUERY_PATH, "r") as f:
+        overpass_query_mall = f.read()
+
+    # set chosen relation_id in query
+    overpass_query_substations = overpass_query_substations.replace("$relation_id$", str(RELATION_ID_BASE + relation_id))
+    overpass_query_mall = overpass_query_mall.replace("$relation_id$", str(RELATION_ID_BASE + relation_id))
+
+    geojson_bayern = query_overpass_for_geojson(OVERPASS_URL, overpass_query_substations)
+    geojson_mall = query_overpass_for_geojson(OVERPASS_URL, overpass_query_mall)
+
+    # save resulting GeoJSON-s
+    with open(SUBSTATIONS_GEOJSON_PATH, "w") as f:
+        json.dump(geojson_bayern, f, indent=2)
+    with open(SHOPPING_MALL_GEOJSON_PATH, "w") as f:
+        json.dump(geojson_mall, f, indent=2)
+
+
+def process_trafos():
+    """Process trafo data and output it as GeoJSON into output_geojson.
 
     """
     # Import geojson of substations/trafos. Trafos of "Deutsche Bahn" and historic trafos have already been deleted.
-    gdf_substations = gpd.read_file(substations_path_geojson)
+    gdf_substations = gpd.read_file(SUBSTATIONS_GEOJSON_PATH)
     print('start:')
     print(len(gdf_substations))
 
@@ -74,7 +107,7 @@ def process_trafos(substations_path_geojson: str, shopping_mall_path_geojson: st
     print(len(gdf_substations))
 
     # 5. how many trafos are there in / next to mall?
-    gdf_shopping = gpd.read_file(shopping_mall_path_geojson)
+    gdf_shopping = gpd.read_file(SHOPPING_MALL_GEOJSON_PATH)
     gdf_shopping = gdf_shopping.to_crs(EPSG)
     union_of_shopping = gdf_shopping.geometry.unary_union
     gdf_substations['within_shopping'] = gdf_substations.within(union_of_shopping)
@@ -89,23 +122,22 @@ def process_trafos(substations_path_geojson: str, shopping_mall_path_geojson: st
     gdf_substations.dropna(axis='columns', inplace=True)
 
     # transform column id into osm_id as is used for buildings
-    gdf_substations['id'] = gdf_substations['id'].map(lambda x: str(x).lstrip('way/node/'))
     gdf_substations.rename(columns={"id": "osm_id"}, inplace=True)
     if "@id" in gdf_substations:
         gdf_substations.drop('@id', axis=1, inplace=True)
 
     # export geojson
-    gdf_substations.to_file(output_path_geojson, driver='GeoJSON')
+    gdf_substations.to_file(TRAFOS_PROCESSED_GEOJSON_PATH, driver='GeoJSON')
 
 
 def main():
     # timing of the script
     start_time = time.time()
 
-    if not os.path.isfile(SUBSTATIONS_GEOJSON):
-        raise FileNotFoundError(f"Path does not exist: {SUBSTATIONS_GEOJSON}")
+    if not os.path.isfile(SUBSTATIONS_GEOJSON_PATH):
+        raise FileNotFoundError(f"Path does not exist: {SUBSTATIONS_GEOJSON_PATH}")
 
-    process_trafos(SUBSTATIONS_GEOJSON, SHOPPING_MALL_GEOJSON, OUTPUT_GEOJSON)
+    process_trafos()
 
     print("--- %s seconds ---" % (time.time() - start_time))
 
