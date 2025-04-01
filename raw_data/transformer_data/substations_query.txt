@@ -1,9 +1,9 @@
 /*
-BAYERN query for transformers
+query for transformers
 */
 [out:json][timeout:500];
 (
-  area["name"="Bayern"];
+  area($relation_id$);
 )->.searchArea;
 
 

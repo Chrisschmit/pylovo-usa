@@ -1,9 +1,9 @@
 /*
-Bayern shopping mall and other places that are not directly connected to the LV grid
+shopping mall and other places that are not directly connected to the LV grid
 */
 [out:json][timeout:500];
 (
-  area["name"="Bayern"];
+  area($relation_id$);
 )->.searchArea;
 
 
