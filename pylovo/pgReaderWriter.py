@@ -2560,6 +2560,7 @@ class PgReaderWriter:
         WHERE version_id = %(v)s AND postcode_result_id = %(p)s;"""
         self.cur.execute(query, {"v": version_id, "p": int(plz)})
         self.conn.commit()
+        self.logger.info(f"All data for PLZ {plz} and version {version_id} deleted")
 
     def delete_version_from_all_tables(self, version_id: str) -> None:
         """Delete all entries of the given version ID from all tables."""
