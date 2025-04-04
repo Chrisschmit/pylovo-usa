@@ -1225,6 +1225,41 @@ class PgReaderWriter:
                 )
             continue
         self.logger.debug("pre transformer clusters completed")
+    def position_greenfield_transformers(pgr, plz, kcid, bcid):
+        """
+        Positions a transformer at the optimal location for a greenfield building cluster.
+
+        The optimal location minimizes the sum of distance*load from each vertex to others.
+
+        Args:
+            pgr: PostgreSQL reader/writer instance
+            plz: Postcode
+            kcid: Kmeans cluster ID
+            bcid: Building cluster ID
+        """
+        # Get all connection points in the building cluster
+        connection_points = pgr.get_building_connection_points_from_bc(kcid, bcid)
+
+        # If there's only one connection point, use it
+        if len(connection_points) == 1:
+            pgr.upsert_transformer_selection(plz, kcid, bcid, connection_points[0])
+            return
+
+        # Get distance matrix between all connection points
+        localid2vid, dist_mat, _ = pgr.get_distance_matrix_from_building_cluster(kcid, bcid)
+
+        # Get load vector for each connection point
+        loads = pgr.generate_load_vector(kcid, bcid)
+
+        # Calculate weighted distance (distance * load) for each potential location
+        total_load_per_vertice = dist_mat.dot(loads)
+
+        # Select the point with minimum weighted distance as transformer location
+        min_localid = np.argmin(total_load_per_vertice)
+        ont_connection_id = int(localid2vid[min_localid])
+
+        # Update the database with the selected transformer position
+        pgr.upsert_transformer_selection(plz, kcid, bcid, ont_connection_id)
 
     def update_building_cluster(
             self,
