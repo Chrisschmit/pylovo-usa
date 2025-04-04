@@ -1421,43 +1421,50 @@ class PgReaderWriter:
         self.cur.execute(query, {"v": VERSION_ID, "p": plz})
         return int(self.cur.fetchone()[0])
 
-    def set_loadarea_cluster_settlement_type(self, plz:int) -> None:
+    def set_plz_settlement_type(self, plz: int) -> None:
         """
-        Sets house_distance and settlement_type for the given plz in table postcode_result
-        :param plz:
-        :return:
+        Determine settlement_type in postcode_result table based on the house_distance metric for a given plz
+        :param plz: Postleitzahl (postal code)
+        :return: None
         """
+        # Get average distance between buildings by sampling 50 random buildings
+        # and finding their 4 nearest neighbors
         distance_query = """WITH some_buildings AS(
-                                SELECT osm_id, center FROM buildings_tem
-                                ORDER BY RANDOM ()
-                                LIMIT 50) 
-                            SELECT b.osm_id, d.dist 
-                            FROM some_buildings AS b
-                            LEFT JOIN LATERAL(
-                            SELECT ST_Distance(b.center, b2.center) AS dist
-                            FROM buildings_tem AS b2
-                            WHERE b.osm_id <> b2.osm_id
-                            ORDER BY b.center <-> b2.center
-                            LIMIT 4) AS d
-                            ON TRUE;"""
+                            SELECT osm_id, center FROM buildings_tem
+                            ORDER BY RANDOM()
+                            LIMIT 50) 
+                        SELECT b.osm_id, d.dist 
+                        FROM some_buildings AS b
+                        LEFT JOIN LATERAL(
+                        SELECT ST_Distance(b.center, b2.center) AS dist
+                        FROM buildings_tem AS b2
+                        WHERE b.osm_id <> b2.osm_id
+                        ORDER BY b.center <-> b2.center
+                        LIMIT 4) AS d
+                        ON TRUE;"""
+
         self.cur.execute(distance_query)
         data = self.cur.fetchall()
-        if len(data) == 0:
+
+        if not data:
             raise ValueError("There is no building in the buildings_tem table!")
+
+        # Calculate average distance
         distance = [t[1] for t in data]
         avg_dis = int(sum(distance) / len(distance))
 
-        query = """ UPDATE postcode_result
-                    SET house_distance = %(avg)s 
-                    WHERE version_id = %(v)s 
-                    AND postcode_result_id = %(p)s;
-                    UPDATE postcode_result
-                    SET settlement_type = (CASE
-                    WHEN house_distance < 25 THEN 3
-                    WHEN 25 <= house_distance AND house_distance < 45 THEN 2
-                    ELSE 1 END)
-                    WHERE version_id = %(v)s 
-                    AND postcode_result_id = %(p)s;"""
+        # Update database with average distance and set settlement types based on threshold
+        query = """
+            UPDATE postcode_result
+            SET house_distance = %(avg)s, 
+                settlement_type = CASE
+                    WHEN %(avg)s < 25 THEN 3
+                    WHEN %(avg)s < 45 THEN 2
+                    ELSE 1
+                END
+            WHERE version_id = %(v)s 
+            AND postcode_result_id = %(p)s;"""
+
         self.cur.execute(query, {"v": VERSION_ID, "avg": avg_dis, "p": plz})
 
     def set_building_peak_load(self) -> int:
