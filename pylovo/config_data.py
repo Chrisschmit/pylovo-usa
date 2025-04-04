@@ -99,11 +99,11 @@ CREATE_QUERIES = {
 )""",
     "building_clusters": """CREATE TABLE IF NOT EXISTS public.building_clusters
 (
-    version_id varchar(10) NOT NULL, 
+    version_id varchar(10) NOT NULL,
     kcid integer NOT NULL,
     bcid integer NOT NULL,
     plz integer,
-    s_max bigint,
+    transformer_size_selected bigint,
     model_status integer,
     ont_vertice_id bigint,
     CONSTRAINT building_clusters_pkey PRIMARY KEY (version_id, kcid, bcid, plz)
