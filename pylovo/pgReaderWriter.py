@@ -979,7 +979,7 @@ class PgReaderWriter:
             f"Building clusters with plz = {plz}, k_mean cluster = {kcid} area cleared."
         )
 
-    def upsert_substation_selection(self, plz:int, kcid:int, bcid:int, connection_id:int):
+    def upsert_transformer_selection(self, plz:int, kcid:int, bcid:int, connection_id:int):
         """Writes the vertice_id of chosen building as ONT location in the building_clusters table"""
 
         query = """UPDATE building_clusters SET ont_vertice_id = %(c)s 
@@ -1208,23 +1208,32 @@ class PgReaderWriter:
             if len(pre_result_dict[transformer_id]) == 0:
                 self.logger.debug(f"transformer {transformer_id} has no asigned consumer, deleted")
                 self.delete_transformers([transformer_id])
-            else:
-                building_cluster_count = building_cluster_count - 1
-                sim_load = self.calculate_sim_load(pre_result_dict[transformer_id])
-                possible_transformers = np.array([100, 160, 250, 400, 630])
-                sim_load = possible_transformers[
-                    possible_transformers > float(sim_load)
-                    ][0].item()
-                self.update_building_cluster(
-                    transformer_id,
-                    pre_result_dict[transformer_id],
-                    building_cluster_count,
-                    kcid,
-                    plz,
-                    sim_load,
-                )
-            continue
-        self.logger.debug("pre transformer clusters completed")
+                continue
+
+            # Create building cluster with sequential negative ID
+            building_cluster_count -= 1
+
+            # Calculate the simulated load for all loads assigned to this transformer
+            sim_load = self.calculate_sim_load(pre_result_dict[transformer_id])
+
+            # Define the available standard transformer sizes in kVA
+            possible_transformers = np.array([100, 160, 250, 400, 630]) #TODO: check with settlement_type approach
+
+            # Select the smallest transformer that is larger than the simulated load
+            transformer_size_selected = possible_transformers[possible_transformers > float(sim_load)][0].item()
+
+            # Update database with new building cluster
+            self.update_building_cluster(
+                transformer_id,
+                pre_result_dict[transformer_id],
+                building_cluster_count,
+                kcid,
+                plz,
+                transformer_size_selected
+            )
+
+        self.logger.debug("Brownfield clusters completed")
+
     def position_greenfield_transformers(pgr, plz, kcid, bcid):
         """
         Positions a transformer at the optimal location for a greenfield building cluster.
@@ -1268,7 +1277,7 @@ class PgReaderWriter:
             count: int,
             kcid: int,
             plz: int,
-            sim_load: int
+            transformer_size_selected: int
     ) -> None:
         """
         Update building cluster information by performing multiple operations:
@@ -1283,7 +1292,7 @@ class PgReaderWriter:
             count (int): The new building cluster identifier.
             kcid (int): The KCID value.
             plz (int): The postcode value.
-            sim_load (int): The simulation load value.
+            transformer_size_selected (int): The selected transformer size for the building cluster.
         """
         query = """
             UPDATE buildings_tem 
@@ -1313,7 +1322,7 @@ class PgReaderWriter:
             "t": transformer_id,
             "k": kcid,
             "pc": plz,
-            "l": sim_load,
+            "l": transformer_size_selected,
         }
         self.cur.execute(query, params)
 
