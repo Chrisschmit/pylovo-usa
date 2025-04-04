@@ -179,7 +179,7 @@ class GridGenerator:
 
                 # Check buildings and manage clusters
                 if self.pgr.count_kmean_cluster_consumers(kcid) > 1:
-                    self.pgr.create_building_clusters_for_kcid(self.plz, kcid)
+                    self.pgr.create_building_clusters_for_kcid(self.plz, kcid) #TODO: name should include transformer_size allocation
                 else:
                     self.pgr.delete_isolated_building(self.plz, kcid) #TODO: check approach with isolated buildings
                 self.logger.debug("rest building cluster finished")
@@ -188,7 +188,7 @@ class GridGenerator:
             for bcid in self.pgr.get_greenfield_bcids(self.plz, kcid):
                 # Transformer positioning for greenfield clusters
                 if bcid >= 0:
-                    self.position_greenfield_transformers(self.pgr, self.plz, kcid, bcid)
+                    self.pgr.position_greenfield_transformers(self.pgr, self.plz, kcid, bcid)
                     self.logger.debug(f"Transformer positioning for kcid{kcid}, bcid{bcid} finished")
                     self.pgr.update_s_max(self.plz, kcid, bcid, 1)
                     self.logger.debug("Smax in building_clusters is updated.")

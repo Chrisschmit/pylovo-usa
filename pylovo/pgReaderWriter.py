@@ -923,8 +923,8 @@ class PgReaderWriter:
         Args:
             bcid: building cluster ID
             plz: postcode cluster ID - plz
-            vertices: Liste der vertice_id von gewählten Gebäuden
-            s_max: Scheinleistung der vorgesehenen Transformator
+            vertices: List of vertice_id of selected buildings
+            s_max: Apparent power of the selected transformer
         """
         # Insert references to building elements in which cluster they are.
         building_query = """UPDATE public.buildings_tem 
