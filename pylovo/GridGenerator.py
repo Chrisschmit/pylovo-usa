@@ -65,7 +65,7 @@ class GridGenerator:
         self.pgr.remove_duplicate_buildings()
         self.logger.info("duplicate buildings removed from buildings_tem")
 
-        self.pgr.set_loadarea_cluster_settlement_type(self.plz)
+        self.pgr.set_plz_settlement_type(self.plz)
         self.logger.info("house_distance and settlement_type in postcode_result")
 
         unloadcount = self.pgr.set_building_peak_load()
@@ -151,35 +151,41 @@ class GridGenerator:
 
     def position_substations(self):
         """
-        Iterates over k-means clusters and building clusters inside and positions substations for each cluster.
-        Considers existing transformers.
+        Positions substations for each bcid cluster considering existing transformers.
         FROM: buildings_tem, building_clusters
-        INTO: buildings_tem, building_clusters,
-        :return:
+        INTO: buildings_tem, building_clusters
         """
         kcid_length = self.pgr.get_kcid_length()
-        for kcounter in range(kcid_length):
+
+        for _ in range(kcid_length):
             kcid = self.pgr.get_next_unfinished_kcid(self.plz)
             self.logger.debug(f"working on kcid {kcid}")
             # Building clustering
-            transformer_list = self.pgr.get_included_transformers(kcid)
-            if len(transformer_list) == 0 or transformer_list is None:
+            # 0. Check for existing transformers
+            transformers = self.pgr.get_included_transformers(kcid)
+
+            # Case 1: No transformers present
+            if not transformers:
+                self.logger.debug(f"kcid{kcid} has no included transformer")
+                # Create greenfield building clusters
                 self.pgr.create_building_clusters_for_kcid(self.plz, kcid)
-                self.logger.debug(f"kcid{kcid} has no included transformer, clustering finished")
+                self.logger.debug(f"kcid{kcid} building clusters finished")
+
+            # Case 2: Transformers present
             else:
-                self.pgr.assign_transformer_clusters(self.plz, kcid, transformer_list)
-                self.logger.debug(
-                    f"kcid{kcid} has {len(transformer_list)} transformers, buildings assigned"
-                )
-                building_count = self.pgr.count_kmean_cluster_consumers(kcid)
-                if building_count > 1:
+                self.logger.debug(f"kcid{kcid} has {len(transformers)} transformers")
+                # Create brownfield building clusters with existing transformers
+                self.pgr.assign_transformer_clusters(self.plz, kcid, transformers)
+
+                # Check buildings and manage clusters
+                if self.pgr.count_kmean_cluster_consumers(kcid) > 1:
                     self.pgr.create_building_clusters_for_kcid(self.plz, kcid)
                 else:
-                    self.pgr.delete_isolated_building(self.plz, kcid)
+                    self.pgr.delete_isolated_building(self.plz, kcid) #TODO: check approach with isolated buildings
                 self.logger.debug("rest building cluster finished")
 
-            bcid_list = self.pgr.get_unfinished_bcids(self.plz, kcid)
-            for bcid in bcid_list:
+            # Process unfinished clusters
+            for bcid in self.pgr.get_greenfield_bcids(self.plz, kcid):
                 # Substation positioning
                 if bcid >= 0:
                     utils.positionSubstation(self.pgr, self.plz, kcid, bcid)
