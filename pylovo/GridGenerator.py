@@ -34,7 +34,7 @@ class GridGenerator:
         self.cache_and_preprocess_static_objects()
         self.preprocess_ways()
         self.apply_kmeans_clustering()
-        self.position_substations()
+        self.position_all_transformers()
         self.install_cables()
         self.pgr.save_and_reset_tables(plz=self.plz)
 
@@ -149,9 +149,9 @@ class GridGenerator:
         if no_kmean_count not in [0, None]:
             warnings.warn("Something wrong with k mean clustering")
 
-    def position_substations(self):
+    def position_all_transformers(self):
         """
-        Positions substations for each bcid cluster considering existing transformers.
+        Positions all transformers for each bcid cluster (brownfield with existing transformers and greenfield)
         FROM: buildings_tem, building_clusters
         INTO: buildings_tem, building_clusters
         """
@@ -161,7 +161,7 @@ class GridGenerator:
             kcid = self.pgr.get_next_unfinished_kcid(self.plz)
             self.logger.debug(f"working on kcid {kcid}")
             # Building clustering
-            # 0. Check for existing transformers
+            # 0. Check for existing transformers from OSM
             transformers = self.pgr.get_included_transformers(kcid)
 
             # Case 1: No transformers present
@@ -175,7 +175,7 @@ class GridGenerator:
             else:
                 self.logger.debug(f"kcid{kcid} has {len(transformers)} transformers")
                 # Create brownfield building clusters with existing transformers
-                self.pgr.assign_transformer_clusters(self.plz, kcid, transformers)
+                self.pgr.position_brownfield_transformers(self.plz, kcid, transformers)
 
                 # Check buildings and manage clusters
                 if self.pgr.count_kmean_cluster_consumers(kcid) > 1:
@@ -186,10 +186,10 @@ class GridGenerator:
 
             # Process unfinished clusters
             for bcid in self.pgr.get_greenfield_bcids(self.plz, kcid):
-                # Substation positioning
+                # Transformer positioning for greenfield clusters
                 if bcid >= 0:
-                    utils.positionSubstation(self.pgr, self.plz, kcid, bcid)
-                    self.logger.debug(f"substation positioning for kcid{kcid}, bcid{bcid} finished")
+                    self.position_greenfield_transformers(self.pgr, self.plz, kcid, bcid)
+                    self.logger.debug(f"Transformer positioning for kcid{kcid}, bcid{bcid} finished")
                     self.pgr.update_s_max(self.plz, kcid, bcid, 1)
                     self.logger.debug("Smax in building_clusters is updated.")
 
