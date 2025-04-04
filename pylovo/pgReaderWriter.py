@@ -739,21 +739,21 @@ class PgReaderWriter:
                 pp.get_element_index(net, "bus", f"Connection Nodebus {node}"), "y"
             ] += (5 * 1e-6 * branch_deviation)
 
-    def get_vertices_from_bcid(self, lcid:int, kcid:int, bcid:int) -> tuple[dict, int]:
-        ont = self.get_ont_info_from_bc(lcid, kcid, bcid)["ont_vertice_id"]
+    def get_vertices_from_bcid(self, plz:int, kcid:int, bcid:int) -> tuple[dict, int]:
+        ont = self.get_ont_info_from_bc(plz, kcid, bcid)["ont_vertice_id"]
 
         consumer_query = """SELECT vertice_id FROM buildings_tem
-                    WHERE plz = %(l)s 
+                    WHERE plz = %(p)s 
                     AND kcid = %(k)s
                     AND bcid = %(b)s;"""
-        self.cur.execute(consumer_query, {"l": lcid, "k": kcid, "b": bcid})
+        self.cur.execute(consumer_query, {"p": plz, "k": kcid, "b": bcid})
         consumer = [t[0] for t in self.cur.fetchall()]
 
         connection_query = """SELECT DISTINCT connection_point FROM buildings_tem
-                    WHERE plz = %(l)s 
+                    WHERE plz = %(p)s 
                     AND kcid = %(k)s
                     AND bcid = %(b)s;"""
-        self.cur.execute(connection_query, {"l": lcid, "k": kcid, "b": bcid})
+        self.cur.execute(connection_query, {"p": plz, "k": kcid, "b": bcid})
         connection = [t[0] for t in self.cur.fetchall()]
 
         vertices_query = """ SELECT DISTINCT node, agg_cost FROM pgr_dijkstra(
@@ -804,13 +804,13 @@ class PgReaderWriter:
 
         return way_list
 
-    def get_ont_geom_from_bcid(self, lcid:int, kcid:int, bcid:int):
+    def get_ont_geom_from_bcid(self, plz:int, kcid:int, bcid:int):
         query = """SELECT ST_X(ST_Transform(geom,4326)), ST_Y(ST_Transform(geom,4326)) FROM transformer_positions
                     WHERE version_id = %(v)s 
-                    AND plz = %(l)s 
+                    AND plz = %(p)s 
                     AND kcid = %(k)s
                     AND bcid = %(b)s;"""
-        self.cur.execute(query, {"v": VERSION_ID, "l": lcid, "k": kcid, "b": bcid})
+        self.cur.execute(query, {"v": VERSION_ID, "p": plz, "k": kcid, "b": bcid})
         geo = self.cur.fetchone()
 
         return geo
@@ -824,13 +824,13 @@ class PgReaderWriter:
 
         return geo
 
-    def get_smax_from_bcid(self, lcid:int, kcid:int, bcid:int) -> int:
+    def get_smax_from_bcid(self, plz:int, kcid:int, bcid:int) -> int:
         query = """SELECT s_max FROM building_clusters
                     WHERE version_id = %(v)s 
-                    AND plz = %(l)s 
+                    AND plz = %(p)s 
                     AND kcid = %(k)s
                     AND bcid = %(b)s;"""
-        self.cur.execute(query, {"v": VERSION_ID, "l": lcid, "k": kcid, "b": bcid})
+        self.cur.execute(query, {"v": VERSION_ID, "p": plz, "k": kcid, "b": bcid})
         s_max = self.cur.fetchone()[0]
 
         return s_max
@@ -884,7 +884,7 @@ class PgReaderWriter:
             kcid: k mean cluster id
         Returns: Die Distanzmatrix der Gebäuden als np.array und das Mapping zwischen vertice_id und lokale ID als dict
         """
-        # Creates a distance matrix from the buildings in the loadarea cluster or smaller in the building cluster
+        # Creates a distance matrix from the buildings in the postcode cluster or smaller in the building cluster
 
         costmatrix_query = """SELECT * FROM pgr_dijkstraCostMatrix(
                             'SELECT way_id as id, source, target, cost, reverse_cost FROM public.ways_tem',
@@ -904,7 +904,7 @@ class PgReaderWriter:
             bcid: building cluster ID
         Returns: Die Distanzmatrix der Gebäuden als np.array und das Mapping zwischen vertice_id und lokale ID als dict
         """
-        # Creates a distance matrix from the buildings in the loadarea cluster or smaller in the building cluster
+        # Creates a distance matrix from the buildings in the postcode cluster or smaller in the building cluster
 
         costmatrix_query = """SELECT * FROM pgr_dijkstraCostMatrix(
                             'SELECT way_id as id, source, target, cost, reverse_cost FROM public.ways_tem',
@@ -917,19 +917,19 @@ class PgReaderWriter:
 
         return self._calculate_cost_arr_dist_matrix(costmatrix_query, params)
 
-    def upsert_building_cluster(self, lcid:int, kcid:int, bcid:int, vertices:list, s_max:float):
+    def upsert_building_cluster(self, plz:int, kcid:int, bcid:int, vertices:list, s_max:float):
         """
         Assign buildings in buildings_tem the bcid and stores the cluster in building_clusters
         Args:
             bcid: building cluster ID
-            lcid: loadarea cluster ID - plz
+            plz: postcode cluster ID - plz
             vertices: Liste der vertice_id von gewählten Gebäuden
             s_max: Scheinleistung der vorgesehenen Transformator
         """
         # Insert references to building elements in which cluster they are.
         building_query = """UPDATE public.buildings_tem 
         SET bcid = %(bc)s 
-        WHERE plz = %(lc)s 
+        WHERE plz = %(pc)s 
         AND kcid = %(kc)s 
         AND bcid ISNULL 
         AND connection_point IN %(vid)s 
@@ -937,7 +937,7 @@ class PgReaderWriter:
 
         params = {
             "v": VERSION_ID,
-            "lc": lcid,
+            "pc": plz,
             "bc": bcid,
             "kc": kcid,
             "vid": tuple(map(int, vertices)),
@@ -946,9 +946,9 @@ class PgReaderWriter:
 
         # Insert new clustering
         cluster_query = """INSERT INTO building_clusters (version_id, plz, kcid, bcid, s_max) 
-                VALUES(%(v)s, %(lc)s, %(kc)s, %(bc)s, %(s)s); """
+                VALUES(%(v)s, %(pc)s, %(kc)s, %(bc)s, %(s)s); """
 
-        params = {"v": VERSION_ID, "lc": lcid, "bc": bcid, "kc": kcid, "s": int(s_max)}
+        params = {"v": VERSION_ID, "pc": plz, "bc": bcid, "kc": kcid, "s": int(s_max)}
         self.cur.execute(cluster_query, params)
 
     def zero_too_large_consumers(self) -> int:
@@ -965,30 +965,30 @@ class PgReaderWriter:
 
         return too_large
 
-    def clear_building_clusters_in_kmean_cluster(self, lcid:int, kcid:int):
-        # Remove old clustering at same loadarea cluster
+    def clear_building_clusters_in_kmean_cluster(self, plz:int, kcid:int):
+        # Remove old clustering at same postcode cluster
         clear_query = """DELETE FROM building_clusters
                 WHERE  version_id = %(v)s 
-                AND plz = %(lc)s
+                AND plz = %(pc)s
                 AND kcid = %(kc)s
                 AND bcid >= 0; """
 
-        params = {"v": VERSION_ID, "lc": lcid, "kc": kcid}
+        params = {"v": VERSION_ID, "pc": plz, "kc": kcid}
         self.cur.execute(clear_query, params)
         self.logger.debug(
-            f"Building clusters with plz = {lcid}, k_mean cluster = {kcid} area cleared."
+            f"Building clusters with plz = {plz}, k_mean cluster = {kcid} area cleared."
         )
 
-    def upsert_substation_selection(self, lcid:int, kcid:int, bcid:int, connection_id:int):
+    def upsert_substation_selection(self, plz:int, kcid:int, bcid:int, connection_id:int):
         """Writes the vertice_id of chosen building as ONT location in the building_clusters table"""
 
         query = """UPDATE building_clusters SET ont_vertice_id = %(c)s 
-                    WHERE version_id = %(v)s AND plz = %(l)s AND kcid = %(k)s AND bcid = %(b)s; 
+                    WHERE version_id = %(v)s AND plz = %(p)s AND kcid = %(k)s AND bcid = %(b)s; 
                     UPDATE building_clusters SET model_status = 1 
-                    WHERE version_id = %(v)s AND plz = %(l)s AND kcid = %(k)s AND bcid = %(b)s;
+                    WHERE version_id = %(v)s AND plz = %(p)s AND kcid = %(k)s AND bcid = %(b)s;
                 INSERT INTO transformer_positions (version_id, plz, kcid, bcid, geom, ogc_fid, comment)
-                    VALUES (%(v)s, %(l)s, %(k)s, %(b)s, (SELECT the_geom FROM ways_tem_vertices_pgr WHERE id = %(c)s), %(c)s::varchar, 'on_way');"""
-        params = {"v": VERSION_ID, "c": connection_id, "b": bcid, "k": kcid, "l": lcid}
+                    VALUES (%(v)s, %(p)s, %(k)s, %(b)s, (SELECT the_geom FROM ways_tem_vertices_pgr WHERE id = %(c)s), %(c)s::varchar, 'on_way');"""
+        params = {"v": VERSION_ID, "c": connection_id, "b": bcid, "k": kcid, "p": plz}
 
         self.cur.execute(query, params)
 
@@ -1060,33 +1060,33 @@ class PgReaderWriter:
             self.logger.debug("double or multiple transformer group s_max assigned")
 
 
-    def get_unfinished_bcids(self, lcid:int, kcid:int) -> list:
+    def get_greenfield_bcids(self, plz:int, kcid:int) -> list:
         """
         Args:
-            lcid: loadarea cluster ID
-        Returns: Eine Liste von nicht modellierten building cluster ID aus dem gegebenen loadarea
+            plz: loadarea cluster ID
+        Returns: A list of greenfield building clusters for a given plz
         """
         query = """SELECT DISTINCT bcid FROM building_clusters
             WHERE version_id = %(v)s 
             AND kcid = %(kc)s
-            AND plz = %(lc)s
+            AND plz = %(pc)s
             AND model_status ISNULL
             ORDER BY bcid; """
-        params = {"v": VERSION_ID, "lc": lcid, "kc": kcid}
+        params = {"v": VERSION_ID, "pc": plz, "kc": kcid}
         self.cur.execute(query, params)
         bcid_list = [t[0] for t in data] if (data := self.cur.fetchall()) else []
         return bcid_list
 
 
-    def get_ont_info_from_bc(self, lcid:int, kcid:int, bcid:int) -> dict:
+    def get_ont_info_from_bc(self, plz:int, kcid:int, bcid:int) -> dict:
 
         query = """SELECT ont_vertice_id, s_max
                     FROM building_clusters
                     WHERE version_id = %(v)s 
                     AND kcid = %(k)s
                     AND bcid = %(b)s
-                    AND plz = %(l)s; """
-        params = {"v": VERSION_ID, "l": lcid, "k": kcid, "b": bcid}
+                    AND plz = %(p)s; """
+        params = {"v": VERSION_ID, "p": plz, "k": kcid, "b": bcid}
         self.cur.execute(query, params)
         info = self.cur.fetchall()
         if not info:
@@ -1232,7 +1232,7 @@ class PgReaderWriter:
             conn_id_list: Union[list, tuple],
             count: int,
             kcid: int,
-            lcid: int,
+            plz: int,
             sim_load: int
     ) -> None:
         """
@@ -1247,7 +1247,7 @@ class PgReaderWriter:
             conn_id_list (Union[list, tuple]): A list or tuple of connection point IDs.
             count (int): The new building cluster identifier.
             kcid (int): The KCID value.
-            lcid (int): The LCID value.
+            plz (int): The postcode value.
             sim_load (int): The simulation load value.
         """
         query = """
@@ -1261,11 +1261,11 @@ class PgReaderWriter:
               AND type != 'Transformer';
 
             INSERT INTO building_clusters (version_id, plz, kcid, bcid, ont_vertice_id, s_max)
-            VALUES (%(v)s, %(lc)s, %(k)s, %(count)s, %(t)s, %(l)s);
+            VALUES (%(v)s, %(pc)s, %(k)s, %(count)s, %(t)s, %(l)s);
 
             INSERT INTO transformer_positions (version_id, plz, kcid, bcid, geom, ogc_fid, comment)
             VALUES (
-                %(v)s, %(lc)s, %(k)s, %(count)s,
+                %(v)s, %(pc)s, %(k)s, %(count)s,
                 (SELECT center FROM buildings_tem WHERE vertice_id = %(t)s),
                 (SELECT osm_id FROM buildings_tem WHERE vertice_id = %(t)s),
                 'Normal'
@@ -1277,7 +1277,7 @@ class PgReaderWriter:
             "c": tuple(conn_id_list),
             "t": transformer_id,
             "k": kcid,
-            "lc": lcid,
+            "pc": plz,
             "l": sim_load,
         }
         self.cur.execute(query, params)
@@ -1503,7 +1503,6 @@ class PgReaderWriter:
     def set_residential_buildings_table(self, plz:int):
         """
         * Fills buildings_tem with residential buildings which are inside the plz area
-        * Sets the loadarea cluster initially to plz
         :param plz:
         :return:
         """
@@ -1519,7 +1518,6 @@ class PgReaderWriter:
     def set_other_buildings_table(self, plz:int):
         """
         * Fills buildings_tem with other buildings which are inside the plz area
-        * Sets the loadarea cluster initially to plz
         * Sets all floors to 1
         :param plz:
         :return:
@@ -1539,7 +1537,7 @@ class PgReaderWriter:
     def set_residential_buildings_table_from_osmid(self, plz:int, buildings:list) -> None:
         """
         * Fills buildings_tem with residential buildings which are inside the selected polygon
-        * Sets the loadarea cluster to first plz that intersects
+        * Sets the postcode cluster to first plz that intersects
         :param shape:
         :return:
         """
@@ -1554,7 +1552,7 @@ class PgReaderWriter:
     def set_other_buildings_table_from_osmid(self, plz:int, buildings:list) -> None:
         """
         * Fills buildings_tem with other buildings which are inside the selected polygon
-        * Sets the loadarea cluster to first plz that intersects shapefile
+        * Sets the postcode cluster to first plz that intersects shapefile
         * Sets all floors to 1
         :param shape:
         :return:
