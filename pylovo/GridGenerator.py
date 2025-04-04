@@ -188,7 +188,7 @@ class GridGenerator:
             for bcid in self.pgr.get_greenfield_bcids(self.plz, kcid):
                 # Transformer positioning for greenfield clusters
                 if bcid >= 0:
-                    self.pgr.position_greenfield_transformers(self.pgr, self.plz, kcid, bcid)
+                    self.pgr.position_greenfield_transformers(self.plz, kcid, bcid)
                     self.logger.debug(f"Transformer positioning for kcid{kcid}, bcid{bcid} finished")
                     self.pgr.update_s_max(self.plz, kcid, bcid, 1)
                     self.logger.debug("Smax in building_clusters is updated.")

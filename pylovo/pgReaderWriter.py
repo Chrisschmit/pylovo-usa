@@ -1249,7 +1249,7 @@ class PgReaderWriter:
 
         self.logger.debug("Brownfield clusters completed")
 
-    def position_greenfield_transformers(pgr, plz, kcid, bcid):
+    def position_greenfield_transformers(self, plz, kcid, bcid):
         """
         Positions a transformer at the optimal location for a greenfield building cluster.
 
@@ -1262,18 +1262,18 @@ class PgReaderWriter:
             bcid: Building cluster ID
         """
         # Get all connection points in the building cluster
-        connection_points = pgr.get_building_connection_points_from_bc(kcid, bcid)
+        connection_points = self.get_building_connection_points_from_bc(kcid, bcid)
 
         # If there's only one connection point, use it
         if len(connection_points) == 1:
-            pgr.upsert_transformer_selection(plz, kcid, bcid, connection_points[0])
+            self.upsert_transformer_selection(plz, kcid, bcid, connection_points[0])
             return
 
         # Get distance matrix between all connection points
-        localid2vid, dist_mat, _ = pgr.get_distance_matrix_from_building_cluster(kcid, bcid)
+        localid2vid, dist_mat, _ = self.get_distance_matrix_from_building_cluster(kcid, bcid)
 
         # Get load vector for each connection point
-        loads = pgr.generate_load_vector(kcid, bcid)
+        loads = self.generate_load_vector(kcid, bcid)
 
         # Calculate weighted distance (distance * load) for each potential location
         total_load_per_vertice = dist_mat.dot(loads)
@@ -1283,7 +1283,7 @@ class PgReaderWriter:
         ont_connection_id = int(localid2vid[min_localid])
 
         # Update the database with the selected transformer position
-        pgr.upsert_transformer_selection(plz, kcid, bcid, ont_connection_id)
+        self.upsert_transformer_selection(plz, kcid, bcid, ont_connection_id)
 
     def update_building_cluster(
             self,
