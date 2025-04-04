@@ -1,8 +1,8 @@
-CLASSIFICATION_VERSION: 4
+CLASSIFICATION_VERSION: 1
 VERSION_COMMENT: "set sample with inspected building quality"
 CLASSIFICATION_REGION: Bayern
 NO_OF_CLUSTERS_ALLOWED: [3, 4, 5, 6, 7]
-N_SAMPLES: 4  # default value
+N_SAMPLES: 7  # default value
 
 REGION_DICT:
   1: Schleswig-Hohlstein
