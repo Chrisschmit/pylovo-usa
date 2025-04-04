@@ -24,7 +24,7 @@ def save_yaml(filepath, data):
 def run_script(script_name):
     """Runs a Python script inside the classification module, streams output"""
     process = subprocess.Popen(
-        ["python", "-m", f"classification.{script_name}"],
+        [sys.executable, "-m", f"classification.{script_name}"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True
