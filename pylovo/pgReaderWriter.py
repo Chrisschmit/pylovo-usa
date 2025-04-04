@@ -1165,48 +1165,63 @@ class PgReaderWriter:
 
         return cost_df
 
-    def assign_transformer_clusters(self, plz:int, kcid:int, transformer_list:list) -> None:
-        """Assign buildings to the existing transformers and store it as bcid in buildings_tem"""
-        self.logger.debug(f"{len(transformer_list)} transformer found")
+    def position_brownfield_transformers(self, plz: int, kcid: int, transformer_list: list) -> None:
+        """
+        Assign buildings to existing transformers and store as bcid in buildings_tem.
 
+        Args:
+            plz: Postal code
+            kcid: K-means cluster ID
+            transformer_list: List of transformer IDs
+        """
+        self.logger.debug(f"{len(transformer_list)} transformers found")
+
+        # Get cost dataframe between consumers and transformers
         cost_df = self.get_consumer_to_transformer_df(kcid, transformer_list)
-        cost_df = cost_df.drop(cost_df[cost_df["agg_cost"] >= 300].index)
-        # for t in cost_df['end_vid']: cost_df_tem = cost_df[cost_df['end_vid'] == t] cost_list =
-        # cost_df_tem.sort_values(by = ['agg_cost'])['agg_cost'].values for i in range(len(cost_list) - 1): if
-        # cost_list[i+1] - cost_list[i] >= 60: cost_df = cost_df.drop(cost_df[(cost_df['end_vid'] == t) & (cost_df[
-        # 'agg_cost'] > cost_list[i])].index) break
-        cost_df = cost_df.sort_values(by=["agg_cost"])
-        sim_load = 0
+
+        # Filter out connections with distance >= 300
+        cost_df = cost_df[cost_df["agg_cost"] < 300].sort_values(by=["agg_cost"])
+
+        # Initialize tracking variables
         pre_result_dict = {transformer_id: [] for transformer_id in transformer_list}
         full_transformer_list = []
         assigned_consumer_list = []
-        for index, row in cost_df.iterrows():
+
+        # Assign consumers to closest transformer
+        for _, row in cost_df.iterrows():
             start_consumer_id = row["start_vid"]
             end_transformer_id = row["end_vid"]
-            if start_consumer_id in assigned_consumer_list:
+
+            # Skip if consumer already assigned or transformer full
+            if start_consumer_id in assigned_consumer_list or end_transformer_id in full_transformer_list:
                 continue
-            if end_transformer_id in full_transformer_list:
-                continue
-            pre_result_dict[end_transformer_id].append(start_consumer_id.item())
+
+            # Try to assign consumer to transformer
+            pre_result_dict[end_transformer_id].append(int(start_consumer_id))
             sim_load = self.calculate_sim_load(pre_result_dict[end_transformer_id])
+
+            # Check if transformer capacity exceeded
             if float(sim_load) >= 630:
-                # this transformer can not take anymore consumers, delete every dataframe record related
-                self.logger.info(f"transformer {end_transformer_id} capacity exceeded")
-                pre_result_dict[end_transformer_id].remove(start_consumer_id.item())
+                # Remove consumer and mark transformer as full
+                pre_result_dict[end_transformer_id].pop()
                 full_transformer_list.append(end_transformer_id)
-                if len(full_transformer_list) != len(transformer_list):
-                    continue
-                self.logger.info("all transformer full")
-                break
+
+                # Exit if all transformers are full
+                if len(full_transformer_list) == len(transformer_list):
+                    self.logger.info("All transformers full")
+                    break
             else:
-                # this consumer has been assigned to specific transformer so delete related in dataframe
+                # Mark consumer as assigned
                 assigned_consumer_list.append(start_consumer_id)
 
-        self.logger.debug("transformer selection finished")
+        self.logger.debug("Transformer selection finished")
+
+        # Create building clusters for each transformer
         building_cluster_count = 0
         for transformer_id in transformer_list:
-            if len(pre_result_dict[transformer_id]) == 0:
-                self.logger.debug(f"transformer {transformer_id} has no asigned consumer, deleted")
+            # Skip empty transformers
+            if not pre_result_dict[transformer_id]:
+                self.logger.debug(f"Transformer {transformer_id} has no assigned consumer, deleted")
                 self.delete_transformers([transformer_id])
                 continue
 
