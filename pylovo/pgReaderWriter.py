@@ -1730,125 +1730,98 @@ class PgReaderWriter:
                 cluster_dict[cluster_id] = (vid_list, opt_transformer)
         return invalid_cluster_dict, cluster_dict, cluster_count
 
-    def create_building_clusters_for_kcid(self, plz:int, kcid:int) -> None:
-        """
-        Create building clusters (bcids) with average linkage method for a given kcid.
-        :param plz:
-        :param kcid:
-        :return:
-        """
-        # Hole die Gebäuden in dem Load Area Cluster
-        buildings = self.get_buildings_from_kc(kcid)
-        # Hole die Verbraucherkategorien
-        consumer_cat_df = self.get_consumer_categories()
-        # Settlement type (1,2,3)
-        settlement_type = self.get_settlement_type_from_plz(plz)
-        # Transformatordaten
-        transformer_capacities, _ = self.get_transformator_data(settlement_type)
-        double_trans = np.multiply(transformer_capacities[2:4], 2)
+    def create_bcid_for_kcid(self, plz: int, kcid: int) -> None:
+                """
+                Create building clusters (bcids) with average linkage method for a given kcid.
+                :param plz: Postal code
+                :param kcid: K-means cluster ID
+                :return: None
+                """
+                # Get data needed for clustering
+                buildings = self.get_buildings_from_kcid(kcid)
+                consumer_cat_df = self.get_consumer_categories()
+                settlement_type = self.get_settlement_type_from_plz(plz)
+                transformer_capacities, _ = self.get_transformer_data(settlement_type)
+                double_trans = np.multiply(transformer_capacities[2:4], 2)
 
-        # Distance Matrix von Verbrauchern in einem Load Area Cluster
-        localid2vid, dist_mat, vid2localid = self.get_distance_matrix_from_kmean_cluster(kcid)
-        # Transform to a condensed distance vector for linkage
-        dist_vector = squareform(dist_mat)
-        # hierarchical clustering
-        if len(dist_vector) > 0:  # todo: check if this addition changes logic
-            Z = linkage(dist_vector, method="average")
+                # Get distance matrix and prepare for hierarchical clustering
+                localid2vid, dist_mat, vid2localid = self.get_distance_matrix_from_kcid(kcid)
+                dist_vector = squareform(dist_mat)
 
-            # transform to flat clustering
-            valid_cluster_dict = {}
-            invalid_trans_cluster_dict = {}
-            cluster_amount = 2
+                if len(dist_vector) == 0:
+                    return
 
-            new_localid2vid = localid2vid
-            while True:
-                invalid_cluster_dict, cluster_dict, cluster_count = self.try_clustering(
-                    Z,
-                    cluster_amount,
-                    new_localid2vid,
-                    buildings,
-                    consumer_cat_df,
-                    transformer_capacities,
-                    double_trans,
-                )
-                # combination and re_index
-                if len(cluster_dict) != 0:
-                    current_valid_amount = len(valid_cluster_dict)
-                    valid_cluster_dict.update(
-                        {x + current_valid_amount: y for x, y in cluster_dict.items()}
-                    )
-                    valid_cluster_dict = dict(enumerate(valid_cluster_dict.values()))
+                # Initialize hierarchical clustering
+                Z = linkage(dist_vector, method="average")
+                valid_cluster_dict = {}
+                invalid_trans_cluster_dict = {}
+                cluster_amount = 2
+                new_localid2vid = localid2vid
 
-                if len(invalid_cluster_dict) != 0:
-                    current_invalid_amount = len(invalid_trans_cluster_dict)
-                    invalid_trans_cluster_dict.update(
-                        {
-                            x + current_invalid_amount: y
-                            for x, y in invalid_cluster_dict.items()
-                        }
-                    )
-                    invalid_trans_cluster_dict = dict(
-                        enumerate(invalid_trans_cluster_dict.values())
+                # Iterative clustering process
+                while True:
+                    # Try clustering with current parameters
+                    invalid_cluster_dict, cluster_dict, _ = self.try_clustering(
+                        Z, cluster_amount, new_localid2vid, buildings,
+                        consumer_cat_df, transformer_capacities, double_trans
                     )
 
-                if len(invalid_trans_cluster_dict) == 0:
-                    # terminate when there is not too_large cluster and amount of double transformers are within limit
-                    # combination and re_index
-                    self.logger.debug(
-                        f"altogether {len(valid_cluster_dict)} single transformer clusters found"
+                    # Process valid clusters
+                    if cluster_dict:
+                        current_valid_amount = len(valid_cluster_dict)
+                        valid_cluster_dict.update({x + current_valid_amount: y for x, y in cluster_dict.items()})
+                        valid_cluster_dict = dict(enumerate(valid_cluster_dict.values()))
+
+                    # Process invalid clusters
+                    if invalid_cluster_dict:
+                        current_invalid_amount = len(invalid_trans_cluster_dict)
+                        invalid_trans_cluster_dict.update(
+                            {x + current_invalid_amount: y for x, y in invalid_cluster_dict.items()}
+                        )
+                        invalid_trans_cluster_dict = dict(enumerate(invalid_trans_cluster_dict.values()))
+
+                    # Check if clustering is complete
+                    if not invalid_trans_cluster_dict:
+                        self.logger.debug(f"altogether {len(valid_cluster_dict)} single transformer clusters found")
+                        break
+                    else:
+                        # Process too-large clusters by re-clustering them
+                        self.logger.debug(f"found {len(invalid_trans_cluster_dict)} too_large clusters")
+                        print(f'altogether {len(invalid_cluster_dict)} too_large clusters found')
+
+                        # Get buildings from the first too-large cluster for re-clustering
+                        invalid_vertice_ids = list(invalid_trans_cluster_dict[0])
+                        invalid_local_ids = [vid2localid[v] for v in invalid_vertice_ids]
+
+                        # Create new mappings and distance matrix for the subclustering
+                        new_localid2vid = {k: v for k, v in localid2vid.items() if k in invalid_local_ids}
+                        new_localid2vid = dict(enumerate(new_localid2vid.values()))
+                        new_dist_mat = dist_mat[invalid_local_ids][:, invalid_local_ids]
+                        new_dist_vector = squareform(new_dist_mat)
+
+                        # Prepare for next iteration
+                        Z = linkage(new_dist_vector, method="average")
+                        cluster_amount = 2
+                        del invalid_trans_cluster_dict[0]
+                        invalid_trans_cluster_dict = dict(enumerate(invalid_trans_cluster_dict.values()))
+
+                # At this point, we've successfully found a valid electrical clustering solution with the minimum
+                # number of clusters. Each cluster:
+                #   1. Contains buildings that can be served by a single transformer
+                #   2. Has an appropriately sized transformer assigned
+                # The valid_cluster_dict maps building cluster IDs to tuples of (building_vertices_list, optimal_transformer_size)
+                # We could calculate the total transformer cost by summing the costs of all selected transformers:
+                # total_transformer_cost = sum([transformer2cost[v[1]] for v in valid_cluster_dict.values()])
+
+                # Save results to database
+                self.clear_building_clusters_in_kmean_cluster(plz, kcid)
+                for bcid, cluster_data in valid_cluster_dict.items():
+                    self.upsert_building_cluster(
+                        plz, kcid, bcid,
+                        vertices=cluster_data[0],
+                        s_max=cluster_data[1]
                     )
-                    break
-
-                else:
-                    self.logger.debug(f"found {len(invalid_trans_cluster_dict)} too_large clusters")
-                    # first deal with those too_large clusters
-
-                    # get local_ids for those buildings which are in a too_large clusters
-                    # print(f'altogether {len(invalid_cluster_dict)} too_large clusters found')
-                    invalid_vertice_ids = list(invalid_trans_cluster_dict[0])
-                    invalid_local_ids = [vid2localid[v] for v in invalid_vertice_ids]
-                    # print(invalid_local_ids)
-
-                    new_localid2vid = {
-                        k: v for k, v in localid2vid.items() if k in invalid_local_ids
-                    }
-                    new_localid2vid = dict(enumerate(new_localid2vid.values()))
-
-                    new_dist_mat = dist_mat[invalid_local_ids]
-                    new_dist_mat = new_dist_mat[:, invalid_local_ids]
-                    new_dist_vector = squareform(new_dist_mat)
-                    Z = linkage(new_dist_vector, method="average")
-                    cluster_amount = 2
-                    # have to refresh double_dict every iteration
-                    del invalid_trans_cluster_dict[0]
-                    invalid_trans_cluster_dict = dict(
-                        enumerate(invalid_trans_cluster_dict.values())
-                    )
-
-                continue
-
-            # at break of this iteration we have a possible clustering which is electrically valid and of min cluster
-            # numbers combine to an overall dict of all buildings about their post_defined cluster_ids:(vid_list,
-            # opt_transformer) current_valid_amount = len(valid_cluster_dict) total cost of transformers
-            # total_transformer_cost = sum([transformer2cost[v[1]] for v in valid_cluster_dict.values()])
-
-            # record result
-            # trafo_count = {100: 0, 160: 0, 250: 0, 400: 0, 630: 0, 1030: 0, 1260: 0}
-            # for key in valid_cluster_dict:
-            #     trafo_count[valid_cluster_dict[key][1]] = trafo_count[valid_cluster_dict[key][1]] + 1
-            # print(trafo_count)
-
-            # Upsert into the database
-            self.clear_building_clusters_in_kmean_cluster(plz, kcid)
-            for bcid in valid_cluster_dict:
-                self.upsert_building_cluster(
-                    plz,
-                    kcid,
-                    bcid,
-                    vertices=valid_cluster_dict[bcid][0],
-                    s_max=valid_cluster_dict[bcid][1],
-                )
-            self.logger.debug(f"BC upsert done for load_cluster {plz} k_mean cluster {kcid} ...")
+                self.logger.debug(f"bcids for plz {plz} kcid {kcid} found...")
 
     def draw_building_connection(self) -> None:
         """
