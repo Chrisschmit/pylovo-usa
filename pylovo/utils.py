@@ -4,6 +4,9 @@ import logging
 
 def create_logger(name, log_file, log_level):
     log_file = log_file
+    logger = logging.getLogger(name=name)
+    logger.handlers.clear()  # Clear existing handlers to prevent duplication
+
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
     # to print log messages to a file
@@ -14,7 +17,7 @@ def create_logger(name, log_file, log_level):
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
 
-    logger = logging.getLogger(name=name)
+    
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
     logger.setLevel(log_level)
