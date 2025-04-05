@@ -81,7 +81,7 @@ class PgReaderWriter:
 
         return settlement_type
 
-    def get_transformator_data(self, settlement_type : int = None) -> tuple[np.array, dict]:
+    def get_transformer_data(self, settlement_type : int = None) -> tuple[np.array, dict]:
         """
         Args:
             Settlement type: 1=City, 2=Village, 3=Rural
@@ -111,7 +111,7 @@ class PgReaderWriter:
         self.logger.debug("Transformer data fetched.")
         return np.array(capacities), transformer2cost
 
-    def get_buildings_from_kc(
+    def get_buildings_from_kcid(
             self,
             kcid : int,
     ) -> pd.DataFrame:
@@ -878,13 +878,13 @@ class PgReaderWriter:
 
         return conn_id
 
-    def get_distance_matrix_from_kmean_cluster(self, kcid:int) -> tuple[dict, np.ndarray, dict]:
+    def get_distance_matrix_from_kcid(self, kcid:int) -> tuple[dict, np.ndarray, dict]:
         """
+        Creates a distance matrix from the buildings in the kcid
         Args:
-            kcid: k mean cluster id
-        Returns: Die Distanzmatrix der Gebäuden als np.array und das Mapping zwischen vertice_id und lokale ID als dict
+            kcid: k-means cluster id
+        Returns: The distance matrix of the buildings as np.array and the mapping between vertice_id and local ID as dict
         """
-        # Creates a distance matrix from the buildings in the postcode cluster or smaller in the building cluster
 
         costmatrix_query = """SELECT * FROM pgr_dijkstraCostMatrix(
                             'SELECT way_id as id, source, target, cost, reverse_cost FROM public.ways_tem',
@@ -1009,7 +1009,7 @@ class PgReaderWriter:
         :return:
         """
         sdl = self.get_settlement_type_from_plz(plz)
-        transformer_capacities, _ = self.get_transformator_data(sdl)
+        transformer_capacities, _ = self.get_transformer_data(sdl)
 
         if note == 0:
             old_query = """SELECT s_max FROM building_clusters

@@ -174,7 +174,7 @@ class GridGenerator:
             if not transformers:
                 self.logger.debug(f"kcid{kcid} has no included transformer")
                 # Create greenfield building clusters
-                self.pgr.create_building_clusters_for_kcid(self.plz, kcid)
+                self.pgr.create_bcid_for_kcid(self.plz, kcid)
                 self.logger.debug(f"kcid{kcid} building clusters finished")
 
             # Case 2: Transformers present
@@ -185,7 +185,7 @@ class GridGenerator:
 
                 # Check buildings and manage clusters
                 if self.pgr.count_kmean_cluster_consumers(kcid) > 1:
-                    self.pgr.create_building_clusters_for_kcid(self.plz, kcid) #TODO: name should include transformer_size allocation
+                    self.pgr.create_bcid_for_kcid(self.plz, kcid) #TODO: name should include transformer_size allocation
                 else:
                     self.pgr.delete_isolated_building(self.plz, kcid) #TODO: check approach with isolated buildings
                 self.logger.debug("rest building cluster finished")
