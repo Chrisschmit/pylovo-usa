@@ -2033,7 +2033,7 @@ class PgReaderWriter:
 
     def update_kmeans_cluster(self, vertices: list) -> None:
         """
-        Applies k-means clustering and updated values in buildings_tem
+        Groups connected components into a k-means id withouth applying clustering
         :param vertices:
         :return:
         """

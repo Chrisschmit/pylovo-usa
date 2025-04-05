@@ -105,49 +105,56 @@ class GridGenerator:
 
     def apply_kmeans_clustering(self):
         """
-        Reads ways and vertices from ways_tem, applies k-means clustering
+        Find connected components (subgraphs) of an undirected street-graph applying
+        the Depth-First Search algorithm. Apply k-means clustering to these street network components.
+        This method reads edges and vertices from ways_tem and applies k-means clustering
+        to group components into clusters.
+
         FROM: ways_tem, buildings_tem
-        INTO: ways_tem, vertices_pgr, buildings_tem,
-        :return:
+        INTO: ways_tem, vertices_pgr, buildings_tem
         """
 
+        # Get connected components from the street network
         component, vertices = self.pgr.get_connected_component()
         component_ids = np.unique(component)
-        if len(component_ids) > 1:
-            for i in range(len(component_ids)):
-                component_id = component_ids[i]
-                related_vertices = vertices[np.argwhere(component == component_id)]
-                conn_building_count = self.pgr.count_connected_buildings(related_vertices)
-                if conn_building_count <= 1 or conn_building_count is None:
-                    self.pgr.delete_ways(related_vertices)
-                    self.pgr.delete_transformers(related_vertices)
-                    self.logger.debug(
-                        "no building component deleted. Useless ways and transformers are deleted from tem tables."
-                    )
-                elif conn_building_count >= LARGE_COMPONENT_LOWER_BOUND:
-                    cluster_count = int(conn_building_count / LARGE_COMPONENT_DIVIDER)
-                    self.pgr.update_large_kmeans_cluster(related_vertices, cluster_count)
-                    self.logger.debug(f"large component {i} updated")
-                else:
-                    self.pgr.update_kmeans_cluster(related_vertices)
-                    self.logger.debug(f"component {i} updated")
-        elif len(component_ids) == 1:
-            conn_building_count = self.pgr.count_connected_buildings(vertices)
-            if conn_building_count >= LARGE_COMPONENT_LOWER_BOUND:
-                cluster_count = int(conn_building_count / LARGE_COMPONENT_DIVIDER)
-                self.pgr.update_large_kmeans_cluster(vertices, cluster_count)
-                self.logger.debug(f" {cluster_count} component updated")
-            else:
-                self.pgr.update_kmeans_cluster(vertices)
-                self.logger.debug("component updated")
-        else:
-            warnings.warn(
-                "something wrong with connected component, no component could be fetched from ways_tem"
-            )
 
+        if len(component_ids) > 0:
+            # Handle components based on number
+            if len(component_ids) > 1:
+                # Process multiple connected components
+                for i, component_id in enumerate(component_ids):
+                    related_vertices = vertices[np.argwhere(component == component_id)]
+                    self._process_component(related_vertices, i)
+            else:
+                # Process single connected component
+                self._process_component(vertices)
+        else:
+            # No components found - issue warning
+            warnings.warn("No connected components found in ways_tem table")
+
+        # Verify clustering was successful for all buildings
         no_kmean_count = self.pgr.count_no_kmean_buildings()
         if no_kmean_count not in [0, None]:
-            warnings.warn("Something wrong with k mean clustering")
+            warnings.warn(f"K-means clustering issue: {no_kmean_count} buildings not assigned to clusters")
+
+    def _process_component(self, vertices, component_index=None):
+        """Helper method to process a component during clustering"""
+        conn_building_count = self.pgr.count_connected_buildings(vertices)
+
+        if conn_building_count <= 1 or conn_building_count is None:
+            # Remove isolated or empty components
+            self.pgr.delete_ways(vertices)
+            self.pgr.delete_transformers(vertices)
+            self.logger.debug("Empty/isolated component removed. Ways and transformers deleted from temporary tables.")
+        elif conn_building_count >= LARGE_COMPONENT_LOWER_BOUND:
+            # K-means applied to large component to define subgroups with cluster ids
+            cluster_count = int(conn_building_count / LARGE_COMPONENT_DIVIDER)
+            self.pgr.update_large_kmeans_cluster(vertices, cluster_count)
+            log_msg = f"Large component {component_index} clustered into {cluster_count} groups" if component_index is not None else f"Large component clustered into {cluster_count} groups"
+            self.logger.debug(log_msg)
+        else:
+            # Allocate cluster id for connected component smaller than the building threshold
+            self.pgr.update_kmeans_cluster(vertices)
 
     def position_all_transformers(self):
         """
