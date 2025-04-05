@@ -105,10 +105,9 @@ class GridGenerator:
 
     def apply_kmeans_clustering(self):
         """
-        Find connected components (subgraphs) of an undirected street-graph applying
-        the Depth-First Search algorithm. Apply k-means clustering to these street network components.
-        This method reads edges and vertices from ways_tem and applies k-means clustering
-        to group components into clusters.
+        Find connected components (subgraphs) of an undirected street-graph applying the Depth-First Search algorithm
+        to edges and vertices from ways_tem and (if necessary due to their size) apply k-means clustering to these
+        street network components.
 
         FROM: ways_tem, buildings_tem
         INTO: ways_tem, vertices_pgr, buildings_tem
@@ -124,10 +123,10 @@ class GridGenerator:
                 # Process multiple connected components
                 for i, component_id in enumerate(component_ids):
                     related_vertices = vertices[np.argwhere(component == component_id)]
-                    self._process_component(related_vertices, i)
+                    self._process_component_to_kcid(related_vertices, i)
             else:
                 # Process single connected component
-                self._process_component(vertices)
+                self._process_component_to_kcid(vertices)
         else:
             # No components found - issue warning
             warnings.warn("No connected components found in ways_tem table")
@@ -137,8 +136,8 @@ class GridGenerator:
         if no_kmean_count not in [0, None]:
             warnings.warn(f"K-means clustering issue: {no_kmean_count} buildings not assigned to clusters")
 
-    def _process_component(self, vertices, component_index=None):
-        """Helper method to process a component during clustering"""
+    def _process_component_to_kcid(self, vertices, component_index=None):
+        """Helper method to process components to kcid groups"""
         conn_building_count = self.pgr.count_connected_buildings(vertices)
 
         if conn_building_count <= 1 or conn_building_count is None:

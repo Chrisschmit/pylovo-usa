@@ -1732,7 +1732,7 @@ class PgReaderWriter:
 
     def create_building_clusters_for_kcid(self, plz:int, kcid:int) -> None:
         """
-        Cluster buildings with average linkage clustering
+        Create building clusters (bcids) with average linkage method for a given kcid.
         :param plz:
         :param kcid:
         :return:
@@ -1748,9 +1748,7 @@ class PgReaderWriter:
         double_trans = np.multiply(transformer_capacities[2:4], 2)
 
         # Distance Matrix von Verbrauchern in einem Load Area Cluster
-        localid2vid, dist_mat, vid2localid = self.get_distance_matrix_from_kmean_cluster(
-            kcid
-        )
+        localid2vid, dist_mat, vid2localid = self.get_distance_matrix_from_kmean_cluster(kcid)
         # Transform to a condensed distance vector for linkage
         dist_vector = squareform(dist_mat)
         # hierarchical clustering
