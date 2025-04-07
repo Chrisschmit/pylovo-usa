@@ -6,6 +6,7 @@ from pylovo.config_version import *
 import os
 import sys
 import pandas as pd
+import numpy as np
 import plotly.express as px
 from matplotlib import pyplot as plt
 import pandapower as pp
