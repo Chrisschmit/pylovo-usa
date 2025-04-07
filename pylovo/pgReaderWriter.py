@@ -917,7 +917,7 @@ class PgReaderWriter:
 
         return self._calculate_cost_arr_dist_matrix(costmatrix_query, params)
 
-    def upsert_building_cluster(self, plz:int, kcid:int, bcid:int, vertices:list, transformer_rated_power:bigint):
+    def upsert_building_cluster(self, plz:int, kcid:int, bcid:int, vertices:list, transformer_rated_power:int):
         """
         Assign buildings in buildings_tem the bcid and stores the cluster in building_clusters
         Args:
