@@ -103,7 +103,7 @@ CREATE_QUERIES = {
     kcid integer NOT NULL,
     bcid integer NOT NULL,
     plz integer,
-    transformer_size_selected bigint,
+    transformer_rated_power bigint,
     model_status integer,
     ont_vertice_id bigint,
     CONSTRAINT building_clusters_pkey PRIMARY KEY (version_id, kcid, bcid, plz)
