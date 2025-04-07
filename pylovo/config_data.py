@@ -127,8 +127,7 @@ CREATE_QUERIES = {
         REFERENCES public.version (version_id)
         ON DELETE CASCADE
 )""",
-    "lines_result": """
-CREATE TABLE IF NOT EXISTS public.lines_result
+    "lines_result": """CREATE TABLE IF NOT EXISTS public.lines_result
 (
     version_id varchar(10) NOT NULL,
     geom geometry(LineString,3035),
