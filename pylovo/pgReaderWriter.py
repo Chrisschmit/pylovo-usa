@@ -304,23 +304,23 @@ class PgReaderWriter:
         return None
 
     def create_transformer(self, plz : int, kcid : int, bcid : int, net : pp.pandapowerNet) -> None:
-        transformer_size_selected = self.get_transformer_size_selected_from_bcid(plz, kcid, bcid)
-        if transformer_size_selected in (250, 400, 630):
-            trafo_name = f"{str(transformer_size_selected)} transformer"
-            trafo_std = f"{str(transformer_size_selected * 1e-3)} MVA 20/0.4 kV"
+        transformer_rated_power = self.get_transformer_rated_power_from_bcid(plz, kcid, bcid)
+        if transformer_rated_power in (250, 400, 630):
+            trafo_name = f"{str(transformer_rated_power)} transformer"
+            trafo_std = f"{str(transformer_rated_power * 1e-3)} MVA 20/0.4 kV"
             parallel = 1
-        elif transformer_size_selected in (100, 160):
-            trafo_name = f"{str(transformer_size_selected)} transformer"
+        elif transformer_rated_power in (100, 160):
+            trafo_name = f"{str(transformer_rated_power)} transformer"
             trafo_std = "0.25 MVA 20/0.4 kV"
             parallel = 1
-        elif transformer_size_selected in (500, 800):
-            trafo_name = f"{str(transformer_size_selected * 0.5)} transformer"
-            trafo_std = f"{str(transformer_size_selected * 1e-3 * 0.5)} MVA 20/0.4 kV"
+        elif transformer_rated_power in (500, 800):
+            trafo_name = f"{str(transformer_rated_power * 0.5)} transformer"
+            trafo_std = f"{str(transformer_rated_power * 1e-3 * 0.5)} MVA 20/0.4 kV"
             parallel = 2
         else:
             trafo_name = "630 transformer"
             trafo_std = "0.63 MVA 20/0.4 kV"
-            parallel = transformer_size_selected / 630
+            parallel = transformer_rated_power / 630
         trafo_index = pp.create_transformer(
             net,
             pp.get_element_index(net, "bus", "MVbus 1"),
@@ -330,7 +330,7 @@ class PgReaderWriter:
             tap_pos=0,
             parallel=parallel,
         )
-        net.trafo.at[trafo_index, "sn_mva"] = transformer_size_selected * 1e-3
+        net.trafo.at[trafo_index, "sn_mva"] = transformer_rated_power * 1e-3
         return None
 
     def create_connection_bus(self, connection_nodes : list, net : pp.pandapowerNet):
@@ -824,16 +824,16 @@ class PgReaderWriter:
 
         return geo
 
-    def get_transformer_size_selected_from_bcid(self, lcid:int, kcid:int, bcid:int) -> int:
-        query = """SELECT transformer_size_selected FROM building_clusters
+    def get_transformer_rated_power_from_bcid(self, lcid:int, kcid:int, bcid:int) -> int:
+        query = """SELECT transformer_rated_power FROM building_clusters
                     WHERE version_id = %(v)s 
                     AND plz = %(l)s 
                     AND kcid = %(k)s
                     AND bcid = %(b)s;"""
         self.cur.execute(query, {"v": VERSION_ID, "l": lcid, "k": kcid, "b": bcid})
-        transformer_size_selected = self.cur.fetchone()[0]
+        transformer_rated_power = self.cur.fetchone()[0]
 
-        return transformer_size_selected
+        return transformer_rated_power
 
     def get_list_from_plz(self, plz:int) -> list:
         query = """SELECT DISTINCT kcid, bcid FROM building_clusters 
@@ -917,14 +917,15 @@ class PgReaderWriter:
 
         return self._calculate_cost_arr_dist_matrix(costmatrix_query, params)
 
-    def upsert_building_cluster(self, lcid:int, kcid:int, bcid:int, vertices:list, transformer_size_selected:float):
+    def upsert_building_cluster(self, lcid:int, kcid:int, bcid:int, vertices:list, transformer_rated_power:float):
         """
         Assign buildings in buildings_tem the bcid and stores the cluster in building_clusters
         Args:
-            bcid: building cluster ID
             lcid: loadarea cluster ID - plz
+            kcid: kmeans cluster ID
+            bcid: building cluster ID
             vertices: Liste der vertice_id von gewählten Gebäuden
-            transformer_size_selected: Scheinleistung der vorgesehenen Transformator
+            transformer_rated_power: Scheinleistung der vorgesehenen Transformator
         """
         # Insert references to building elements in which cluster they are.
         building_query = """UPDATE public.buildings_tem 
@@ -945,10 +946,10 @@ class PgReaderWriter:
         self.cur.execute(building_query, params)
 
         # Insert new clustering
-        cluster_query = """INSERT INTO building_clusters (version_id, plz, kcid, bcid, transformer_size_selected) 
+        cluster_query = """INSERT INTO building_clusters (version_id, plz, kcid, bcid, transformer_rated_power) 
                 VALUES(%(v)s, %(lc)s, %(kc)s, %(bc)s, %(s)s); """
 
-        params = {"v": VERSION_ID, "lc": lcid, "bc": bcid, "kc": kcid, "s": int(transformer_size_selected)}
+        params = {"v": VERSION_ID, "lc": lcid, "bc": bcid, "kc": kcid, "s": int(transformer_rated_power)}
         self.cur.execute(cluster_query, params)
 
     def zero_too_large_consumers(self) -> int:
@@ -999,7 +1000,7 @@ class PgReaderWriter:
 
         return count
 
-    def update_transformer_size_selected(self, plz:int, kcid:int, bcid:int, note: int):
+    def update_transformer_rated_power(self, plz:int, kcid:int, bcid:int, note: int):
         """
         Updates Smax in building_clusters
         :param plz:
@@ -1012,7 +1013,7 @@ class PgReaderWriter:
         transformer_capacities, _ = self.get_transformator_data(sdl)
 
         if note == 0:
-            old_query = """SELECT transformer_size_selected FROM building_clusters
+            old_query = """SELECT transformer_rated_power FROM building_clusters
                             WHERE  version_id = %(v)s
                             AND plz = %(p)s
                             AND kcid = %(k)s
@@ -1020,23 +1021,23 @@ class PgReaderWriter:
             self.cur.execute(
                 old_query, {"v": VERSION_ID, "p": plz, "k": kcid, "b": bcid}
             )
-            transformer_size_selected = self.cur.fetchone()[0]
+            transformer_rated_power = self.cur.fetchone()[0]
 
-            new_transformer_size_selected = transformer_capacities[transformer_capacities > transformer_size_selected][0].item()
-            update_query = """UPDATE building_clusters SET transformer_size_selected = %(n)s
+            new_transformer_rated_power = transformer_capacities[transformer_capacities > transformer_rated_power][0].item()
+            update_query = """UPDATE building_clusters SET transformer_rated_power = %(n)s
                             WHERE version_id = %(v)s 
                             AND plz = %(p)s
                             AND kcid = %(k)s
                             AND bcid = %(b)s;"""
             self.cur.execute(
                 update_query,
-                {"v": VERSION_ID, "p": plz, "k": kcid, "b": bcid, "n": new_transformer_size_selected},
+                {"v": VERSION_ID, "p": plz, "k": kcid, "b": bcid, "n": new_transformer_rated_power},
             )
         else:
             double_trans = np.multiply(transformer_capacities[2:4], 2)
             combined = np.concatenate((transformer_capacities, double_trans), axis=None)
             np.sort(combined, axis=None)
-            old_query = """SELECT transformer_size_selected FROM building_clusters
+            old_query = """SELECT transformer_rated_power FROM building_clusters
                                         WHERE version_id = %(v)s 
                                         AND plz = %(p)s
                                         AND kcid = %(k)s
@@ -1044,20 +1045,20 @@ class PgReaderWriter:
             self.cur.execute(
                 old_query, {"v": VERSION_ID, "p": plz, "k": kcid, "b": bcid}
             )
-            transformer_size_selected = self.cur.fetchone()[0]
-            if transformer_size_selected in combined.tolist():
+            transformer_rated_power = self.cur.fetchone()[0]
+            if transformer_rated_power in combined.tolist():
                 return None
-            new_transformer_size_selected = np.ceil(transformer_size_selected / 630) * 630
-            update_query = """UPDATE building_clusters SET transformer_size_selected = %(n)s
+            new_transformer_rated_power = np.ceil(transformer_rated_power / 630) * 630
+            update_query = """UPDATE building_clusters SET transformer_rated_power = %(n)s
                                             WHERE version_id = %(v)s 
                                             AND plz = %(p)s 
                                             AND kcid = %(k)s 
                                             AND bcid = %(b)s;"""
             self.cur.execute(
                 update_query,
-                {"v": VERSION_ID, "p": plz, "k": kcid, "b": bcid, "n": new_transformer_size_selected},
+                {"v": VERSION_ID, "p": plz, "k": kcid, "b": bcid, "n": new_transformer_rated_power},
             )
-            self.logger.debug("double or multiple transformer group transformer_size_selected assigned")
+            self.logger.debug("double or multiple transformer group transformer_rated_power assigned")
 
 
     def get_unfinished_bcids(self, lcid:int, kcid:int) -> list:
@@ -1080,7 +1081,7 @@ class PgReaderWriter:
 
     def get_ont_info_from_bc(self, lcid:int, kcid:int, bcid:int) -> dict | None:
 
-        query = """SELECT ont_vertice_id, transformer_size_selected
+        query = """SELECT ont_vertice_id, transformer_rated_power
                     FROM building_clusters
                     WHERE version_id = %(v)s 
                     AND kcid = %(k)s
@@ -1093,7 +1094,7 @@ class PgReaderWriter:
             self.logger.debug(f"found no ont information for kcid {kcid}, bcid {bcid}")
             return None
 
-        return {"ont_vertice_id": info[0][0], "transformer_size_selected": info[0][1]}
+        return {"ont_vertice_id": info[0][0], "transformer_rated_power": info[0][1]}
 
     def get_cables(self,  anw: tuple) -> pd.DataFrame:
         query = """SELECT name, max_i_a, r_mohm_per_km, x_mohm_per_km, z_mohm_per_km, cost_eur FROM equipment_data
@@ -1231,7 +1232,7 @@ class PgReaderWriter:
     ) -> None:
         query = """UPDATE buildings_tem SET bcid = %(count)s WHERE vertice_id = %(t)s;
                 UPDATE buildings_tem SET bcid = %(count)s WHERE connection_point IN %(c)s AND type != 'Transformer';
-                INSERT INTO building_clusters (version_id, plz, kcid, bcid, ont_vertice_id, transformer_size_selected)
+                INSERT INTO building_clusters (version_id, plz, kcid, bcid, ont_vertice_id, transformer_rated_power)
                     VALUES (%(v)s, %(lc)s, %(k)s, %(count)s, %(t)s, %(l)s);
                 INSERT INTO transformer_positions (version_id, plz, kcid, bcid, geom, ogc_fid, comment)
                     VALUES (%(v)s, %(lc)s, %(k)s, %(count)s, 
@@ -1752,7 +1753,7 @@ class PgReaderWriter:
                     kcid,
                     bcid,
                     vertices=valid_cluster_dict[bcid][0],
-                    transformer_size_selected=valid_cluster_dict[bcid][1],
+                    transformer_rated_power=valid_cluster_dict[bcid][1],
                 )
             self.logger.debug(f"BC upsert done for load_cluster {plz} k_mean cluster {kcid} ...")
 
