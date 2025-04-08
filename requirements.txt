@@ -22,5 +22,6 @@ geoalchemy2==0.17.1
 scikit-learn==1.6.1
 scikit-learn-extra==0.3.0
 factor-analyzer==0.5.1
+PyYAML==6.0.2
 requests==2.32.3
 osm2geojson==0.2.6

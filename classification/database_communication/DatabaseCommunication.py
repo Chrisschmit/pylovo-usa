@@ -5,8 +5,7 @@ from geoalchemy2 import Geometry, WKTElement
 from sqlalchemy import create_engine
 
 from classification.clustering.clustering_algorithms import *
-from classification.clustering.config_clustering import *
-from classification.config_classification import *
+from classification.config_loader import *
 from pylovo.config_data import *
 from pylovo.config_version import *
 
@@ -173,7 +172,7 @@ class DatabaseCommunication:
         df_transformers_classified = pd.merge(df_transformer_positions, df_parameters_of_grids, how='right',
                                               left_on=['version_id', 'plz', 'kcid', 'bcid'],
                                               right_on=['version_id', 'plz', 'kcid', 'bcid'])
-        df_transformers_classified.drop(columns=['plz', 'kcid', 'bcid'], inplace=True)
+        
 
         # add classification id
         df_transformers_classified['classification_id'] = CLASSIFICATION_VERSION
