@@ -264,8 +264,8 @@ class GridGenerator:
 
                     # Install consumer cables
                     local_length_dict = self.pgr.install_consumer_cables(
-                        self.plz, kcid, bcid, branch_deviation, connection_node_list,
-                        ont_vertice, vertices_dict, Pd, net, CONNECTION_AVAILABLE_CABLES, local_length_dict
+                        self.plz, bcid, kcid, branch_deviation, connection_node_list,
+                        ont_vertice, vertices_dict, Pd, net, CONNECTION_AVAILABLE_CABLES, local_length_dict,
                     )
 
                     # Connect to transformer

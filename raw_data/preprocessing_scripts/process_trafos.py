@@ -80,7 +80,6 @@ gdf_substations.rename(columns={"centroid": "geometry"}, inplace=True)
 gdf_substations.dropna(axis='columns', inplace=True)
 
 # transform column id into osm_id as is used for buildings
-gdf_substations['id'] = gdf_substations['id'].map(lambda x: x.lstrip('way/node/'))
 gdf_substations.rename(columns={"id": "osm_id"}, inplace=True)
 gdf_substations.drop('@id', axis=1, inplace=True)
 

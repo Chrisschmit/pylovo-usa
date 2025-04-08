@@ -10,6 +10,9 @@ log.txt
 classification/examples/**/*.pdf
 classification/examples/**/*.png
 
+# Ignore all Jupyter Notebook files in classification/examples/
+classification/examples/**/*.ipynb
+
 ### Default .gitignore file for Python projects
 
 # Environments

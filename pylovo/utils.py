@@ -1,6 +1,7 @@
 import numpy as np
 import logging
 
+
 def create_logger(name, log_file, log_level):
     log_file = log_file
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")

@@ -1,6 +1,6 @@
 -- Add a customized postcode entry to the database by defining a polygon of arbitrary coordinates
 
-INSERT INTO public.postcode (gid, plz, note, qkm, population, geom)
+INSERT INTO public.postcode (postcode_id, plz, note, qkm, population, geom)
 VALUES (
     9994,
     '10004',
