@@ -57,33 +57,33 @@ class GridGenerator:
         """
 
         self.pgr.copy_postcode_result_table(self.plz)
-        self.logger.info(f"working on plz {self.plz}")
+        self.logger.info(f"Working on plz {self.plz}")
 
         self.pgr.set_residential_buildings_table(self.plz)
         self.pgr.set_other_buildings_table(self.plz)
-        self.logger.info("buildings_tem table prepared")
+        self.logger.info("Buildings_tem table prepared")
         self.pgr.remove_duplicate_buildings()
-        self.logger.info("duplicate buildings removed from buildings_tem")
+        self.logger.info("Duplicate buildings removed from buildings_tem")
 
         self.pgr.set_plz_settlement_type(self.plz)
-        self.logger.info("house_distance and settlement_type in postcode_result")
+        self.logger.info("House_distance and settlement_type in postcode_result")
 
         unloadcount = self.pgr.set_building_peak_load()
         self.logger.info(
-            f"building peakload calculated in buildings_tem, {unloadcount} unloaded buildings are removed from "
+            f"Building peakload calculated in buildings_tem, {unloadcount} unloaded buildings are removed from "
             f"buildings_tem"
         )
         too_large = self.pgr.zero_too_large_consumers()
         self.logger.info(f"{too_large} too large consumers removed from buildings_tem")
 
         self.pgr.assign_close_buildings()
-        self.logger.info("all close buildings assigned and removed from buildings_tem")
+        self.logger.info("All close buildings assigned and removed from buildings_tem")
 
         self.pgr.insert_transformers(self.plz)
-        self.logger.info("transformers inserted in to the buildings_tem table")
+        self.logger.info("Transformers inserted in to the buildings_tem table")
         self.pgr.count_indoor_transformers()
         self.pgr.drop_indoor_transformers()
-        self.logger.info("indoor transformers dropped from the buildings_tem table")
+        self.logger.info("Indoor transformers dropped from the buildings_tem table")
 
     def preprocess_ways(self):
         """
@@ -93,11 +93,11 @@ class GridGenerator:
         :return:
         """
         ways_count = self.pgr.set_ways_tem_table(self.plz)
-        self.logger.info(f"ways_tem table filled with {ways_count} ways")
+        self.logger.info(f"The ways_tem table filled with {ways_count} ways")
         self.pgr.connect_unconnected_ways()
-        self.logger.info("ways connection finished in ways_tem")
+        self.logger.info("Ways connection finished in ways_tem")
         self.pgr.draw_building_connection()
-        self.logger.info("building connection finished in ways_tem")
+        self.logger.info("Building connection finished in ways_tem")
 
         self.pgr.update_ways_cost()
         unconn = self.pgr.set_vertice_id()
