@@ -1,10 +1,16 @@
 import time
 import os
+from subprocess import CalledProcessError
+
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 import json
+import subprocess
+import argparse
+import requests
 
+from pylovo import SyngridDatabaseConstructor
 from pylovo.utils import query_overpass_for_geojson
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
@@ -22,14 +28,24 @@ EPSG = 32633
 SUBSTATIONS_QUERY_PATH = os.path.join(".", "raw_data", "transformer_data", "substations_query.txt")
 SHOPPING_MALL_QUERY_PATH = os.path.join(".", "raw_data", "transformer_data", "shopping_mall_query.txt")
 
-SUBSTATIONS_GEOJSON_PATH = os.path.join(".", "raw_data", "transformer_data", "fetched_trafos", "substations.geojson")
-SHOPPING_MALL_GEOJSON_PATH = os.path.join(".", "raw_data", "transformer_data", "fetched_trafos", "shopping_mall.geojson")
 
-TRAFOS_PROCESSED_GEOJSON_PATH = os.path.join(".", "raw_data", "transformer_data", "processed_trafos", "trafos_processed.geojson")
-TRAFOS_PROCESSED_3035_GEOJSON_PATH = os.path.join(".", "raw_data", "transformer_data", "processed_trafos", "trafos_processed_3035.geojson")
+def get_substations_geojson_path(relation_id: int) -> str:
+    return os.path.join(".", "raw_data", "transformer_data", "fetched_trafos", f"{relation_id}_substations.geojson")
 
 
-def fetch_trafos(relation_id: int):
+def get_shopping_mall_geojson_path(relation_id: int) -> str:
+    return os.path.join(".", "raw_data", "transformer_data", "fetched_trafos", f"{relation_id}_shopping_mall.geojson")
+
+
+def get_trafos_processed_geojson_path(relation_id: int) -> str:
+    return os.path.join(".", "raw_data", "transformer_data", "processed_trafos", f"{relation_id}_trafos_processed.geojson")
+
+
+def get_trafos_processed_3035_geojson_path(relation_id: int) -> str:
+    return os.path.join(".", "raw_data", "transformer_data", "processed_trafos", f"{relation_id}_trafos_processed_3035.geojson")
+
+
+def fetch_trafos(relation_id: int) -> None:
     """Fetch trafos from OSM bound by area defined by given relation_id
 
     Args:
@@ -49,18 +65,21 @@ def fetch_trafos(relation_id: int):
     geojson_mall = query_overpass_for_geojson(OVERPASS_URL, overpass_query_mall)
 
     # save resulting GeoJSON-s
-    with open(SUBSTATIONS_GEOJSON_PATH, "w") as f:
+    with open(get_substations_geojson_path(relation_id), "w") as f:
         json.dump(geojson_bayern, f, indent=2)
-    with open(SHOPPING_MALL_GEOJSON_PATH, "w") as f:
+    with open(get_shopping_mall_geojson_path(relation_id), "w") as f:
         json.dump(geojson_mall, f, indent=2)
 
 
-def process_trafos():
+def process_trafos(relation_id: int) -> None:
     """Process trafo data and output it as GeoJSON into output_geojson.
+
+    Args:
+        relation_id (int): relation ID of the area of interest that specifies which file is used as processing input
 
     """
     # Import geojson of substations/trafos. Trafos of "Deutsche Bahn" and historic trafos have already been deleted.
-    gdf_substations = gpd.read_file(SUBSTATIONS_GEOJSON_PATH)
+    gdf_substations = gpd.read_file(get_substations_geojson_path(relation_id))
     print('start:')
     print(len(gdf_substations))
 
@@ -107,7 +126,7 @@ def process_trafos():
     print(len(gdf_substations))
 
     # 5. how many trafos are there in / next to mall?
-    gdf_shopping = gpd.read_file(SHOPPING_MALL_GEOJSON_PATH)
+    gdf_shopping = gpd.read_file(get_shopping_mall_geojson_path(relation_id))
     gdf_shopping = gdf_shopping.to_crs(EPSG)
     union_of_shopping = gdf_shopping.geometry.unary_union
     gdf_substations['within_shopping'] = gdf_substations.within(union_of_shopping)
@@ -128,20 +147,119 @@ def process_trafos():
         gdf_substations.drop('@id', axis=1, inplace=True)
 
     # export geojson
-    gdf_substations.to_file(TRAFOS_PROCESSED_GEOJSON_PATH, driver='GeoJSON')
+    gdf_substations.to_file(get_trafos_processed_geojson_path(relation_id), driver='GeoJSON')
 
 
-def main():
+def handle_user_input() -> tuple[int, bool]:
+    parser = argparse.ArgumentParser(
+        prog="process_trafos",
+        description="Fetch transformers from Overpass API, process the fetched data,"
+                    "and finally load them into the database."
+    )
+    parser.add_argument(
+        "--relation-id",
+        type=int,
+        default=RELATION_ID,
+        help="specify the relation ID of the area the script should work with",
+        required=False
+    )
+    parser.add_argument(
+        "-y", "--yes",
+        action="store_true",
+        help="do not prompt for confirmation",
+        required=False
+    )
+    parser.add_argument(
+        "--ignore-existing",
+        action="store_true",
+        help="ignore error where transformer osm_id already exists in database",
+        required=False
+    )
+
+    args = parser.parse_args()
+    relation_id = args.relation_id
+    skip_confirmation = args.yes
+    ignore_existing = args.ignore_existing
+
+    print(f"Selected relation ID: {relation_id}")
+
+    # get the hint of area and print it to the console
+    response = requests.get(OVERPASS_URL, params={'data': f"[out:json]; relation({relation_id}); out tags;"})
+    response.raise_for_status()
+    area_hint = None
+    tags = response.json()["elements"][0]["tags"]
+    if "name" in tags:
+        area_hint = tags["name"]
+    elif "note" in tags:  # useful for postal codes
+        area_hint = tags["note"]
+
+    if area_hint is not None:
+        print(f"Corresponding area: {area_hint}")
+    else:
+        print(f"Corresponding area tags: {tags}")
+
+    # prompt user to make sure they selected the right relation ID
+    if not skip_confirmation:
+        answer = input("Do you want to continue? [Y/n] ").strip().lower()
+        if answer not in ("y", "yes", ""):
+            print("Aborted.")
+            exit(1)
+        print("Continuing...")
+    return relation_id, ignore_existing
+
+
+def main(relation_id: int, ignore_existing: bool) -> None:
+    """Fetch transformers from Overpass API, process the fetched data, and finally load them into the database.
+
+    Args:
+        relation_id (int): relation ID of the area of interest
+        ignore_existing (bool): ignore existing transformers.
+
+    """
     # timing of the script
     start_time = time.time()
 
-    if not os.path.isfile(SUBSTATIONS_GEOJSON_PATH):
-        raise FileNotFoundError(f"Path does not exist: {SUBSTATIONS_GEOJSON_PATH}")
+    print("Fetching transformers...")
+    fetch_trafos(relation_id)
+    print("Processing transformers...")
+    process_trafos(relation_id)
 
-    process_trafos()
+    in_file = get_trafos_processed_geojson_path(relation_id)
+    out_file = get_trafos_processed_3035_geojson_path(relation_id)
+
+    # Convert the GeoJSON file to EPSG:3035 and write to a new file
+    subprocess.run(
+        [
+            "ogr2ogr",
+            "-f", "GeoJSON",
+            "-s_srs", f"EPSG:{EPSG}",
+            "-t_srs", "EPSG:3035",
+            out_file,  # output
+            in_file  # input
+        ],
+        shell=False
+    )
+
+    # write new data to transformers table
+    print("Loading transformers into database...")
+    trafo_dict = [
+        {
+            "path": out_file,
+            "table_name": "transformers"
+        }
+    ]
+    sgc = SyngridDatabaseConstructor()
+    try:
+        sgc.ogr_to_db(trafo_dict, skip_failures=ignore_existing)
+    except CalledProcessError as e:
+        print("An error occurred when importing data into database:", e)
+        print("\nMost likely cause is data already existing in database. Try the --ignore-existing flag.")
+        exit(1)
+
 
     print("--- %s seconds ---" % (time.time() - start_time))
 
 
 if __name__ == "__main__":
-    main()
+    rel_id, ign_existing = handle_user_input()
+    main(rel_id, ignore_existing=ign_existing)

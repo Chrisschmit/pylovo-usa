@@ -10,8 +10,8 @@ import sqlparse
 
 from pylovo.config_data import *
 from pylovo.pgReaderWriter import PgReaderWriter
-from raw_data.preprocessing_scripts.process_trafos import process_trafos, TRAFOS_PROCESSED_GEOJSON_PATH, TRAFOS_PROCESSED_3035_GEOJSON_PATH, \
-    fetch_trafos, RELATION_ID, EPSG
+from raw_data.preprocessing_scripts.process_trafos import process_trafos, get_trafos_processed_3035_geojson_path, \
+    fetch_trafos, RELATION_ID, EPSG, get_trafos_processed_geojson_path
 
 
 # uncomment for automated building import of buildings in regiostar_samples
@@ -83,7 +83,7 @@ class SyngridDatabaseConstructor:
                 f"Table name {table_name} is not a valid parameter value for the function create_table. See config.py"
             )
 
-    def ogr_to_db(self, ogr_file_list):
+    def ogr_to_db(self, ogr_file_list, skip_failures: bool = None):
         """
             OGR/GDAL is a translator library for raster and vector geospatial data formats
             inserts building data specified into database
@@ -98,8 +98,7 @@ class SyngridDatabaseConstructor:
 
             table_exists = self.table_exists(table_name=table_name)
             print("ogr working for table", table_name)
-            subprocess.run(
-                [
+            command = [
                     "ogr2ogr",
                     "-append" if table_exists else "-overwrite",
                     "-progress",
@@ -116,9 +115,12 @@ class SyngridDatabaseConstructor:
                     "EPSG:3035",
                     "-lco",
                     "geometry_name=geom",
-                ],
-                shell=False            
-            )
+            ]
+            if skip_failures:
+                command.append("-skipfailures")
+
+            subprocess.run(command, check=True, shell=False, stderr=subprocess.DEVNULL if skip_failures else None)
+
             et = time.time()
             print(f"{file_name} is successfully imported to db in {int(et - st)} s")
 
@@ -127,15 +129,18 @@ class SyngridDatabaseConstructor:
         """Call the overpass api for transformer data and populate the transformers table.
 
         """
-        update_trafos = not os.path.isfile(TRAFOS_PROCESSED_GEOJSON_PATH)
+        trafos_processed_geojson_path = get_trafos_processed_geojson_path(RELATION_ID)
+        trafos_processed_3035_geojson_path = get_trafos_processed_3035_geojson_path(RELATION_ID)
+
+        update_trafos = not os.path.isfile(trafos_processed_geojson_path)
 
         if update_trafos:
-            print(f"{TRAFOS_PROCESSED_GEOJSON_PATH} does not exist -> fetch transformer data from API and process it")
+            print(f"{trafos_processed_geojson_path} does not exist -> fetch transformer data from API and process it")
             fetch_trafos(RELATION_ID)
-            process_trafos()
+            process_trafos(RELATION_ID)
 
-        in_file = TRAFOS_PROCESSED_GEOJSON_PATH
-        out_file = TRAFOS_PROCESSED_3035_GEOJSON_PATH
+        in_file = trafos_processed_geojson_path
+        out_file = trafos_processed_3035_geojson_path
 
         if update_trafos or not os.path.isfile(out_file):
             # Convert the GeoJSON file to EPSG:3035 and write to a new file
