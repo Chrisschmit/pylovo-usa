@@ -20,7 +20,9 @@ px.set_mapbox_access_token(ACCESS_TOKEN_PLOTLY)
 
 
 def plot_pie_of_trafo_cables(plz):
-    """plots a pie chart of the trafos and cable types for a plz"""
+    """
+    Plots a pie chart of the trafos and cable types for a plz
+    """
     gg = GridGenerator(plz=plz)
     pg = gg.pgr
     data_list, data_labels, trafo_dict = pg.read_per_trafo_dict(plz=plz)
@@ -52,7 +54,7 @@ def plot_hist_trafos(plz):
 
 def plot_boxplot_plz(plz):
     """
-    boxplot of load number, bus number, simultaneaous load peak, max trafo distance, avg trafo distance
+    Boxplot of load number, bus number, simultaneaous load peak, max trafo distance, avg trafo distance
     """
     gg = GridGenerator(plz=plz)
     pg = gg.pgr
@@ -75,7 +77,7 @@ def plot_boxplot_plz(plz):
 
 def plot_cable_length_of_types(plz):
     """
-    plots distribution of cable length by length
+    Plots distribution of cable length by length
     """
     gg = GridGenerator(plz=plz)
     pg = gg.pgr
@@ -114,7 +116,7 @@ def plot_cable_length_of_types(plz):
 
 def get_trafo_dicts(plz):
     """
-    retrieve load count, bus count and cable lenth per type for a plz
+    Retrieve load count, bus count and cable lenth per type for a plz
     """
     gg = GridGenerator(plz=plz)
     pg = gg.pgr
@@ -154,10 +156,9 @@ def get_trafo_dicts(plz):
     return load_count_dict, bus_count_dict, cable_length_dict
 
 def plot_trafo_on_map(plz, save_plots: bool = False) -> None:
-    """trafo types are plotted by their capacity on plotly basemap
-    :param save_plots: option to save the plot, defaults to False
-    :type save_plots: bool
-     """
+    """
+    Transformer types are plotted by their capacity on a plotly basemap
+    """
 
     net_plot = pp.create_empty_network()
     gg = GridGenerator(plz=plz)
