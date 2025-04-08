@@ -165,9 +165,7 @@ def plot_trafo_on_map(plz, save_plots: bool = False) -> None:
     pg = gg.pgr
     cluster_list = pg.get_list_from_plz(plz)
     grid_index = 1
-    set_mapbox_token(
-        "pk.eyJ1IjoidG9uZ3llMTk5NyIsImEiOiJjbDZ4bWo0aXQwdWdsM2VxbGltMHNzZGUyIn0.TFDYpXsPsvxWPdPRdgCNhg"
-    )
+    set_mapbox_token("pk.eyJ1IjoiYmVuZWhhcm8iLCJhIjoiY205OGdwejJ1MDJsbzJsczl1ajdyYmlzaSJ9.HWA8ZLQm1Sp0Whs5PADxrw") # public token
     for kcid, bcid in cluster_list:
         net = pg.read_net(plz, kcid, bcid)
         for row in net.trafo[["sn_mva", "lv_bus"]].itertuples():
