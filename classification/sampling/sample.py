@@ -4,7 +4,7 @@ import pandas as pd
 import psycopg2
 from sqlalchemy import create_engine
 
-from classification.config_classification import *
+from classification.config_loader import *
 from pylovo.GridGenerator import GridGenerator
 from pylovo.config_data import *
 
