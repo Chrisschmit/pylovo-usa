@@ -1783,12 +1783,11 @@ class PgReaderWriter:
 
                     # Check if clustering is complete
                     if not invalid_trans_cluster_dict:
-                        self.logger.debug(f"Found {len(valid_cluster_dict)} single transformer clusters for PLZ: {plz}, KCID: {kcid}")
+                        self.logger.info(f"Found {len(valid_cluster_dict)} single transformer clusters for PLZ: {plz}, KCID: {kcid}")
                         break
                     else:
                         # Process too large clusters by re-clustering them
-                        self.logger.debug(f"Found {len(valid_cluster_dict)} too_large clusters for PLZ: {plz}, KCID: {kcid}")
-                        print(f'altogether {len(invalid_cluster_dict)} too_large clusters found')
+                        self.logger.info(f"Found {len(valid_cluster_dict)} too_large clusters for PLZ: {plz}, KCID: {kcid}")
 
                         # Get buildings from the first too-large cluster for re-clustering
                         invalid_vertice_ids = list(invalid_trans_cluster_dict[0])
