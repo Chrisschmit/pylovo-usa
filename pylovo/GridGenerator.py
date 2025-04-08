@@ -2,10 +2,6 @@ import warnings
 from pathlib import Path
 
 import pandapower as pp
-import plotly
-from pandapower.plotting.plotly import vlevel_plotly
-from pandapower.plotting.plotly.mapbox_plot import set_mapbox_token
-
 from pylovo import pgReaderWriter as pg, utils
 from pylovo.config_data import *
 from pylovo.config_version import *
@@ -38,9 +34,18 @@ class GridGenerator:
         self.cache_and_preprocess_static_objects()
         self.preprocess_ways()
         self.apply_kmeans_clustering()
-        self.position_substations()
+        self.position_all_transformers()
         self.install_cables()
         self.pgr.save_and_reset_tables(plz=self.plz)
+
+
+    def check_if_results_exist(self):
+        postcode_count = self.pgr.count_postcode_result(self.plz)
+        if postcode_count:
+            raise ResultExistsError(
+                f"The grids for the postcode area {self.plz} is already generated "
+                f"for the version {VERSION_ID}."
+            )
 
     def cache_and_preprocess_static_objects(self):
         """
@@ -52,33 +57,33 @@ class GridGenerator:
         """
 
         self.pgr.copy_postcode_result_table(self.plz)
-        self.logger.info(f"working on plz {self.plz}")
+        self.logger.info(f"Working on plz {self.plz}")
 
         self.pgr.set_residential_buildings_table(self.plz)
         self.pgr.set_other_buildings_table(self.plz)
-        self.logger.info("buildings_tem table prepared")
+        self.logger.info("Buildings_tem table prepared")
         self.pgr.remove_duplicate_buildings()
-        self.logger.info("duplicate buildings removed from buildings_tem")
+        self.logger.info("Duplicate buildings removed from buildings_tem")
 
-        self.pgr.set_loadarea_cluster_settlement_type(self.plz)
-        self.logger.info("house_distance and settlement_type in postcode_result")
+        self.pgr.set_plz_settlement_type(self.plz)
+        self.logger.info("House_distance and settlement_type in postcode_result")
 
         unloadcount = self.pgr.set_building_peak_load()
         self.logger.info(
-            f"building peakload calculated in buildings_tem, {unloadcount} unloaded buildings are removed from "
+            f"Building peakload calculated in buildings_tem, {unloadcount} unloaded buildings are removed from "
             f"buildings_tem"
         )
         too_large = self.pgr.zero_too_large_consumers()
         self.logger.info(f"{too_large} too large consumers removed from buildings_tem")
 
         self.pgr.assign_close_buildings()
-        self.logger.info("all close buildings assigned and removed from buildings_tem")
+        self.logger.info("All close buildings assigned and removed from buildings_tem")
 
         self.pgr.insert_transformers(self.plz)
-        self.logger.info("transformers inserted in to the buildings_tem table")
-        # self.pgr.count_indoor_transformers() #TODO: check why uncommented
+        self.logger.info("Transformers inserted in to the buildings_tem table")
+        self.pgr.count_indoor_transformers()
         self.pgr.drop_indoor_transformers()
-        self.logger.info("indoor transformers dropped from the buildings_tem table")
+        self.logger.info("Indoor transformers dropped from the buildings_tem table")
 
     def preprocess_ways(self):
         """
@@ -88,11 +93,11 @@ class GridGenerator:
         :return:
         """
         ways_count = self.pgr.set_ways_tem_table(self.plz)
-        self.logger.info(f"ways_tem table filled with {ways_count} ways")
+        self.logger.info(f"The ways_tem table filled with {ways_count} ways")
         self.pgr.connect_unconnected_ways()
-        self.logger.info("ways connection finished in ways_tem")
+        self.logger.info("Ways connection finished in ways_tem")
         self.pgr.draw_building_connection()
-        self.logger.info("building connection finished in ways_tem")
+        self.logger.info("Building connection finished in ways_tem")
 
         self.pgr.update_ways_cost()
         unconn = self.pgr.set_vertice_id()
@@ -100,250 +105,216 @@ class GridGenerator:
 
     def apply_kmeans_clustering(self):
         """
-        Reads ways and vertices from ways_tem, applies k-means clustering
+        Find connected components (subgraphs) of an undirected street-graph applying the Depth-First Search algorithm
+        to edges and vertices from ways_tem and (if necessary due to their size) apply k-means clustering to these
+        street network components.
+
         FROM: ways_tem, buildings_tem
-        INTO: ways_tem, vertices_pgr, buildings_tem,
-        :return:
+        INTO: ways_tem, vertices_pgr, buildings_tem
         """
 
+        # Get connected components from the street network
         component, vertices = self.pgr.get_connected_component()
         component_ids = np.unique(component)
-        if len(component_ids) > 1:
-            for i in range(len(component_ids)):
-                component_id = component_ids[i]
-                related_vertices = vertices[np.argwhere(component == component_id)]
-                conn_building_count = self.pgr.count_connected_buildings(related_vertices)
-                if conn_building_count <= 1 or conn_building_count is None:
-                    self.pgr.delete_ways(related_vertices)
-                    self.pgr.delete_transformers(related_vertices)
-                    self.logger.debug(
-                        "no building component deleted. Useless ways and transformers are deleted from tem tables."
-                    )
-                elif conn_building_count >= LARGE_COMPONENT_LOWER_BOUND:
-                    cluster_count = int(conn_building_count / LARGE_COMPONENT_DIVIDER)
-                    self.pgr.update_large_kmeans_cluster(related_vertices, cluster_count)
-                    self.logger.debug(f"large component {i} updated")
-                else:
-                    self.pgr.update_kmeans_cluster(related_vertices)
-                    self.logger.debug(f"component {i} updated")
-        elif len(component_ids) == 1:
-            conn_building_count = self.pgr.count_connected_buildings(vertices)
-            if conn_building_count >= LARGE_COMPONENT_LOWER_BOUND:
-                cluster_count = int(conn_building_count / LARGE_COMPONENT_DIVIDER)
-                self.pgr.update_large_kmeans_cluster(vertices, cluster_count)
-                self.logger.debug(f" {cluster_count} component updated")
-            else:
-                self.pgr.update_kmeans_cluster(vertices)
-                self.logger.debug("component updated")
-        else:
-            warnings.warn(
-                "something wrong with connected component, no component could be fetched from ways_tem"
-            )
 
+        if len(component_ids) > 0:
+            # Handle components based on number
+            if len(component_ids) > 1:
+                # Process multiple connected components
+                for i, component_id in enumerate(component_ids):
+                    related_vertices = vertices[np.argwhere(component == component_id)]
+                    self._process_component_to_kcid(related_vertices, i)
+            else:
+                # Process single connected component
+                self._process_component_to_kcid(vertices)
+        else:
+            # No components found - issue warning
+            warnings.warn("No connected components found in ways_tem table")
+
+        # Verify clustering was successful for all buildings
         no_kmean_count = self.pgr.count_no_kmean_buildings()
         if no_kmean_count not in [0, None]:
-            warnings.warn("Something wrong with k mean clustering")
+            warnings.warn(f"K-means clustering issue: {no_kmean_count} buildings not assigned to clusters")
 
-    def position_substations(self):
+    def _process_component_to_kcid(self, vertices, component_index=None):
+        """Helper method to process components to kcid groups"""
+        conn_building_count = self.pgr.count_connected_buildings(vertices)
+
+        if conn_building_count <= 1 or conn_building_count is None:
+            # Remove isolated or empty components
+            self.pgr.delete_ways(vertices)
+            self.pgr.delete_transformers(vertices)
+            self.logger.debug("Empty/isolated component removed. Ways and transformers deleted from temporary tables.")
+        elif conn_building_count >= LARGE_COMPONENT_LOWER_BOUND:
+            # K-means applied to large component to define subgroups with cluster ids
+            cluster_count = int(conn_building_count / LARGE_COMPONENT_DIVIDER)
+            self.pgr.update_large_kmeans_cluster(vertices, cluster_count)
+            log_msg = f"Large component {component_index} clustered into {cluster_count} groups" if component_index is not None else f"Large component clustered into {cluster_count} groups"
+            self.logger.debug(log_msg)
+        else:
+            # Allocate cluster id for connected component smaller than the building threshold
+            self.pgr.update_kmeans_cluster(vertices)
+
+    def position_all_transformers(self):
         """
-        Iterates over k-means clusters and building clusters inside and positions substations for each cluster.
-        Considers existing transformers.
+        Positions all transformers for each bcid cluster (brownfield with existing transformers and greenfield)
         FROM: buildings_tem, building_clusters
-        INTO: buildings_tem, building_clusters,
-        :return:
+        INTO: buildings_tem, building_clusters
         """
         kcid_length = self.pgr.get_kcid_length()
-        for kcounter in range(kcid_length):
+
+        for _ in range(kcid_length):
             kcid = self.pgr.get_next_unfinished_kcid(self.plz)
             self.logger.debug(f"working on kcid {kcid}")
             # Building clustering
-            transformer_list = self.pgr.get_included_transformers(kcid)
-            if len(transformer_list) == 0 or transformer_list is None:
-                self.pgr.create_building_clusters_for_kcid(self.plz, kcid)
-                self.logger.debug(f"kcid{kcid} has no included transformer, clustering finished")
+            # 0. Check for existing transformers from OSM
+            transformers = self.pgr.get_included_transformers(kcid)
+
+            # Case 1: No transformers present
+            if not transformers:
+                self.logger.debug(f"kcid{kcid} has no included transformer")
+                # Create greenfield building clusters
+                self.pgr.create_bcid_for_kcid(self.plz, kcid)
+                self.logger.debug(f"kcid{kcid} building clusters finished")
+
+            # Case 2: Transformers present
             else:
-                self.pgr.assign_transformer_clusters(self.plz, kcid, transformer_list)
-                self.logger.debug(
-                    f"kcid{kcid} has {len(transformer_list)} transformers, buildings assigned"
-                )
-                building_count = self.pgr.count_kmean_cluster_consumers(kcid)
-                if building_count > 1:
-                    self.pgr.create_building_clusters_for_kcid(self.plz, kcid)
+                self.logger.debug(f"kcid{kcid} has {len(transformers)} transformers")
+                # Create brownfield building clusters with existing transformers
+                self.pgr.position_brownfield_transformers(self.plz, kcid, transformers)
+
+                # Check buildings and manage clusters
+                if self.pgr.count_kmean_cluster_consumers(kcid) > 1:
+                    self.pgr.create_bcid_for_kcid(self.plz, kcid) #TODO: name should include transformer_size allocation
                 else:
-                    self.pgr.delete_isolated_building(self.plz, kcid)
+                    self.pgr.delete_isolated_building(self.plz, kcid) #TODO: check approach with isolated buildings
                 self.logger.debug("rest building cluster finished")
 
-            bcid_list = self.pgr.get_unfinished_bcids(self.plz, kcid)
-            for bcid in bcid_list:
-                # Substation positioning
+            # Process unfinished clusters
+            for bcid in self.pgr.get_greenfield_bcids(self.plz, kcid):
+                # Transformer positioning for greenfield clusters
                 if bcid >= 0:
-                    utils.positionSubstation(self.pgr, self.plz, kcid, bcid)
-                    self.logger.debug(f"substation positioning for kcid{kcid}, bcid{bcid} finished")
+                    self.pgr.position_greenfield_transformers(self.plz, kcid, bcid)
+                    self.logger.debug(f"Transformer positioning for kcid{kcid}, bcid{bcid} finished")
                     self.pgr.update_transformer_rated_power(self.plz, kcid, bcid, 1)
                     self.logger.debug("Smax in building_clusters is updated.")
 
     def install_cables(self):
-        """the pandapower network for each cluster (kcid, bcid) is generated and filled with the corresponding
-        bus and line elements"""
+        """
+        Installs electrical cables to connect buildings and transformers in power grid clusters.
+
+        This method creates a pandapower network for each building cluster (kcid, bcid) in the
+        postal code area and connects the buildings with appropriate electrical cables. It follows
+        a branch-by-branch approach, starting from the furthest nodes and working inward toward
+        the transformer.
+
+        The algorithm works as follows:
+        1. Retrieves all clusters (kcid, bcid) for the postal code area
+        2. For each cluster:
+           a. Prepares building and connection data
+           b. Creates an electrical network with pandapower
+           c. Adds buses, transformers, and loads to the network
+           d. Installs cables using a greedy algorithm that:
+              - Starts from the furthest nodes from the transformer
+              - Creates branches with maximum possible load
+              - Selects minimum size cables that can handle the current
+              - Connects branches back to transformer
+        3. Tracks progress and saves the network configurations
+
+        The cable installation prioritizes cost efficiency while ensuring the electrical
+        requirements are met for each branch of the distribution network.
+
+        Returns:
+            None
+        """
+        # Get all clusters for the postal code area
         cluster_list = self.pgr.get_list_from_plz(self.plz)
         ci_count = 0
         ci_process = 0
         main_street_available_cables = CABLE_COST_DICT.keys()
+
         for id in cluster_list:
-            kcid = id[0]
-            bcid = id[1]
+            kcid, bcid = id
             self.logger.debug(f"working on kcid {kcid}, bcid {bcid}")
-            # prepare data
-            (
-                vertices_dict,
-                ont_vertice,
-                vertices_list,
-                buildings_df,
-                consumer_df,
-                consumer_list,
-                connection_nodes,
-            ) = self.pgr.prepare_vertices_list(self.plz, kcid, bcid)
 
-            # Power demand variables
-            Pd, load_units, load_type = self.pgr.get_consumer_simultaneous_load_dict(
-                consumer_list, buildings_df
+            # Get data for this cluster
+            vertices_dict, ont_vertice, vertices_list, buildings_df, consumer_df, consumer_list, connection_nodes = (
+                self.pgr.prepare_vertices_list(self.plz, kcid, bcid)
             )
-
-            # test cable_cost dict
+            Pd, load_units, load_type = self.pgr.get_consumer_simultaneous_load_dict(consumer_list, buildings_df)
             local_length_dict = {c: 0 for c in CABLE_COST_DICT.keys()}
 
-            # create network
+            # Create network and add components
             net = pp.create_empty_network()
-
-            # add std_type:
             self.pgr.create_cable_std_type(net)
-
-            # Add buses and load to network
-
-            # lv mv bus
             self.pgr.create_lvmv_bus(self.plz, kcid, bcid, net)
-
-            # transformer
             self.pgr.create_transformer(self.plz, kcid, bcid, net)
-
-            # connection nodes
             self.pgr.create_connection_bus(connection_nodes, net)
+            self.pgr.create_consumer_bus_and_load(consumer_list, load_units, net, load_type, buildings_df)
 
-            # consumer nodes and load
-            self.pgr.create_consumer_bus_and_load(
-                consumer_list, load_units, net, load_type, buildings_df
-            )
-
-            # Add lines to network
-
-            # consider connection nodes to install bus lines, starts from the furthest node and
-            # forms increasing branches until current limit satisfied
-            # each branch line has a 5 * 1e-6 deviation to see clearly in plotly
-
+            # Install cables branch by branch
             branch_deviation = 0
             connection_node_list = connection_nodes
-            while True:
-                if len(connection_node_list) == 0:
-                    self.logger.debug("main street cable installation finished")
-                    break
+
+            while connection_node_list:
+                # Handle single remaining node case
                 if len(connection_node_list) == 1:
-                    sim_load = utils.simultaneousPeakLoad(
-                        buildings_df, consumer_df, connection_node_list
-                    )
-                    Imax = sim_load / (VN * V_BAND_LOW * np.sqrt(3))  # current in kA
+                    sim_load = utils.simultaneousPeakLoad(buildings_df, consumer_df, connection_node_list)
+                    Imax = sim_load / (VN * V_BAND_LOW * np.sqrt(3))
 
+                    # Install consumer cables
                     local_length_dict = self.pgr.install_consumer_cables(
-                        self.plz,
-                        bcid,
-                        kcid,
-                        branch_deviation,
-                        connection_node_list,
-                        ont_vertice,
-                        vertices_dict,
-                        Pd,
-                        net,
-                        CONNECTION_AVAILABLE_CABLES,
-                        local_length_dict,
+                        self.plz, bcid, kcid, branch_deviation, connection_node_list,
+                        ont_vertice, vertices_dict, Pd, net, CONNECTION_AVAILABLE_CABLES, local_length_dict,
                     )
 
+                    # Connect to transformer
                     if connection_node_list[0] == ont_vertice:
-                        cable, count = self.pgr.find_minimal_available_cable(
-                            Imax, net, main_street_available_cables
-                        )
+                        cable, count = self.pgr.find_minimal_available_cable(Imax, net, main_street_available_cables)
                         self.pgr.create_line_ont_to_lv_bus(
                             self.plz, bcid, kcid, connection_node_list[0], branch_deviation, net, cable, count
                         )
                     else:
                         cable, count = self.pgr.find_minimal_available_cable(
-                            Imax,
-                            net,
-                            main_street_available_cables,
-                            vertices_dict[connection_nodes[0]],
+                            Imax, net, main_street_available_cables, vertices_dict[connection_nodes[0]]
                         )
                         length = self.pgr.create_line_start_to_lv_bus(
-                            self.plz,
-                            bcid,
-                            kcid,
-                            connection_node_list[0],
-                            branch_deviation,
-                            net,
-                            vertices_dict,
-                            cable,
-                            count,
-                            ont_vertice,
+                            self.plz, bcid, kcid, connection_node_list[0], branch_deviation,
+                            net, vertices_dict, cable, count, ont_vertice
                         )
                         local_length_dict[cable] += length
 
-                    self.pgr.deviate_bus_geodata(
-                        connection_node_list, branch_deviation, net
-                    )
+                    self.pgr.deviate_bus_geodata(connection_node_list, branch_deviation, net)
                     self.logger.debug("main street cable installation finished")
                     break
 
-                # start with finding the furthest node
+                # Process multiple nodes as branches
                 furthest_node_path_list = self.pgr.find_furthest_node_path_list(
                     connection_node_list, vertices_dict, ont_vertice
                 )
-                # create max_possible load branch
                 branch_node_list, Imax = self.pgr.get_maximum_load_branch(
                     furthest_node_path_list, buildings_df, consumer_df
                 )
+
+                # Install cables for this branch
                 local_length_dict = self.pgr.install_consumer_cables(
-                    self.plz,
-                    bcid,
-                    kcid,
-                    branch_deviation,
-                    branch_node_list,
-                    ont_vertice,
-                    vertices_dict,
-                    Pd,
-                    net,
-                    CONNECTION_AVAILABLE_CABLES,
-                    local_length_dict,
+                    self.plz, bcid, kcid, branch_deviation, branch_node_list,
+                    ont_vertice, vertices_dict, Pd, net, CONNECTION_AVAILABLE_CABLES, local_length_dict
                 )
-                # for available load branch, select the min size cable
+
+                # Select appropriate cable and connect nodes
                 branch_distance = vertices_dict[branch_node_list[0]]
                 cable, count = self.pgr.find_minimal_available_cable(
                     Imax, net, main_street_available_cables, branch_distance
                 )
-                # install cables for this branch, start from drawing outer parts, leave the transformer<->starting node line to next step
-                # important: always draw line start from closer nodes to further nodes, so that the 'line id = line to node' will be unique
-                #           bus line for the branch shall be separately drawn through each connection points
+
                 if len(branch_node_list) >= 2:
                     local_length_dict = self.pgr.create_line_node_to_node(
-                        self.plz,
-                        kcid,
-                        bcid,
-                        branch_node_list,
-                        branch_deviation,
-                        vertices_dict,
-                        local_length_dict,
-                        cable,
-                        ont_vertice,
-                        count,
-                        net,
+                        self.plz, kcid, bcid, branch_node_list, branch_deviation,
+                        vertices_dict, local_length_dict, cable, ont_vertice, count, net
                     )
-                # start node goes directly to transformer along the street
+
+                # Connect branch to transformer
                 branch_start_node = branch_node_list[-1]
                 if branch_start_node == ont_vertice:
                     self.pgr.create_line_ont_to_lv_bus(
@@ -351,29 +322,29 @@ class GridGenerator:
                     )
                 else:
                     length = self.pgr.create_line_start_to_lv_bus(
-                        self.plz,
-                        bcid,
-                        kcid,
-                        branch_start_node,
-                        branch_deviation,
-                        net,
-                        vertices_dict,
-                        cable,
-                        count,
-                        ont_vertice,
+                        self.plz, bcid, kcid, branch_start_node, branch_deviation,
+                        net, vertices_dict, cable, count, ont_vertice
                     )
                     local_length_dict[cable] += length
+
+                # Update processed nodes and visualization
                 for vertice in branch_node_list:
                     connection_node_list.remove(vertice)
-                self.pgr.deviate_bus_geodata(branch_node_list, branch_deviation, net)
 
+                self.pgr.deviate_bus_geodata(branch_node_list, branch_deviation, net)
                 branch_deviation += 1
-                continue
+
+            # Track and report progress
             ci_count += 1
-            if ci_count >= len(cluster_list) / 10:
+            progress_increment = 10  # Report progress in 10% increments
+            progress_threshold = max(1, len(cluster_list) / progress_increment)
+
+            if ci_count >= progress_threshold:
+                ci_process += progress_increment
                 ci_count = 0
-                ci_process += 10
-                self.logger.info(f"{ci_process} % finished")
+                self.logger.info(
+                    f"Cable installation: {min(ci_process, 100)}% complete ({ci_process // progress_increment}/{progress_increment})")
+
             self.save_net(net, kcid, bcid)
 
     def analyse_results(self):
@@ -386,51 +357,6 @@ class GridGenerator:
         self.logger.info("result analysis finished")
         self.pgr.conn.commit()
 
-    def plot_trafo_on_map(self, save_plots: bool = False) -> None:
-        """trafo types are plotted by their capacity on plotly basemap
-        :param save_plots: option to save the plot, defaults to False
-        :type save_plots: bool
-         """
-
-        net_plot = pp.create_empty_network()
-        cluster_list = self.pgr.get_list_from_plz(self.plz)
-        grid_index = 1
-        set_mapbox_token(
-            "pk.eyJ1IjoidG9uZ3llMTk5NyIsImEiOiJjbDZ4bWo0aXQwdWdsM2VxbGltMHNzZGUyIn0.TFDYpXsPsvxWPdPRdgCNhg"
-        )
-        for kcid, bcid in cluster_list:
-            net = self.pgr.read_net(self.plz, kcid, bcid)
-            for row in net.trafo[["sn_mva", "lv_bus"]].itertuples():
-                trafo_size = round(row.sn_mva * 1e3)
-                trafo_geom = np.array(net.bus_geodata.loc[row.lv_bus, ["x", "y"]])
-                pp.create_bus(
-                    net_plot,
-                    name="Distribution_grid_"
-                         + str(grid_index)
-                         + "<br>"
-                         + "transformer: "
-                         + str(trafo_size)
-                         + "_kVA",
-                    vn_kv=trafo_size,
-                    geodata=trafo_geom,
-                    type="b",
-                )
-                grid_index += 1
-
-        figure = vlevel_plotly(
-            net_plot, on_map=True, colors_dict=PLOT_COLOR_DICT, projection="epsg:4326"
-        )
-
-        if save_plots:
-            savepath_folder = Path(
-                RESULT_DIR, "figures", f"version_{VERSION_ID}", self.plz
-            )
-            savepath_folder.mkdir(parents=True, exist_ok=True)
-            savepath_file = Path(savepath_folder, "trafo_on_map.html")
-            plotly.offline.plot(
-                figure,
-                filename=savepath_file,
-            )
 
     def save_net(self, net, kcid, bcid):
         """
@@ -448,14 +374,6 @@ class GridGenerator:
         self.pgr.save_net(self.plz, kcid, bcid, json_string)
 
         self.logger.info(f"Grid with kcid:{kcid} bcid:{bcid} is stored. ")
-
-    def check_if_results_exist(self):
-        postcode_count = self.pgr.count_postcode_result(self.plz)
-        if postcode_count:
-            raise ResultExistsError(
-                f"The grids for the postcode area {self.plz} is already generated "
-                f"for the version {VERSION_ID}."
-            )
 
     def generate_grid_for_multiple_plz(self, df_plz: pd.DataFrame, analyze_grids: bool = False) -> None:
         """generates grid for all plz contained in the column 'plz' of df_samples
