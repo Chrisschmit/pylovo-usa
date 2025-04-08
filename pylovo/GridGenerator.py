@@ -179,7 +179,7 @@ class GridGenerator:
                 if bcid >= 0:
                     utils.positionSubstation(self.pgr, self.plz, kcid, bcid)
                     self.logger.debug(f"substation positioning for kcid{kcid}, bcid{bcid} finished")
-                    self.pgr.update_s_max(self.plz, kcid, bcid, 1)
+                    self.pgr.update_transformer_rated_power(self.plz, kcid, bcid, 1)
                     self.logger.debug("Smax in building_clusters is updated.")
 
     def install_cables(self):
@@ -254,8 +254,8 @@ class GridGenerator:
 
                     local_length_dict = self.pgr.install_consumer_cables(
                         self.plz,
-                        kcid,
                         bcid,
+                        kcid,
                         branch_deviation,
                         connection_node_list,
                         ont_vertice,

@@ -160,7 +160,7 @@ class SyngridDatabaseConstructor:
                     self.pgr.conn.commit()
             # read and write
             df = pd.read_csv(file_path, index_col=False)
-            df = df.rename(columns={"einwohner": "population"})
+            df = df.rename(columns={"einwohner": "population", "gid": "postcode_id"})
             df.to_sql(
                 name=table_name,
                 con=self.pgr.sqla_engine,

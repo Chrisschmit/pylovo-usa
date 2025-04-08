@@ -1,4 +1,4 @@
-INSERT INTO public.postcode (gid,
+INSERT INTO public.postcode (postcode_id,
                              plz,
                              note,
                              qkm,
