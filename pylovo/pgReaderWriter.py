@@ -1225,7 +1225,7 @@ class PgReaderWriter:
             # Skip empty transformers
             if not pre_result_dict[transformer_id]:
                 self.logger.debug(f"Transformer {transformer_id} has no assigned consumer, deleted")
-                self.delete_transformers([transformer_id])
+                self.delete_transformers_from_buildings_tem([transformer_id])
                 continue
 
             # Create building cluster with sequential negative ID
@@ -2028,7 +2028,7 @@ class PgReaderWriter:
                 DELETE FROM ways_tem_vertices_pgr WHERE id IN %(v)s;"""
         self.cur.execute(query, {"v": tuple(map(int, vertices))})
 
-    def delete_transformers(self, vertices: list) -> None:
+    def delete_transformers_from_buildings_tem(self, vertices: list) -> None:
         """
         Deletes selected transformers from buildings_tem
         :param vertices:
