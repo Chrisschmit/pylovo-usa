@@ -1593,40 +1593,6 @@ class PgReaderWriter:
             UPDATE buildings_tem SET floors = 1 WHERE floors ISNULL;"""
         self.cur.execute(query, {"v": VERSION_ID, "plz": plz})
 
-
-    def set_residential_buildings_table_from_osmid(self, plz: int, buildings: list) -> None:
-        """
-        * Fills buildings_tem with residential buildings which are inside the selected polygon
-        * Sets the postcode cluster to first plz that intersects
-        :param shape:
-        :return:
-        """
-
-        # Fill table
-        query = """INSERT INTO buildings_tem (osm_id, area, type, geom, center, floors)
-                SELECT osm_id, area, building_t, geom, ST_Centroid(geom), floors::int FROM res
-                WHERE res.osm_id = ANY(%(buildings)s);
-                UPDATE buildings_tem SET plz = %(p)s WHERE plz ISNULL;"""
-        self.cur.execute(query, {"v": VERSION_ID, "p": plz, "buildings": buildings})
-
-    def set_other_buildings_table_from_osmid(self, plz: int, buildings: list) -> None:
-        """
-        * Fills buildings_tem with other buildings which are inside the selected polygon
-        * Sets the postcode cluster to first plz that intersects shapefile
-        * Sets all floors to 1
-        :param shape:
-        :return:
-        """
-
-        # Fill table
-        query = """INSERT INTO buildings_tem(osm_id, area, type, geom, center)
-                SELECT osm_id, area, use, geom, ST_Centroid(geom) FROM oth AS o 
-                WHERE o.use in ('Commercial', 'Public')
-                AND o.osm_id = ANY(%(buildings)s);
-            UPDATE buildings_tem SET plz = %(p)s WHERE plz ISNULL;
-            UPDATE buildings_tem SET floors = 1 WHERE floors ISNULL;"""
-        self.cur.execute(query, {"v": VERSION_ID, "p": plz, "buildings": buildings})
-
     def get_connected_component(self) -> tuple[np.ndarray, np.ndarray]:
         """
         Reads from ways_tem
