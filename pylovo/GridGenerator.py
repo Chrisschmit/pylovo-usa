@@ -350,13 +350,13 @@ class GridGenerator:
 
     def analyse_results(self):
         try:
-            self.logger.info("start basic result analysis")
+            self.logger.info("Start basic result analysis")
             self.pgr.analyse_basic_parameters(self.plz)
-            self.logger.info("start cable counting")
+            self.logger.info("Start cable counting")
             self.pgr.analyse_cables(self.plz)
-            self.logger.info("start per trafo analysis")
+            self.logger.info("Start per trafo analysis")
             self.pgr.analyse_per_trafo_parameters(self.plz)
-            self.logger.info("result analysis finished")
+            self.logger.info("Result analysis finished")
             self.pgr.conn.commit()
         except Exception as e:
             self.logger.error(f"Error during analysis for PLZ {self.plz}: {e}")
