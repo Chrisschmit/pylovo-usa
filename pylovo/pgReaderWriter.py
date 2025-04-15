@@ -201,78 +201,38 @@ class PgReaderWriter:
         return Pd, load_units, load_type
 
     def create_cable_std_type(self, net: pp.pandapowerNet) -> None:
-        pp.create_std_type(
-            net,
-            {
-                "r_ohm_per_km": 1.15,
-                "x_ohm_per_km": 0.09,
-                "max_i_ka": 0.103,
-                "c_nf_per_km": 0,
-                "q_mm2": 16,
-            },
-            name="NYY 4x16 SE",
-            element="line",
-        )
-        pp.create_std_type(
-            net,
-            {
-                "r_ohm_per_km": 0.524,
-                "x_ohm_per_km": 0.085,
-                "max_i_ka": 0.159,
-                "c_nf_per_km": 0,
-                "q_mm2": 35,
-            },
-            name="NYY 4x35 SE",
-            element="line",
-        )
-        pp.create_std_type(
-            net,
-            {
-                "r_ohm_per_km": 0.164,
-                "x_ohm_per_km": 0.08,
-                "max_i_ka": 0.313,
-                "c_nf_per_km": 0,
-                "q_mm2": 185,
-            },
-            name="NAYY 4x185 SE",
-            element="line",
-        )
-        pp.create_std_type(
-            net,
-            {
-                "r_ohm_per_km": 0.32,
-                "x_ohm_per_km": 0.082,
-                "max_i_ka": 0.215,
-                "c_nf_per_km": 0,
-                "q_mm2": 95,
-            },
-            name="NAYY 4x95 SE",
-            element="line",
-        )
-        pp.create_std_type(
-            net,
-            {
-                "r_ohm_per_km": 0.268,
-                "x_ohm_per_km": 0.082,
-                "max_i_ka": 0.232,
-                "c_nf_per_km": 0,
-                "q_mm2": 70,
-            },
-            name="NYY 4x70 SE",
-            element="line",
-        )
-        pp.create_std_type(
-            net,
-            {
-                "r_ohm_per_km": 0.193,
-                "x_ohm_per_km": 0.082,
-                "max_i_ka": 0.280,
-                "c_nf_per_km": 0,
-                "q_mm2": 95,
-            },
-            name="NYY 4x95 SE",
-            element="line",
-        )
+        """Create standard cable types from equipment_data table."""
+        query = """
+            SELECT name, r_mohm_per_km/1000.0 as r_ohm_per_km, x_mohm_per_km/1000.0 as x_ohm_per_km, 
+                   max_i_a/1000.0 as max_i_ka
+            FROM public.equipment_data
+            WHERE typ = 'Cable'
+        """
+
+        # Execute query and fetch cable data
+        self.cur.execute(query)
+        cables = self.cur.fetchall()
+
+        # Create standard type for each cable in the database
+        for cable in cables:
+            name, r_ohm_per_km, x_ohm_per_km, max_i_ka = cable
+            pp_name = name.replace('_', ' ')
+            q_mm2 = int(name.split("_")[-1])  # Extract cross-section from name
+
+            pp.create_std_type(
+                net,
+                {
+                    "r_ohm_per_km": r_ohm_per_km,
+                    "x_ohm_per_km": x_ohm_per_km,
+                    "max_i_ka": max_i_ka,
+                    "c_nf_per_km": 0,  # Always zero
+                    "q_mm2": q_mm2
+                },
+                name=pp_name,
+                element="line",
+            )
+
+        self.logger.debug(f"Created {len(cables)} standard cable types from equipment_data table")
         return None
 
     def create_lvmv_bus(self, plz: int, kcid: int, bcid: int, net: pp.pandapowerNet) -> None:
