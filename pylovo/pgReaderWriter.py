@@ -87,16 +87,16 @@ class PgReaderWriter:
             Settlement type: 1=City, 2=Village, 3=Rural
         Returns: Typical transformer capacities and costs depending on the settlement type
         """
-        # if settlement_type == 1:
-        #     application_area_tuple = (1, 2, 3)
-        # elif settlement_type == 2:
-        #     application_area_tuple = (2, 3, 4)
-        # elif settlement_type == 3:
-        #     application_area_tuple = (3, 4, 5)
-        # else:
-        #     print("Incorrect settlement type number specified.")
-        #     return
-        application_area_tuple = (1, 2, 3, 4, 5) # TODO:check selection
+        if settlement_type == 1:
+            application_area_tuple = (1, 2, 3)
+        elif settlement_type == 2:
+            application_area_tuple = (2, 3, 4)
+        elif settlement_type == 3:
+            application_area_tuple = (3, 4, 5)
+        else:
+            self.logger.debug("Incorrect settlement type number specified.")
+            return
+        # application_area_tuple = (1, 2, 3, 4, 5) # TODO:check selection
 
         query = """SELECT equipment_data.s_max_kva , cost_eur
             FROM public.equipment_data
