@@ -27,7 +27,7 @@ class PgReaderWriter:
     Use this class to interact with the database and to utilize connection resources.
     """
 
-    # Konstruktor
+    # Constructor
     def __init__(
             self, dbname=DBNAME, user=USER, pw=PASSWORD, host=HOST, port=PORT, **kwargs
         ):
@@ -178,25 +178,18 @@ class PgReaderWriter:
             connection_nodes,
         )
 
-    def get_consumer_simultaneous_load_dict(
-            self, consumer_list: list, buildings_df: pd.DataFrame
-        ) -> tuple[dict, dict, dict]:
-        Pd = {
-            consumer: 0 for consumer in consumer_list
-        }  # dict of all vertices in bc, 0 as default
+    def get_consumer_simultaneous_load_dict(self, consumer_list: list, buildings_df: pd.DataFrame) -> tuple[dict, dict, dict]:
+        Pd = {consumer: 0 for consumer in consumer_list}  # dict of all vertices in bc, 0 as default
         load_units = {consumer: 0 for consumer in consumer_list}
         load_type = {consumer: "SFH" for consumer in consumer_list}
 
         for row in buildings_df.itertuples():
             load_units[row.vertice_id] = row.houses_per_building
             load_type[row.vertice_id] = row.type
-            gzf = CONSUMER_CATEGORIES.loc[
-                CONSUMER_CATEGORIES.definition == row.type, "sim_factor"
-            ].item()
+            gzf = CONSUMER_CATEGORIES.loc[CONSUMER_CATEGORIES.definition == row.type, "sim_factor"].item()
 
-            Pd[row.vertice_id] = utils.oneSimultaneousLoad(
-                row.peak_load_in_kw * 1e-3, row.houses_per_building, gzf
-            )  # simultaneous load of each building in mW
+            # Determine simultaneous load of each building in MW
+            Pd[row.vertice_id] = utils.oneSimultaneousLoad(row.peak_load_in_kw * 1e-3, row.houses_per_building, gzf)
 
         return Pd, load_units, load_type
 
@@ -1219,7 +1212,6 @@ class PgReaderWriter:
         The optimal location minimizes the sum of distance*load from each vertex to others.
 
         Args:
-            pgr: PostgreSQL reader/writer instance
             plz: Postcode
             kcid: Kmeans cluster ID
             bcid: Building cluster ID
@@ -1697,14 +1689,12 @@ class PgReaderWriter:
                     if cluster_dict:
                         current_valid_amount = len(valid_cluster_dict)
                         valid_cluster_dict.update({x + current_valid_amount: y for x, y in cluster_dict.items()})
-                        valid_cluster_dict = dict(enumerate(valid_cluster_dict.values()))
+                        valid_cluster_dict = dict(enumerate(valid_cluster_dict.values())) # reindexing the dict with enumerate
 
                     # Process invalid clusters
                     if invalid_cluster_dict:
                         current_invalid_amount = len(invalid_trans_cluster_dict)
-                        invalid_trans_cluster_dict.update(
-                            {x + current_invalid_amount: y for x, y in invalid_cluster_dict.items()}
-                        )
+                        invalid_trans_cluster_dict.update({x + current_invalid_amount: y for x, y in invalid_cluster_dict.items()})
                         invalid_trans_cluster_dict = dict(enumerate(invalid_trans_cluster_dict.values()))
 
                     # Check if clustering is complete
