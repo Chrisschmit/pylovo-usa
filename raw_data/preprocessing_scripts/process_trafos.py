@@ -25,8 +25,60 @@ MIN_DISTANCE_BETWEEN_TRAFOS = 8
 VOLTAGE_THRESHOLD = 110000
 EPSG = 32633
 
-SUBSTATIONS_QUERY_PATH = os.path.join(".", "raw_data", "transformer_data", "substations_query.txt")
-SHOPPING_MALL_QUERY_PATH = os.path.join(".", "raw_data", "transformer_data", "shopping_mall_query.txt")
+SUBSTATIONS_QUERY_PATH = os.path.join(".", "raw_data", "transformer_data", "overpass_queries", "substations_query.txt")
+SHOPPING_MALL_QUERY_PATH = os.path.join(".", "raw_data", "transformer_data", "overpass_queries", "shopping_mall_query.txt")
+
+
+def main(relation_id: int, ignore_existing: bool) -> None:
+    """Fetch transformers from Overpass API, process the fetched data, and finally load them into the database.
+
+    Args:
+        relation_id (int): relation ID of the area of interest
+        ignore_existing (bool): ignore existing transformers.
+
+    """
+    # timing of the script
+    start_time = time.time()
+
+    print("Fetching transformers...")
+    fetch_trafos(relation_id)
+    print("Processing transformers...")
+    process_trafos(relation_id)
+
+    in_file = get_trafos_processed_geojson_path(relation_id)
+    out_file = get_trafos_processed_3035_geojson_path(relation_id)
+
+    # Convert the GeoJSON file to EPSG:3035 and write to a new file
+    subprocess.run(
+        [
+            "ogr2ogr",
+            "-f", "GeoJSON",
+            "-s_srs", f"EPSG:{EPSG}",
+            "-t_srs", "EPSG:3035",
+            out_file,  # output
+            in_file  # input
+        ],
+        shell=False
+    )
+
+    # write new data to transformers table
+    print("Loading transformers into database...")
+    trafo_dict = [
+        {
+            "path": out_file,
+            "table_name": "transformers"
+        }
+    ]
+    sgc = SyngridDatabaseConstructor()
+    try:
+        sgc.ogr_to_db(trafo_dict, skip_failures=ignore_existing)
+    except CalledProcessError as e:
+        print("An error occurred when importing data into database:", e)
+        print("\nMost likely cause is data already existing in database. Try the --ignore-existing flag.")
+        exit(1)
+
+
+    print("--- %s seconds ---" % (time.time() - start_time))
 
 
 def get_substations_geojson_path(relation_id: int) -> str:
@@ -206,58 +258,6 @@ def handle_user_input() -> tuple[int, bool]:
             exit(1)
         print("Continuing...")
     return relation_id, ignore_existing
-
-
-def main(relation_id: int, ignore_existing: bool) -> None:
-    """Fetch transformers from Overpass API, process the fetched data, and finally load them into the database.
-
-    Args:
-        relation_id (int): relation ID of the area of interest
-        ignore_existing (bool): ignore existing transformers.
-
-    """
-    # timing of the script
-    start_time = time.time()
-
-    print("Fetching transformers...")
-    fetch_trafos(relation_id)
-    print("Processing transformers...")
-    process_trafos(relation_id)
-
-    in_file = get_trafos_processed_geojson_path(relation_id)
-    out_file = get_trafos_processed_3035_geojson_path(relation_id)
-
-    # Convert the GeoJSON file to EPSG:3035 and write to a new file
-    subprocess.run(
-        [
-            "ogr2ogr",
-            "-f", "GeoJSON",
-            "-s_srs", f"EPSG:{EPSG}",
-            "-t_srs", "EPSG:3035",
-            out_file,  # output
-            in_file  # input
-        ],
-        shell=False
-    )
-
-    # write new data to transformers table
-    print("Loading transformers into database...")
-    trafo_dict = [
-        {
-            "path": out_file,
-            "table_name": "transformers"
-        }
-    ]
-    sgc = SyngridDatabaseConstructor()
-    try:
-        sgc.ogr_to_db(trafo_dict, skip_failures=ignore_existing)
-    except CalledProcessError as e:
-        print("An error occurred when importing data into database:", e)
-        print("\nMost likely cause is data already existing in database. Try the --ignore-existing flag.")
-        exit(1)
-
-
-    print("--- %s seconds ---" % (time.time() - start_time))
 
 
 if __name__ == "__main__":

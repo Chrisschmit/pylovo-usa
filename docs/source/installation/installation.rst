@@ -137,7 +137,7 @@ If you want more control over your input data follow instructions below:
 By default the database is populated with preloaded data of transformers in Bavaria.
 
 If you want to fetch up-to-date data upon running ``executable_scripts/main_constructor.py`` data from OSM, delete the
-``raw_data/transformer_data/fetched_trafos/2145268_shopping_mall.geojson`` file before running the script.
+``raw_data/transformer_data/processed_trafos/*_trafos_processed.geojson`` file before running the script.
 
 If you want to fetch up-to-date data upon running ``executable_scripts/main_constructor.py`` from a different area
 then change the ``RELATION_ID`` in ``raw_data/preprocessing_scripts/process_trafos.py`` to the relation ID
@@ -159,8 +159,8 @@ How to find desired relation ID
 
    **Sidebar example:** Relation: Munich (**62428**)
 
-How to add more transformer data
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+How to add more transformer data after database has already been constructed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 To add more transformers from different areas after ``executable_scripts/main_constructor.py`` has been run, i.e. the database
 has been constructed, simply run the ``raw_data/preprocessing_scripts/process_trafos.py`` script as shown in the example.
 
@@ -168,7 +168,7 @@ Example:
 
 ::
 
-    $ python raw_data/preprocessing_scripts/process_trafos.py --relation-id 62611
+    $ python -m raw_data.preprocessing_scripts.process_trafos --relation-id 62611
     Selected relation ID: 62611
     Corresponding area: Baden-Württemberg
     Do you want to continue? [Y/n]

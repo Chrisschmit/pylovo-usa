@@ -127,7 +127,7 @@ class SyngridDatabaseConstructor:
 
     def transformers_to_db(self):
         """Call the overpass api for transformer data and populate the transformers table.
-        Delete raw_data/transformer_data/fetched_trafos/2145268_shopping_mall.geojson to
+        Delete raw_data/transformer_data/processed_trafos/*_trafos_processed.geojson to
         fetch fresh data from OSM.
 
         """
