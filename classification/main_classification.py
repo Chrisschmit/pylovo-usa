@@ -8,6 +8,44 @@ import sys
 CONFIG_CLASSIFICATION_PATH = os.path.join(os.path.dirname(__file__), "config_classification.yaml")
 CONFIG_CLUSTERING_PATH = os.path.join(os.path.dirname(__file__), "clustering/config_clustering.yaml")
 
+def main():
+    """Main function to execute the classification pipeline."""
+    print("Running classification pipeline...")
+
+    # Step 1: Ensure user has configured `config_classification.yaml`
+    config_classification = load_yaml(CONFIG_CLASSIFICATION_PATH)
+    print(f"Using classification version: {config_classification['CLASSIFICATION_VERSION']}")
+
+    # Step 2: Run prepare_data_for_clustering.py
+    print("\nRunning prepare_data_for_clustering.py...")
+    run_script("prepare_data_for_clustering")
+
+    # Step 3: Ask user for manual input or automatic assignment
+    if get_user_confirmation():
+        # User wants to enter clustering parameters manually
+        clustering_parameters = get_custom_clustering_parameters()
+        cluster_numbers = get_custom_cluster_numbers()
+
+        # Update YAML file manually
+        config = load_yaml(CONFIG_CLUSTERING_PATH)
+        config["LIST_OF_CLUSTERING_PARAMETERS"] = clustering_parameters
+        config["N_CLUSTERS_KMEDOID"], config["N_CLUSTERS_KMEANS"], config["N_CLUSTERS_GMM"] = cluster_numbers
+        save_yaml(CONFIG_CLUSTERING_PATH, config)
+
+        print("\nManually assigned clustering parameters and number of clusters updated in config_clustering.yaml")
+    else:
+        # Step 4: Automatically update clustering parameters and cluster numbers
+        print("\nGetting parameters for clustering...")
+        update_list_of_clustering_parameters()
+
+        print("\nGetting number of clusters for clustering...")
+        update_number_of_clusters()
+
+    # Step 5: Run apply_clustering_for_QGIS_visualisation.py
+    print("\nRunning apply_clustering_for_QGIS_visualisation.py...")
+    run_script("apply_clustering_for_QGIS_visualisation")
+
+    print("\nClassification process completed successfully!")
 
 def load_yaml(filepath):
     """Load a YAML file."""
@@ -157,47 +195,6 @@ def update_number_of_clusters():
     # Save updated YAML file
     save_yaml(CONFIG_CLUSTERING_PATH, config)
     print("Number of clusters updated in config_clustering.yaml")
-
-
-def main():
-    """Main function to execute the classification pipeline."""
-    print("Running classification pipeline...")
-
-    # Step 1: Ensure user has configured `config_classification.yaml`
-    config_classification = load_yaml(CONFIG_CLASSIFICATION_PATH)
-    print(f"Using classification version: {config_classification['CLASSIFICATION_VERSION']}")
-    
-    # Step 2: Run prepare_data_for_clustering.py
-    print("\nRunning prepare_data_for_clustering.py...")
-    run_script("prepare_data_for_clustering")
-
-    # Step 3: Ask user for manual input or automatic assignment
-    if get_user_confirmation():
-        # User wants to enter clustering parameters manually
-        clustering_parameters = get_custom_clustering_parameters()
-        cluster_numbers = get_custom_cluster_numbers()
-
-        # Update YAML file manually
-        config = load_yaml(CONFIG_CLUSTERING_PATH)
-        config["LIST_OF_CLUSTERING_PARAMETERS"] = clustering_parameters
-        config["N_CLUSTERS_KMEDOID"], config["N_CLUSTERS_KMEANS"], config["N_CLUSTERS_GMM"] = cluster_numbers
-        save_yaml(CONFIG_CLUSTERING_PATH, config)
-
-        print("\nManually assigned clustering parameters and number of clusters updated in config_clustering.yaml")
-    else:
-        # Step 4: Automatically update clustering parameters and cluster numbers
-        print("\nGetting parameters for clustering...")
-        update_list_of_clustering_parameters()
-
-        print("\nGetting number of clusters for clustering...")
-        update_number_of_clusters()
-
-    # Step 5: Run apply_clustering_for_QGIS_visualisation.py
-    print("\nRunning apply_clustering_for_QGIS_visualisation.py...")
-    run_script("apply_clustering_for_QGIS_visualisation")
-    
-
-    print("\nClassification process completed successfully!")
 
 
 if __name__ == "__main__":
