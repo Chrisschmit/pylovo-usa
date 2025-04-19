@@ -25,21 +25,12 @@ class SyngridDatabaseConstructor:
     """
 
     def __init__(self, pgr=None):
+        self.extensions_added = False
+
         if pgr:
             self.pgr = pgr
         else:
             self.pgr = PgReaderWriter()
-
-        postgis_versions = ["3.4.2", "3.4.3"]
-        postgis_extension_created = False
-
-        # create extension if not exists for recognition of geom datatypes
-        with self.pgr.conn.cursor() as cur:
-            # create extension if not exists for recognition of geom datatypes
-            cur.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
-            print("CREATE EXTENSION postgis")
-            cur.execute("CREATE EXTENSION IF NOT EXISTS pgRouting;")
-            print("CREATE EXTENSION pgRouting")
 
 
     def get_table_name_list(self):
@@ -60,6 +51,16 @@ class SyngridDatabaseConstructor:
             return False
 
     def create_table(self, table_name):
+        # create extension if not exists for recognition of geom datatypes
+        if not self.extensions_added:
+            with self.pgr.conn.cursor() as cur:
+                # create extension if not exists for recognition of geom datatypes
+                cur.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
+                print("CREATE EXTENSION postgis")
+                cur.execute("CREATE EXTENSION IF NOT EXISTS pgRouting;")
+                print("CREATE EXTENSION pgRouting")
+                self.pgr.conn.commit()
+                self.extensions_added = True
 
         if table_name == "all":
             try:
