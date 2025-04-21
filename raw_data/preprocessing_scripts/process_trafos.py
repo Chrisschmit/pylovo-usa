@@ -71,7 +71,7 @@ def main(relation_id: int, ignore_existing: bool) -> None:
     ]
     sgc = SyngridDatabaseConstructor()
     try:
-        sgc.ogr_to_db(trafo_dict, skip_failures=ignore_existing)
+        sgc.ogr_to_db(trafo_dict, skip_failures=True)
     except CalledProcessError as e:
         print("An error occurred when importing data into database:", e)
         print("\nMost likely cause is data already existing in database. Try the --ignore-existing flag.")
@@ -202,7 +202,7 @@ def process_trafos(relation_id: int) -> None:
     gdf_substations.to_file(get_trafos_processed_geojson_path(relation_id), driver='GeoJSON')
 
 
-def handle_user_input() -> tuple[int, bool]:
+def handle_user_input() -> int:
     parser = argparse.ArgumentParser(
         prog="process_trafos",
         description="Fetch transformers from Overpass API, process the fetched data,"
@@ -221,17 +221,10 @@ def handle_user_input() -> tuple[int, bool]:
         help="do not prompt for confirmation",
         required=False
     )
-    parser.add_argument(
-        "--ignore-existing",
-        action="store_true",
-        help="ignore error where transformer osm_id already exists in database",
-        required=False
-    )
 
     args = parser.parse_args()
     relation_id = args.relation_id
     skip_confirmation = args.yes
-    ignore_existing = args.ignore_existing
 
     print(f"Selected relation ID: {relation_id}")
 
@@ -257,9 +250,9 @@ def handle_user_input() -> tuple[int, bool]:
             print("Aborted.")
             exit(1)
         print("Continuing...")
-    return relation_id, ignore_existing
+    return relation_id
 
 
 if __name__ == "__main__":
-    rel_id, ign_existing = handle_user_input()
-    main(rel_id, ignore_existing=ign_existing)
+    rel_id = handle_user_input()
+    main(rel_id, ignore_existing=True)
