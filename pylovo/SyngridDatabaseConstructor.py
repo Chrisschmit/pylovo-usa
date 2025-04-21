@@ -120,7 +120,18 @@ class SyngridDatabaseConstructor:
             if skip_failures:
                 command.append("-skipfailures")
 
-            subprocess.run(command, check=True, shell=False, stderr=subprocess.DEVNULL if skip_failures else None)
+            result = subprocess.run(command, check=True, shell=False, stderr=subprocess.PIPE if skip_failures else None)
+            if skip_failures:
+                error_list = result.stderr.decode().replace("\r", "").split("\n")
+                error_list = [e[e.find("ERROR: "):e.find("DETAIL: ")] for e in error_list]
+                error_list = [e.strip("\n") for e in error_list if "ERROR: " in e]
+                error_set = set(error_list)
+                
+                print(f"Warning: Error(s) occurred while processing {file_name}:")
+                for error in error_set:
+                    print("\t" + error)
+                    if "duplicate key value violates unique constraint" in error:
+                        print("\tThis is likely due to importing already existing data.")
 
             et = time.time()
             print(f"{file_name} is successfully imported to db in {int(et - st)} s")
