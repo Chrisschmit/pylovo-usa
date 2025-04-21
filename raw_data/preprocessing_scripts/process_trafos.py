@@ -29,7 +29,7 @@ SUBSTATIONS_QUERY_PATH = os.path.join(".", "raw_data", "transformer_data", "over
 SHOPPING_MALL_QUERY_PATH = os.path.join(".", "raw_data", "transformer_data", "overpass_queries", "shopping_mall_query.txt")
 
 
-def main(relation_id: int, ignore_existing: bool) -> None:
+def main(relation_id: int) -> None:
     """Fetch transformers from Overpass API, process the fetched data, and finally load them into the database.
 
     Args:
@@ -255,4 +255,4 @@ def handle_user_input() -> int:
 
 if __name__ == "__main__":
     rel_id = handle_user_input()
-    main(rel_id, ignore_existing=True)
+    main(rel_id)
