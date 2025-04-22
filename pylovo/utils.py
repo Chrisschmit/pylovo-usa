@@ -1,4 +1,7 @@
 import numpy as np
+import osm2geojson
+import requests
+
 import logging
 
 
@@ -66,3 +69,45 @@ def oneSimultaneousLoad(installed_power, load_count, sim_factor):
     sim_load = installed_power * (sim_factor + (1 - sim_factor) * (load_count ** (-3 / 4)))
 
     return sim_load
+
+
+def osmjson_to_geojson(osmjson: dict[str, str]) -> dict[str, str]:
+    """Convert JSON dict received from overpass api to GeoJSON dictionary.
+
+    Args:
+        osmjson: JSON dictionary received from overpass api
+
+    Returns:
+        dict: GeoJSON representation of osmjson
+
+    """
+    geojson = osm2geojson.json2geojson(osmjson)
+
+    # put attributes in "tags" directly into "properties"
+    for feature in geojson['features']:
+        if "tags" in feature["properties"]:
+            feature["properties"].update(feature["properties"].pop("tags"))
+
+    return geojson
+
+
+def query_overpass_for_geojson(overpass_url: str, query: str) -> dict[str, str]:
+    """Execute an overpass turbo query and convert results to GeoJSON.
+
+    Args:
+        overpass_url: Overpass API URL
+        query: Query string
+
+    Returns:
+        dict: GeoJSON representation of overpass results
+
+    """
+    # call api for data
+    response = requests.get(overpass_url, params={'data': query})
+    response.raise_for_status()
+
+    # convert JSON data to GeoJSON format
+    osmjson = response.json()
+    geojson = osmjson_to_geojson(osmjson)
+
+    return geojson

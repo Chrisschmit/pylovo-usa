@@ -10,10 +10,12 @@ import sqlparse
 
 from pylovo.config_data import *
 from pylovo.pgReaderWriter import PgReaderWriter
+from raw_data.preprocessing_scripts.process_trafos import process_trafos, get_trafos_processed_3035_geojson_path, \
+    fetch_trafos, RELATION_ID, EPSG, get_trafos_processed_geojson_path
+
 
 # uncomment for automated building import of buildings in regiostar_samples
 # from raw_data.import_building_data import OGR_FILE_LIST
-
 
 
 class SyngridDatabaseConstructor:
@@ -23,21 +25,12 @@ class SyngridDatabaseConstructor:
     """
 
     def __init__(self, pgr=None):
+        self.extensions_added = False
+
         if pgr:
             self.pgr = pgr
         else:
             self.pgr = PgReaderWriter()
-
-        postgis_versions = ["3.4.2", "3.4.3"]
-        postgis_extension_created = False
-
-        # create extension if not exists for recognition of geom datatypes
-        with self.pgr.conn.cursor() as cur:
-            # create extension if not exists for recognition of geom datatypes
-            cur.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
-            print("CREATE EXTENSION postgis")
-            cur.execute("CREATE EXTENSION IF NOT EXISTS pgRouting;")
-            print("CREATE EXTENSION pgRouting")
 
 
     def get_table_name_list(self):
@@ -58,6 +51,16 @@ class SyngridDatabaseConstructor:
             return False
 
     def create_table(self, table_name):
+        # create extension if not exists for recognition of geom datatypes
+        if not self.extensions_added:
+            with self.pgr.conn.cursor() as cur:
+                # create extension if not exists for recognition of geom datatypes
+                cur.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
+                print("CREATE EXTENSION postgis")
+                cur.execute("CREATE EXTENSION IF NOT EXISTS pgRouting;")
+                print("CREATE EXTENSION pgRouting")
+                self.pgr.conn.commit()
+                self.extensions_added = True
 
         if table_name == "all":
             try:
@@ -81,7 +84,7 @@ class SyngridDatabaseConstructor:
                 f"Table name {table_name} is not a valid parameter value for the function create_table. See config.py"
             )
 
-    def ogr_to_db(self, ogr_file_list):
+    def ogr_to_db(self, ogr_file_list, skip_failures: bool = None):
         """
             OGR/GDAL is a translator library for raster and vector geospatial data formats
             inserts building data specified into database
@@ -96,8 +99,7 @@ class SyngridDatabaseConstructor:
 
             table_exists = self.table_exists(table_name=table_name)
             print("ogr working for table", table_name)
-            subprocess.run(
-                [
+            command = [
                     "ogr2ogr",
                     "-append" if table_exists else "-overwrite",
                     "-progress",
@@ -114,28 +116,59 @@ class SyngridDatabaseConstructor:
                     "EPSG:3035",
                     "-lco",
                     "geometry_name=geom",
-                ],
-                shell=False            
-            )
+            ]
+            if skip_failures:
+                command.append("-skipfailures")
+
+            result = subprocess.run(command, check=True, shell=False, stderr=subprocess.PIPE if skip_failures else None)
+            if skip_failures:
+                error_list = result.stderr.decode().replace("\r", "").split("\n")
+                error_list = [e[e.find("ERROR: "):e.find("DETAIL: ")] for e in error_list]
+                error_list = [e.strip("\n") for e in error_list if "ERROR: " in e]
+                error_set = set(error_list)
+                
+                print(f"Warning: Error(s) occurred while processing {file_name}:")
+                for error in error_set:
+                    print("\t" + error)
+                    if "duplicate key value violates unique constraint" in error:
+                        print("\tThis is likely due to importing already existing data.")
+
             et = time.time()
             print(f"{file_name} is successfully imported to db in {int(et - st)} s")
 
-    def transformers_to_db(self, sgc):
-        in_file = os.path.join(".", "raw_data", "transformer_data", "substations_bayern_processed.geojson")
-        out_file = os.path.join(".", "raw_data", "transformer_data", "substations_bayern_processed_3035.geojson")
 
-        # Convert the GeoJSON file to EPSG:3035 and write to a new file
-        subprocess.run(
-            [
-                "ogr2ogr",
-                "-f", "GeoJSON",
-                "-s_srs", "EPSG:32633",
-                "-t_srs", "EPSG:3035",
-                out_file,  # output
-                in_file  # input
-            ],
-            shell=False
-        )
+    def transformers_to_db(self):
+        """Call the overpass api for transformer data and populate the transformers table.
+        Delete raw_data/transformer_data/processed_trafos/*_trafos_processed.geojson to
+        fetch fresh data from OSM.
+
+        """
+        trafos_processed_geojson_path = get_trafos_processed_geojson_path(RELATION_ID)
+        trafos_processed_3035_geojson_path = get_trafos_processed_3035_geojson_path(RELATION_ID)
+
+        update_trafos = not os.path.isfile(trafos_processed_geojson_path)
+
+        if update_trafos:
+            print(f"{trafos_processed_geojson_path} does not exist -> fetch transformer data from API and process it")
+            fetch_trafos(RELATION_ID)
+            process_trafos(RELATION_ID)
+
+        in_file = trafos_processed_geojson_path
+        out_file = trafos_processed_3035_geojson_path
+
+        if update_trafos or not os.path.isfile(out_file):
+            # Convert the GeoJSON file to EPSG:3035 and write to a new file
+            subprocess.run(
+                [
+                    "ogr2ogr",
+                    "-f", "GeoJSON",
+                    "-s_srs", f"EPSG:{str(EPSG)}",
+                    "-t_srs", "EPSG:3035",
+                    out_file,  # output
+                    in_file  # input
+                ],
+                shell=False
+            )
 
         trafo_dict = [
             {
@@ -143,7 +176,7 @@ class SyngridDatabaseConstructor:
                 "table_name": "transformers"
             }
         ]
-        sgc.ogr_to_db(trafo_dict)
+        self.ogr_to_db(trafo_dict)
 
     def csv_to_db(self):
 
