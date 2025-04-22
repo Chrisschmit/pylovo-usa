@@ -223,6 +223,7 @@ class SyngridDatabaseConstructor:
 
         leftover = ""  # Holds any partial statement that didn't end with a semicolon
 
+        print("\nStart inserting ways into public_2po_4pgr table.")
         with open(sc_path, 'r', encoding='utf-8') as sc_file:
             while True:
                 # Read next chunk

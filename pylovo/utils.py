@@ -7,6 +7,9 @@ import logging
 
 def create_logger(name, log_file, log_level):
     log_file = log_file
+    logger = logging.getLogger(name=name)
+    logger.handlers.clear()  # Clear existing handlers to prevent duplication
+
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
     # to print log messages to a file
@@ -17,7 +20,7 @@ def create_logger(name, log_file, log_level):
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
 
-    logger = logging.getLogger(name=name)
+    
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
     logger.setLevel(log_level)
@@ -66,29 +69,6 @@ def oneSimultaneousLoad(installed_power, load_count, sim_factor):
     sim_load = installed_power * (sim_factor + (1 - sim_factor) * (load_count ** (-3 / 4)))
 
     return sim_load
-
-
-def positionSubstation(pgr, plz, kcid, bcid):
-    print("positionSubstation", plz, kcid, bcid)
-    # Hole die Gebäuden in dem Load Area Cluster
-    connection_points = pgr.get_building_connection_points_from_bc(kcid, bcid)
-    print("connectionPoints", connection_points)
-    if len(connection_points) == 1:
-        pgr.upsert_substation_selection(plz, kcid, bcid, connection_points[0])
-        return
-    # Distance Matrix von Verbrauchern in einem Load Area Cluster
-    localid2vid, dist_mat, vid2localid = pgr.get_distance_matrix_from_building_cluster(kcid, bcid)
-
-    # Calculate the sum of distance*load from each vertice to the others
-    loads = pgr.generate_load_vector(kcid, bcid)
-    print("LOADSHERE", loads)
-    total_load_per_vertice = dist_mat.dot(loads)
-
-    # Find the vertice_id of optimal building
-    min_localid = np.argmin(total_load_per_vertice)
-    ont_connection_id = int(localid2vid[min_localid])
-
-    pgr.upsert_substation_selection(plz, kcid, bcid, ont_connection_id)
 
 
 def osmjson_to_geojson(osmjson: dict[str, str]) -> dict[str, str]:
