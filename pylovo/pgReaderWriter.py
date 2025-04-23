@@ -74,7 +74,7 @@ class PgReaderWriter:
         Returns: Settlement type: 1=City, 2=Village, 3=Rural
         """
         settlement_query = """SELECT settlement_type FROM public.postcode_result
-            WHERE postcode_result_id = %(p)s 
+            WHERE postcode_result_plz = %(p)s 
             LIMIT 1; """
         self.cur.execute(settlement_query, {"p": plz})
         settlement_type = self.cur.fetchone()[0]
@@ -1452,11 +1452,11 @@ class PgReaderWriter:
         :param plz:
         :return:
         """
-        query = """INSERT INTO postcode_result (version_id, postcode_result_id, geom) 
+        query = """INSERT INTO postcode_result (version_id, postcode_result_plz, geom) 
                     SELECT %(v)s as version_id, plz, geom FROM postcode 
                     WHERE plz = %(p)s
                     LIMIT 1 
-                    ON CONFLICT (version_id,postcode_result_id) DO NOTHING;"""
+                    ON CONFLICT (version_id,postcode_result_plz) DO NOTHING;"""
 
         self.cur.execute(query, {"v": VERSION_ID, "p": plz})
 
@@ -1467,7 +1467,7 @@ class PgReaderWriter:
         """
         query = """SELECT COUNT(*) FROM postcode_result
                     WHERE version_id = %(v)s
-                    AND postcode_result_id::INT = %(p)s"""
+                    AND postcode_result_plz::INT = %(p)s"""
         self.cur.execute(query, {"v": VERSION_ID, "p": plz})
         return int(self.cur.fetchone()[0])
 
@@ -1523,7 +1523,7 @@ class PgReaderWriter:
                     ELSE 1
                 END
             WHERE version_id = %(v)s 
-            AND postcode_result_id = %(p)s;"""
+            AND postcode_result_plz = %(p)s;"""
 
         self.cur.execute(query, {"v": VERSION_ID, "avg": avg_dis, "p": plz})
 
@@ -1571,7 +1571,7 @@ class PgReaderWriter:
         query = """INSERT INTO buildings_tem (osm_id, area, type, geom, center, floors)
                 SELECT osm_id, area, building_t, geom, ST_Centroid(geom), floors::int FROM res
                 WHERE ST_Contains((SELECT post.geom FROM postcode_result as post WHERE version_id = %(v)s
-                AND postcode_result_id = %(plz)s LIMIT 1), ST_Centroid(res.geom));
+                AND postcode_result_plz = %(plz)s LIMIT 1), ST_Centroid(res.geom));
                 UPDATE buildings_tem SET plz = %(plz)s WHERE plz ISNULL;"""
         self.cur.execute(query, {"v": VERSION_ID, "plz": plz})
 
@@ -1588,7 +1588,7 @@ class PgReaderWriter:
                 SELECT osm_id, area, use, geom, ST_Centroid(geom) FROM oth AS o 
                 WHERE o.use in ('Commercial', 'Public')
                 AND ST_Contains((SELECT post.geom FROM postcode_result as post WHERE version_id = %(v)s
-                    AND  postcode_result_id = %(plz)s), ST_Centroid(o.geom));;
+                    AND  postcode_result_plz = %(plz)s), ST_Centroid(o.geom));;
             UPDATE buildings_tem SET plz = %(plz)s WHERE plz ISNULL;
             UPDATE buildings_tem SET floors = 1 WHERE floors ISNULL;"""
         self.cur.execute(query, {"v": VERSION_ID, "plz": plz})
@@ -1657,7 +1657,7 @@ class PgReaderWriter:
         query = """INSERT INTO ways_tem
             SELECT * FROM ways AS w 
             WHERE ST_Intersects(w.geom,(SELECT geom FROM postcode_result WHERE version_id = %(v)s
-                    AND  postcode_result_id = %(p)s));
+                    AND  postcode_result_plz = %(p)s));
             SELECT COUNT(*) FROM ways_tem;"""
         self.cur.execute(query, {"v": VERSION_ID, "p": plz})
         count = self.cur.fetchone()[0]
@@ -1855,7 +1855,7 @@ class PgReaderWriter:
                 SELECT osm_id, geom 
                 --FROM transformers WHERE ST_Within(geom, (SELECT geom FROM postcode_result LIMIT 1)) IS FALSE;
                 FROM transformers as t
-                    WHERE ST_Within(t.geom, (SELECT geom FROM postcode_result WHERE postcode_result_id = %(p)s AND version_id = %(v)s)); --IS FALSE;
+                    WHERE ST_Within(t.geom, (SELECT geom FROM postcode_result WHERE postcode_result_plz = %(p)s AND version_id = %(v)s)); --IS FALSE;
             UPDATE buildings_tem SET plz = %(p)s WHERE plz ISNULL;
             UPDATE buildings_tem SET center = ST_Centroid(geom) WHERE center ISNULL;
             UPDATE buildings_tem SET type = 'Transformer' WHERE type ISNULL;
@@ -2515,9 +2515,9 @@ class PgReaderWriter:
         :param plz:
         :return:
         """
-        query = """INSERT INTO postcode_result (version_id, postcode_result_id, settlement_type, geom, house_distance) 
+        query = """INSERT INTO postcode_result (version_id, postcode_result_plz, settlement_type, geom, house_distance) 
                     VALUES(%(v)s, %(p)s::INT, null, ST_Multi(ST_Transform(ST_GeomFromGeoJSON(%(shape)s), 3035)), null)
-                    ON CONFLICT (version_id,postcode_result_id) DO NOTHING;"""
+                    ON CONFLICT (version_id,postcode_result_plz) DO NOTHING;"""
 
         self.cur.execute(query, {"v": VERSION_ID, "p": plz, "shape": shape})
 
@@ -2588,7 +2588,7 @@ class PgReaderWriter:
             self.conn.commit()
 
         query = """DELETE FROM postcode_result
-        WHERE version_id = %(v)s AND postcode_result_id = %(p)s;"""
+        WHERE version_id = %(v)s AND postcode_result_plz = %(p)s;"""
         self.cur.execute(query, {"v": version_id, "p": int(plz)})
         self.conn.commit()
         self.logger.info(f"All data for PLZ {plz} and version {version_id} deleted")

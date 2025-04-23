@@ -279,8 +279,8 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     "postcode": """CREATE TABLE IF NOT EXISTS public.postcode
 (
     postcode_id integer NOT NULL,
-    plz int,
-    note varchar(86),
+    plz int UNIQUE NOT NULL,
+    note varchar,
     qkm double precision,
     population integer,
     geom geometry(MultiPolygon,3035),
@@ -289,14 +289,18 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     "postcode_result": """CREATE TABLE IF NOT EXISTS public.postcode_result
 (   
     version_id varchar(10) NOT NULL,
-    postcode_result_id integer NOT NULL,
+    postcode_result_plz integer NOT NULL,
     settlement_type integer,
     geom geometry(MultiPolygon,3035),
     house_distance numeric,
-    CONSTRAINT "postcode_result_pkey" PRIMARY KEY (version_id, postcode_result_id),
+    CONSTRAINT "postcode_result_pkey" PRIMARY KEY (version_id, postcode_result_plz),
     CONSTRAINT fk_postcode_result_version_id
         FOREIGN KEY (version_id)
         REFERENCES public.version (version_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_postcode_result_plz
+        FOREIGN KEY (postcode_result_plz)
+        REFERENCES public.postcode (plz)
         ON DELETE CASCADE
 )""",
     "transformer_positions": """CREATE TABLE IF NOT EXISTS public.transformer_positions 
