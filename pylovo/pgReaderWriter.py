@@ -827,7 +827,7 @@ class PgReaderWriter:
         return geo
 
     def get_transformer_rated_power_from_bcid(self, plz: int, kcid: int, bcid: int) -> int:
-        query = """SELECT transformer_rated_power FROM building_clusters
+        query = """SELECT transformer_rated_power FROM grid_result
                     WHERE version_id = %(v)s 
                     AND plz = %(p)s 
                     AND kcid = %(k)s
@@ -838,7 +838,7 @@ class PgReaderWriter:
         return transformer_rated_power
 
     def get_list_from_plz(self, plz: int) -> list:
-        query = """SELECT DISTINCT kcid, bcid FROM building_clusters 
+        query = """SELECT DISTINCT kcid, bcid FROM grid_result 
                     WHERE  version_id = %(v)s AND plz = %(p)s 
                     ORDER BY kcid, bcid;"""
         self.cur.execute(query, {"p": plz, "v": VERSION_ID})
@@ -921,7 +921,7 @@ class PgReaderWriter:
 
     def upsert_building_cluster(self, plz: int, kcid: int, bcid: int, vertices: list, transformer_rated_power: int):
         """
-        Assign buildings in buildings_tem the bcid and stores the cluster in building_clusters
+        Assign buildings in buildings_tem the bcid and stores the cluster in grid_result
         Args:
             plz: postcode cluster ID - plz
             kcid: kmeans cluster ID
@@ -948,7 +948,7 @@ class PgReaderWriter:
         self.cur.execute(building_query, params)
 
         # Insert new clustering
-        cluster_query = """INSERT INTO building_clusters (version_id, plz, kcid, bcid, transformer_rated_power) 
+        cluster_query = """INSERT INTO grid_result (version_id, plz, kcid, bcid, transformer_rated_power) 
                 VALUES(%(v)s, %(pc)s, %(kc)s, %(bc)s, %(s)s); """
 
         params = {"v": VERSION_ID, "pc": plz, "bc": bcid, "kc": kcid, "s": int(transformer_rated_power)}
@@ -968,9 +968,9 @@ class PgReaderWriter:
 
         return too_large
 
-    def clear_building_clusters_in_kmean_cluster(self, plz: int, kcid: int):
+    def clear_grid_result_in_kmean_cluster(self, plz: int, kcid: int):
         # Remove old clustering at same postcode cluster
-        clear_query = """DELETE FROM building_clusters
+        clear_query = """DELETE FROM grid_result
                 WHERE  version_id = %(v)s 
                 AND plz = %(pc)s
                 AND kcid = %(kc)s
@@ -983,11 +983,11 @@ class PgReaderWriter:
         )
 
     def upsert_transformer_selection(self, plz: int, kcid: int, bcid: int, connection_id: int):
-        """Writes the vertice_id of chosen building as ONT location in the building_clusters table"""
+        """Writes the vertice_id of chosen building as ONT location in the grid_result table"""
 
-        query = """UPDATE building_clusters SET ont_vertice_id = %(c)s 
+        query = """UPDATE grid_result SET ont_vertice_id = %(c)s 
                     WHERE version_id = %(v)s AND plz = %(p)s AND kcid = %(k)s AND bcid = %(b)s; 
-                    UPDATE building_clusters SET model_status = 1 
+                    UPDATE grid_result SET model_status = 1 
                     WHERE version_id = %(v)s AND plz = %(p)s AND kcid = %(k)s AND bcid = %(b)s;
                 INSERT INTO transformer_positions (version_id, plz, kcid, bcid, geom, ogc_fid, comment)
                     VALUES (%(v)s, %(p)s, %(k)s, %(b)s, (SELECT the_geom FROM ways_tem_vertices_pgr WHERE id = %(c)s), %(c)s::varchar, 'on_way');"""
@@ -1004,7 +1004,7 @@ class PgReaderWriter:
 
     def update_transformer_rated_power(self, plz: int, kcid: int, bcid: int, note: int):
         """
-        Updates Smax in building_clusters
+        Updates transformer_rated_power in grid_result
         :param plz:
         :param kcid:
         :param bcid:
@@ -1015,7 +1015,7 @@ class PgReaderWriter:
         transformer_capacities, _ = self.get_transformer_data(sdl)
 
         if note == 0:
-            old_query = """SELECT transformer_rated_power FROM building_clusters
+            old_query = """SELECT transformer_rated_power FROM grid_result
                             WHERE  version_id = %(v)s
                             AND plz = %(p)s
                             AND kcid = %(k)s
@@ -1026,7 +1026,7 @@ class PgReaderWriter:
             transformer_rated_power = self.cur.fetchone()[0]
 
             new_transformer_rated_power = transformer_capacities[transformer_capacities > transformer_rated_power][0].item()
-            update_query = """UPDATE building_clusters SET transformer_rated_power = %(n)s
+            update_query = """UPDATE grid_result SET transformer_rated_power = %(n)s
                             WHERE version_id = %(v)s 
                             AND plz = %(p)s
                             AND kcid = %(k)s
@@ -1039,7 +1039,7 @@ class PgReaderWriter:
             double_trans = np.multiply(transformer_capacities[2:4], 2)
             combined = np.concatenate((transformer_capacities, double_trans), axis=None)
             np.sort(combined, axis=None)
-            old_query = """SELECT transformer_rated_power FROM building_clusters
+            old_query = """SELECT transformer_rated_power FROM grid_result
                                         WHERE version_id = %(v)s 
                                         AND plz = %(p)s
                                         AND kcid = %(k)s
@@ -1051,7 +1051,7 @@ class PgReaderWriter:
             if transformer_rated_power in combined.tolist():
                 return None
             new_transformer_rated_power = np.ceil(transformer_rated_power / 630) * 630
-            update_query = """UPDATE building_clusters SET transformer_rated_power = %(n)s
+            update_query = """UPDATE grid_result SET transformer_rated_power = %(n)s
                                             WHERE version_id = %(v)s 
                                             AND plz = %(p)s 
                                             AND kcid = %(k)s 
@@ -1070,7 +1070,7 @@ class PgReaderWriter:
             kcid: kmeans cluster ID
         Returns: A list of greenfield building clusters for a given plz
         """
-        query = """SELECT DISTINCT bcid FROM building_clusters
+        query = """SELECT DISTINCT bcid FROM grid_result
             WHERE version_id = %(v)s 
             AND kcid = %(kc)s
             AND plz = %(pc)s
@@ -1085,7 +1085,7 @@ class PgReaderWriter:
     def get_ont_info_from_bc(self, plz: int, kcid: int, bcid: int) -> dict | None:
 
         query = """SELECT ont_vertice_id, transformer_rated_power
-                    FROM building_clusters
+                    FROM grid_result
                     WHERE version_id = %(v)s 
                     AND kcid = %(k)s
                     AND bcid = %(b)s
@@ -1112,8 +1112,8 @@ class PgReaderWriter:
         """
         query = """SELECT kcid FROM buildings_tem 
                     WHERE kcid NOT IN (
-                        SELECT DISTINCT kcid FROM building_clusters
-                        WHERE version_id = %(v)s AND  building_clusters.plz = %(plz)s) AND kcid IS NOT NULL
+                        SELECT DISTINCT kcid FROM grid_result
+                        WHERE version_id = %(v)s AND grid_result.plz = %(plz)s) AND kcid IS NOT NULL
                     ORDER BY kcid
                     LIMIT 1;"""
         self.cur.execute(query, {"v": VERSION_ID, "plz": plz})
@@ -1301,7 +1301,7 @@ class PgReaderWriter:
         Update building cluster information by performing multiple operations:
           - Update the 'bcid' in 'buildings_tem' where 'vertice_id' matches the transformer_id.
           - Update the 'bcid' in 'buildings_tem' for rows where 'connection_point' is in the provided list and type is not 'Transformer'.
-          - Insert a new record into 'building_clusters'.
+          - Insert a new record into 'grid_result'.
           - Insert a new record into 'transformer_positions' using subqueries for geometry and OGC ID.
         Args:
             transformer_id (int): The ID of the transformer.
@@ -1321,7 +1321,7 @@ class PgReaderWriter:
             WHERE connection_point IN %(c)s 
               AND type != 'Transformer';
 
-            INSERT INTO building_clusters (version_id, plz, kcid, bcid, ont_vertice_id, transformer_rated_power)
+            INSERT INTO grid_result (version_id, plz, kcid, bcid, ont_vertice_id, transformer_rated_power)
             VALUES (%(v)s, %(pc)s, %(k)s, %(count)s, %(t)s, %(l)s);
 
             INSERT INTO transformer_positions (version_id, plz, kcid, bcid, geom, ogc_fid, comment)
@@ -1814,7 +1814,7 @@ class PgReaderWriter:
                 # total_transformer_cost = sum([transformer2cost[v[1]] for v in valid_cluster_dict.values()])
 
                 # Save results to database
-                self.clear_building_clusters_in_kmean_cluster(plz, kcid)
+                self.clear_grid_result_in_kmean_cluster(plz, kcid)
                 for bcid, cluster_data in valid_cluster_dict.items():
                     self.upsert_building_cluster(
                         plz, kcid, bcid,
@@ -1950,8 +1950,8 @@ class PgReaderWriter:
         self.cur.execute(query)
 
     def count_one_building_cluster(self) -> int:
-        query = """SELECT COUNT(*) FROM building_clusters bc 
-            WHERE (SELECT COUNT(*) FROM buildings_tem b WHERE b.kcid = bc.kcid AND b.bcid = bc.bcid) = 1;"""
+        query = """SELECT COUNT(*) FROM grid_result gr 
+            WHERE (SELECT COUNT(*) FROM buildings_tem b WHERE b.kcid = gr.kcid AND b.bcid = gr.bcid) = 1;"""
         self.cur.execute(query)
         try:
             count = self.cur.fetchone()[0]
@@ -2416,8 +2416,9 @@ class PgReaderWriter:
         return cable_length
 
     def save_net(self, plz:int, kcid:int, bcid:int, json_string:str) -> None:
-        insert_query = "INSERT INTO grids VALUES (%s, %s, %s, %s, %s)"
-        self.cur.execute(insert_query, vars=(VERSION_ID, plz, kcid, bcid, json_string))
+        insert_query = ("""INSERT INTO grid_result (grid) VALUES (%s)
+        WHERE version_id = %s AND plz = %s AND kcid = %s AND bcid = %s;""")
+        self.cur.execute(insert_query, vars=(json_string, VERSION_ID, plz, kcid, bcid))
 
     def read_net(self, plz: int, kcid: int, bcid: int) -> pp.pandapowerNet:
         """
@@ -2434,7 +2435,7 @@ class PgReaderWriter:
         Raises:
             ValueError: If the requested grid does not exist in the database
         """
-        read_query = "SELECT grid FROM grids WHERE version_id = %s AND plz = %s AND kcid = %s AND bcid = %s LIMIT 1"
+        read_query = "SELECT grid FROM grid_result WHERE version_id = %s AND plz = %s AND kcid = %s AND bcid = %s LIMIT 1"
         self.cur.execute(read_query, vars=(VERSION_ID, plz, kcid, bcid))
 
         result = self.cur.fetchall()
@@ -2485,7 +2486,7 @@ class PgReaderWriter:
 
     def get_grid_versions_with_plz(self, plz: int) -> list[tuple]:
         query = (
-            f"""SELECT DISTINCT version_id FROM grids WHERE plz = %(p)s"""
+            f"""SELECT DISTINCT version_id FROM grid_result WHERE plz = %(p)s"""
         )
         self.cur.execute(query, {"p": plz})
         result = self.cur.fetchall()
@@ -2494,15 +2495,15 @@ class PgReaderWriter:
     def get_grids_of_version(self, plz: int, version_id: str) -> list[tuple]:
         query = (
             f"""SELECT kcid, bcid, grid
-                FROM grids 
+                FROM grid_result 
                 WHERE plz = %(p)s AND version_id = %(v)s""")
         self.cur.execute(query, {"p": plz, "v": version_id})
         result = self.cur.fetchall()
         return result
 
     def get_grids_from_plz(self, plz: int) -> pd.DataFrame:
-        grids_query = """SELECT * FROM grids
-                        WHERE plz = %(p)s"""
+        grids_query = """SELECT version_id, plz, kcid, bcid, grid FROM grids_result
+                         WHERE plz = %(p)s"""
         params = {"p": plz}
         grids_df = pd.read_sql_query(grids_query, con=self.conn, params=params)
         self.logger.debug(f"{len(grids_df)} grid data fetched.")
@@ -2578,7 +2579,7 @@ class PgReaderWriter:
         :param version_id: Version ID
         """
         tables = [
-            "building_clusters", "buildings_result", "parameters_per_plz", "grids",
+            "grid_result", "buildings_result", "parameters_per_plz",
             "lines_result", "transformer_positions", "ways_result"
         ]
 
@@ -2596,7 +2597,7 @@ class PgReaderWriter:
     def delete_version_from_all_tables(self, version_id: str) -> None:
         """Delete all entries of the given version ID from all tables."""
         tables = [
-            "building_clusters", "buildings_result", "parameters_per_plz", "grids",
+            "grid_result", "buildings_result", "parameters_per_plz",
             "lines_result", "postcode_result", "transformer_positions", "ways_result", "version"
         ]
         for table in tables:
