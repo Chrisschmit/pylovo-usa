@@ -338,7 +338,11 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
 )""",
     "ags_log": """CREATE TABLE IF NOT EXISTS public.ags_log
 (
-    ags bigint PRIMARY KEY
+    ags bigint PRIMARY KEY,
+    CONSTRAINT fk_ags
+        FOREIGN KEY (ags)
+        REFERENCES public.municipal_register (ags)
+        ON DELETE CASCADE
 )""",
     "transformers": """CREATE TABLE IF NOT EXISTS public.transformers
 (
