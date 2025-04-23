@@ -379,9 +379,9 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     way_id integer NOT NULL,
     plz integer,
     CONSTRAINT pk_ways_result PRIMARY KEY (version_id, way_id, plz),
-    CONSTRAINT fk_ways_result_version_id
-        FOREIGN KEY (version_id)
-        REFERENCES public.version (version_id)
+    CONSTRAINT fk_ways_result_version_id_plz
+        FOREIGN KEY (version_id, plz)
+        REFERENCES public.postcode_result (version_id, plz)
         ON DELETE CASCADE
 )""",
     "ways_tem": """CREATE TABLE IF NOT EXISTS public.ways_tem
