@@ -49,7 +49,7 @@ class GridParameters:
         self.vsw_per_branch = None
         self.max_vsw_of_a_branch = None
 
-    def calc_grid_parameters(self) -> None:
+    def calc_parameters_per_plz(self) -> None:
         """calculate parameters of each grid
         save results to table 'clustering_parameters' on database
         """

@@ -30,7 +30,7 @@ def print_parameters_for_clustering_for_classification_version() -> None:
     no_of_factors = (ev[0] > 1).sum()
 
     # print parameters
-    get_parameters_for_clustering(df_grid_parameters=df, n_comps=no_of_factors)
+    get_parameters_for_clustering(df_parameters_per_plz=df, n_comps=no_of_factors)
 
 
 def get_best_no_of_clusters_ch_index_for_classification_version() -> None:
@@ -39,5 +39,5 @@ def get_best_no_of_clusters_ch_index_for_classification_version() -> None:
     dc = DatabaseCommunication()
     df_parameters_of_grids = dc.get_clustering_parameters_for_classification_version()
 
-    plot_ch_index_for_clustering_algos(df_grid_parameters=df_parameters_of_grids,
+    plot_ch_index_for_clustering_algos(df_parameters_per_plz=df_parameters_of_grids,
                                        no_of_clusters_allowed=NO_OF_CLUSTERS_ALLOWED)
