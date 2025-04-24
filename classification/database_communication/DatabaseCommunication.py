@@ -117,7 +117,9 @@ class DatabaseCommunication:
         # load transformer positions from database, preserve geo-datatype of geom column
         query = """
                 SELECT version_id, plz, kcid, bcid, geom
-                FROM public.transformer_positions
+                FROM public.transformer_positions tp
+                JOIN public.grid_result gr
+                  ON tp.grid_result_id = gr.grid_result_id
                 WHERE version_id=%(v)s;"""
         params = {"v": VERSION_ID}
         df_transformer_positions = gpd.read_postgis(query, con=self.sqla_engine, params=params, )

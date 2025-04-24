@@ -807,11 +807,14 @@ class PgReaderWriter:
         return way_list
 
     def get_ont_geom_from_bcid(self, plz: int, kcid: int, bcid: int):
-        query = """SELECT ST_X(ST_Transform(geom,4326)), ST_Y(ST_Transform(geom,4326)) FROM transformer_positions
-                    WHERE version_id = %(v)s 
-                    AND plz = %(p)s 
-                    AND kcid = %(k)s
-                    AND bcid = %(b)s;"""
+        query = """SELECT ST_X(ST_Transform(geom,4326)), ST_Y(ST_Transform(geom,4326))
+                   FROM transformer_positions tp
+                   JOIN grid_result gr
+                   ON tp.grid_result_id = gr.grid_result_id
+                   WHERE version_id = %(v)s 
+                   AND plz = %(p)s 
+                   AND kcid = %(k)s
+                   AND bcid = %(b)s;"""
         self.cur.execute(query, {"v": VERSION_ID, "p": plz, "k": kcid, "b": bcid})
         geo = self.cur.fetchone()
 
@@ -985,12 +988,18 @@ class PgReaderWriter:
     def upsert_transformer_selection(self, plz: int, kcid: int, bcid: int, connection_id: int):
         """Writes the vertice_id of chosen building as ONT location in the grid_result table"""
 
-        query = """UPDATE grid_result SET ont_vertice_id = %(c)s 
-                    WHERE version_id = %(v)s AND plz = %(p)s AND kcid = %(k)s AND bcid = %(b)s; 
-                    UPDATE grid_result SET model_status = 1 
-                    WHERE version_id = %(v)s AND plz = %(p)s AND kcid = %(k)s AND bcid = %(b)s;
-                INSERT INTO transformer_positions (version_id, plz, kcid, bcid, geom, ogc_fid, comment)
-                    VALUES (%(v)s, %(p)s, %(k)s, %(b)s, (SELECT the_geom FROM ways_tem_vertices_pgr WHERE id = %(c)s), %(c)s::varchar, 'on_way');"""
+        query = """UPDATE grid_result SET ont_vertice_id = %(c)s
+                   WHERE version_id = %(v)s AND plz = %(p)s AND kcid = %(k)s AND bcid = %(b)s;
+                   
+                   UPDATE grid_result SET model_status = 1 
+                   WHERE version_id = %(v)s AND plz = %(p)s AND kcid = %(k)s AND bcid = %(b)s;
+                   
+                   INSERT INTO transformer_positions (grid_result_id, geom, comment)
+                   VALUES (
+                     (SELECT grid_result_id FROM grid_result WHERE version_id = %(v)s AND plz = %(p)s AND kcid = %(k)s AND bcid = %(b)s),
+                     (SELECT the_geom FROM ways_tem_vertices_pgr WHERE id = %(c)s),
+                     'on_way'
+                   );"""
         params = {"v": VERSION_ID, "c": connection_id, "b": bcid, "k": kcid, "p": plz}
 
         self.cur.execute(query, params)
@@ -1324,9 +1333,9 @@ class PgReaderWriter:
             INSERT INTO grid_result (version_id, plz, kcid, bcid, ont_vertice_id, transformer_rated_power)
             VALUES (%(v)s, %(pc)s, %(k)s, %(count)s, %(t)s, %(l)s);
 
-            INSERT INTO transformer_positions (version_id, plz, kcid, bcid, geom, ogc_fid, comment)
+            INSERT INTO transformer_positions (grid_result_id, geom, osm_id, comment)
             VALUES (
-                %(v)s, %(pc)s, %(k)s, %(count)s,
+                (SELECT grid_result_id FROM grid_result WHERE version_id = %(v)s AND plz = %(p)s AND kcid = %(k)s AND bcid = %(b)s),
                 (SELECT center FROM buildings_tem WHERE vertice_id = %(t)s),
                 (SELECT osm_id FROM buildings_tem WHERE vertice_id = %(t)s),
                 'Normal'
@@ -2470,7 +2479,51 @@ class PgReaderWriter:
         else:
             filters = ""
         query = (
-                f"""SELECT * FROM public.{table} 
+                f"""SELECT * FROM public.{table}
+                    WHERE version_id = %(v)s """
+                + filters
+        )
+        version = VERSION_ID
+        if 'version_id' in kwargs:
+            version = kwargs.get('version_id')
+
+        params = {"v": version}
+        with self.sqla_engine.begin() as connection:
+            gdf = gpd.read_postgis(query, con=connection, params=params)
+
+        return gdf
+
+    def get_geo_df_join(
+            self,
+            select: list[str],
+            table1: str,
+            table2: str,
+            on: tuple[str, str],
+            **kwargs,
+    ) -> gpd.GeoDataFrame:
+        """
+        Args:
+            **kwargs: equality filters matching with the table column names
+        Returns: A geodataframe with all building information
+        :param select: list of column names
+        :param table1: table name
+        :param table2: table name
+        :param on: join on on[0] = on[1]
+        """
+        if kwargs:
+            filters = " AND " + " AND ".join(
+                [f"{key} = {value}" for key, value in kwargs.items() if key != 'version_id']
+            )
+        else:
+            filters = ""
+
+        column_names = ", ".join(select)
+
+        query = (
+                f"""SELECT {column_names}
+                    FROM public.{table1}
+                    JOIN public.{table2}
+                      ON {on[0]} = {on[1]}
                     WHERE version_id = %(v)s """
                 + filters
         )

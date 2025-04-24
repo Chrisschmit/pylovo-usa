@@ -122,7 +122,7 @@ CREATE_QUERIES = {
     plz integer NOT NULL,
     transformer_rated_power bigint,
     model_status integer,
-    ont_vertice_id bigint,
+    ont_vertice_id bigint, -- from connection_id
     grid json,
     CONSTRAINT cluster_identifier UNIQUE (version_id, kcid, bcid, plz),
     CONSTRAINT fk_grid_result_version_id_plz
@@ -312,17 +312,17 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
 )""",
     "transformer_positions": """CREATE TABLE IF NOT EXISTS public.transformer_positions 
 (
-    version_id varchar(10) NOT NULL, 
-    plz integer,
-    kcid integer,
-    bcid integer,
+    grid_result_id bigint PRIMARY KEY,
     geom geometry(Point,3035),
-    ogc_fid varchar(50),
+    osm_id varchar,
     "comment" varchar,
-    CONSTRAINT fk_lines_result_grid_result
-        FOREIGN KEY (version_id, plz, kcid, bcid)
-        REFERENCES public.grid_result (version_id, plz, kcid, bcid)
-        ON DELETE CASCADE
+    CONSTRAINT fk_tp_grid_result_id
+        FOREIGN KEY (grid_result_id)
+        REFERENCES public.grid_result (grid_result_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_tp_osm_id
+        FOREIGN KEY (osm_id)
+        REFERENCES public.transformers (osm_id)
 )""",
     "transformer_classified": """CREATE TABLE IF NOT EXISTS public.transformer_classified 
 (
