@@ -1485,9 +1485,10 @@ class PgReaderWriter:
         :param plz:
         :return:
         """
-        query = """SELECT COUNT(*) FROM clustering_parameters
-                    WHERE version_id = %(v)s
-                    AND plz = %(p)s"""
+        query = """SELECT COUNT(cp.grid_result_id) FROM clustering_parameters cp
+                   JOIN grid_result gr ON gr.grid_result_id = cp.grid_result_id
+                   WHERE version_id = %(v)s
+                   AND plz = %(p)s"""
         self.cur.execute(query, {"v": VERSION_ID, "p": plz})
         return int(self.cur.fetchone()[0])
 
@@ -2699,12 +2700,13 @@ class PgReaderWriter:
         query = """
                 WITH plz_table(plz) AS (
                     VALUES (%(p)s)
-                    ),
-                clustering AS(
-                    SELECT * 
-                    FROM public.clustering_parameters 
+                ),
+                clustering AS (
+                    SELECT version_id, plz, kcid, bcid, cp.*
+                    FROM public.clustering_parameters cp 
+                    JOIN public.grid_result gr ON cp.grid_result_id = gr.grid_result_id
                     WHERE version_id = %(v)s
-                    )
+                )
                 SELECT c.* 
                 FROM clustering c
                 FULL JOIN plz_table p

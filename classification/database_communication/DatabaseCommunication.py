@@ -38,9 +38,10 @@ class DatabaseCommunication:
         :rtype: pd.DataFrame
         """
         query = """
-                SELECT * 
-                FROM public.clustering_parameters 
-                WHERE version_id = %(v)s AND plz = %(p)s;"""
+                SELECT version_id, plz, kcid, bcid, cp.*
+                FROM public.clustering_parameters cp 
+                JOIN public.grid_result gr ON cp.grid_result_id = gr.grid_result_id
+                WHERE gr.version_id = %(v)s AND gr.plz = %(p)s;"""
         params = {"v": VERSION_ID, "p": plz}
         df_query = pd.read_sql_query(query, con=self.conn, params=params, )
         columns = CLUSTERING_PARAMETERS
@@ -58,12 +59,13 @@ class DatabaseCommunication:
                     SELECT plz
                     FROM public.sample_set
                     WHERE classification_id= %(c)s
-                    ),
-                clustering AS(
-                    SELECT * 
-                    FROM public.clustering_parameters 
-                    WHERE version_id = %(v)s AND filtered = false
-                    )
+                ),
+                clustering AS (
+                    SELECT version_id, plz, kcid, bcid, cp.*
+                    FROM public.clustering_parameters cp 
+                    JOIN public.grid_result gr ON cp.grid_result_id = gr.grid_result_id
+                    WHERE gr.version_id = %(v)s AND cp.filtered = false
+                )
                 SELECT c.* 
                 FROM clustering c
                 JOIN plz_table p
@@ -90,12 +92,13 @@ class DatabaseCommunication:
                     SELECT plz, pop, area, lat, lon, ags, name_city, regio7, regio5, pop_den
                     FROM public.sample_set
                     WHERE classification_id= %(c)s
-                    ),
-                clustering AS(
-                    SELECT * 
-                    FROM public.clustering_parameters 
-                    WHERE version_id = %(v)s AND filtered = false
-                    )
+                ),
+                clustering AS (
+                    SELECT version_id, plz, kcid, bcid, cp.*
+                    FROM public.clustering_parameters cp 
+                    JOIN public.grid_result gr ON cp.grid_result_id = gr.grid_result_id
+                    WHERE gr.version_id = %(v)s AND cp.filtered = false
+                )
                 SELECT c.*, p.pop, p.area, p.lat, p.lon, p.ags, p.name_city, p.regio7, p.regio5, p.pop_den
                 FROM clustering c
                 JOIN plz_table p
@@ -200,18 +203,18 @@ class DatabaseCommunication:
         """apply maximum households per building threshold on clustering parameter table
         by indicating if the threshold is surpassed in the filtered column
         """
-        query = """WITH buildings(version_id, plz, bcid, kcid) AS (
-                        SELECT version_id, plz, bcid, kcid
-                        FROM public.buildings_result
-                        WHERE houses_per_building > %(h)s)
-                        
-            UPDATE public.clustering_parameters c
-            SET filtered = true
-            FROM buildings b
-            WHERE c.version_id = b.version_id AND 
-                c.plz = b.plz AND 
-                c.kcid = b.kcid AND
-                c.bcid = b.bcid;"""
+        query = """WITH buildings(grid_result_id, version_id, plz, bcid, kcid) AS (
+                       SELECT gr.grid_result_id, gr.version_id, gr.plz, gr.bcid, gr.kcid
+                       FROM public.buildings_result br
+                       JOIN public.grid_result gr
+                       ON br.version_id = gr.version_id AND br.plz = gr.plz AND br.kcid = gr.kcid AND br.bcid = gr.bcid
+                       WHERE houses_per_building > %(h)s
+                   )
+                   
+                   UPDATE public.clustering_parameters c
+                   SET filtered = true
+                   FROM buildings b
+                   WHERE c.grid_result_id = b.grid_result_id;"""  # TODO: update in next commit
         self.cur.execute(query, {"h": THRESHOLD_HOUSEHOLDS_PER_BUILDING})
         print(self.cur.statusmessage)
         self.conn.commit()

@@ -133,7 +133,10 @@ CREATE_QUERIES = {
         FOREIGN KEY (ont_vertice_id)
         REFERENCES public.buildings_result (connection_point)
         ON DELETE CASCADE
-)""",
+);
+CREATE INDEX idx_grid_results_version_id_plz_bcid_kcid
+ON grid_results (version_id, plz, bcid, kcid)
+""",
     "lines_result": """CREATE TABLE IF NOT EXISTS public.lines_result
 (
     version_id varchar(10) NOT NULL,
@@ -216,10 +219,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
 )""",
     "clustering_parameters": """CREATE TABLE IF NOT EXISTS public.clustering_parameters
 (
-    version_id varchar(10) NOT NULL,
-    plz integer NOT NULL,
-    kcid integer NOT NULL ,
-    bcid integer NOT NULL,
+    grid_result_id bigint PRIMARY KEY,
     
     no_connection_buses integer,
     no_branches integer,
@@ -251,10 +251,9 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
     max_vsw_of_a_branch numeric,
     
     filtered boolean,
-    CONSTRAINT clustering_parameters_pkey PRIMARY KEY (version_id, plz, bcid, kcid),
     CONSTRAINT fk_clustering_parameters_grid_result
-        FOREIGN KEY (version_id, plz, kcid, bcid)
-        REFERENCES public.grid_result (version_id, plz, kcid, bcid)
+        FOREIGN KEY (grid_result_id)
+        REFERENCES public.grid_result (grid_result_id)
         ON DELETE CASCADE
 )""",
     "buildings_tem": """CREATE TABLE IF NOT EXISTS public.buildings_tem
