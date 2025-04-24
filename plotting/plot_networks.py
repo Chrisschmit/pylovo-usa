@@ -62,7 +62,11 @@ def plot_contextily(plz: str, kcid: int, bcid: int, zoomfactor: int = 19) -> Non
     ax.set_xticks([])
     ax.set_yticks([])
     # Buildings
-    buildings_gdf = pg.get_geo_df(table="buildings_result", plz=int(plz))
+    buildings_gdf = pg.get_geo_df_join(
+        ["version_id", "plz", "kcid", "bcid", "br.*"],
+        "buildings_result br", "grid_result gr",
+        ("br.grid_result_id", "gr.grid_result_id"),
+    plz=int(plz))
     buildings_8_gdf = buildings_gdf[buildings_gdf.bcid == bcid]
     buildings_8_gdf = buildings_8_gdf[buildings_8_gdf.kcid == kcid]
     # cables / lines

@@ -2070,8 +2070,15 @@ class PgReaderWriter:
 
         # Save building results
         query = f"""
-                INSERT INTO buildings_result 
-                    SELECT '{VERSION_ID}' as version_id, * FROM buildings_tem WHERE peak_load_in_kw != 0 AND peak_load_in_kw != -1;"""
+                INSERT INTO buildings_result
+                (version_id, osm_id, grid_result_id, area, type, geom, houses_per_building, center,
+                peak_load_in_kw, vertice_id, floors, connection_point)
+                SELECT '{VERSION_ID}' as version_id, osm_id, gr.grid_result_id, area, type, geom, houses_per_building,
+                center, peak_load_in_kw, vertice_id, floors, bt.connection_point
+                FROM buildings_tem bt
+                JOIN grid_result gr
+                ON bt.version_id = gr.version_id AND bt.plz = gr.plz AND bt.kcid = gr.kcid AND bt.bcid = gr.bcid
+                WHERE peak_load_in_kw != 0 AND peak_load_in_kw != -1;"""
         self.cur.execute(query)
 
         # Save ways results
@@ -2497,8 +2504,8 @@ class PgReaderWriter:
     def get_geo_df_join(
             self,
             select: list[str],
-            table1: str,
-            table2: str,
+            from_table: str,
+            join_table: str,
             on: tuple[str, str],
             **kwargs,
     ) -> gpd.GeoDataFrame:
@@ -2507,8 +2514,8 @@ class PgReaderWriter:
             **kwargs: equality filters matching with the table column names
         Returns: A geodataframe with all building information
         :param select: list of column names
-        :param table1: table name
-        :param table2: table name
+        :param from_table: table name
+        :param join_table: table name
         :param on: join on on[0] = on[1]
         """
         if kwargs:
@@ -2522,8 +2529,8 @@ class PgReaderWriter:
 
         query = (
                 f"""SELECT {column_names}
-                    FROM public.{table1}
-                    JOIN public.{table2}
+                    FROM public.{from_table}
+                    JOIN public.{join_table}
                       ON {on[0]} = {on[1]}
                     WHERE version_id = %(v)s """
                 + filters

@@ -203,18 +203,16 @@ class DatabaseCommunication:
         """apply maximum households per building threshold on clustering parameter table
         by indicating if the threshold is surpassed in the filtered column
         """
-        query = """WITH buildings(grid_result_id, version_id, plz, bcid, kcid) AS (
-                       SELECT gr.grid_result_id, gr.version_id, gr.plz, gr.bcid, gr.kcid
-                       FROM public.buildings_result br
-                       JOIN public.grid_result gr
-                       ON br.version_id = gr.version_id AND br.plz = gr.plz AND br.kcid = gr.kcid AND br.bcid = gr.bcid
+        query = """WITH buildings(grid_result_id) AS (
+                       SELECT DISTINCT grid_result_id
+                       FROM public.buildings_result
                        WHERE houses_per_building > %(h)s
                    )
                    
                    UPDATE public.clustering_parameters c
                    SET filtered = true
                    FROM buildings b
-                   WHERE c.grid_result_id = b.grid_result_id;"""  # TODO: update in next commit
+                   WHERE c.grid_result_id = b.grid_result_id;"""
         self.cur.execute(query, {"h": THRESHOLD_HOUSEHOLDS_PER_BUILDING})
         print(self.cur.statusmessage)
         self.conn.commit()

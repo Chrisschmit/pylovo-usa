@@ -135,7 +135,7 @@ CREATE_QUERIES = {
         ON DELETE CASCADE
 );
 CREATE INDEX idx_grid_results_version_id_plz_bcid_kcid
-ON grid_results (version_id, plz, bcid, kcid)
+ON public.grid_result (version_id, plz, bcid, kcid)
 """,
     "lines_result": """CREATE TABLE IF NOT EXISTS public.lines_result
 (
@@ -159,24 +159,29 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
 (
     version_id varchar(10) NOT NULL,
     osm_id varchar NOT NULL,
+    grid_result_id bigint NOT NULL,
     area numeric,
     type varchar(30),
     geom geometry(MultiPolygon,3035),
     houses_per_building integer,
     center geometry(Point,3035),
     peak_load_in_kw numeric,
-    plz integer,
     vertice_id integer,
-    bcid integer,
-    kcid integer,
     floors integer,
     connection_point integer,
     CONSTRAINT buildings_result_pkey PRIMARY KEY (version_id, osm_id),
     CONSTRAINT fk_buildings_result_grid_result
-        FOREIGN KEY (version_id, plz, kcid, bcid)
-        REFERENCES public.grid_result (version_id, plz, kcid, bcid)
+        FOREIGN KEY (version_id, grid_result_id)
+        REFERENCES public.grid_result (version_id, grid_result_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_buildings_result_type
+        FOREIGN KEY (type)
+        REFERENCES public.consumer_categories (definition)
         ON DELETE CASCADE
-)""",
+);
+CREATE INDEX idx_buildings_result_grid_result_id
+ON public.buildings_result (grid_result_id)
+""",
     "sample_set": """CREATE TABLE IF NOT EXISTS public.sample_set
 (
     classification_id integer NOT NULL,
