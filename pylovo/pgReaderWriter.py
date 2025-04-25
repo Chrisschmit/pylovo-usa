@@ -2597,28 +2597,29 @@ class PgReaderWriter:
     ) -> None:
         """writes lines / cables that belong to a network into the database"""
         line_insertion_query = """INSERT INTO lines_result (
-                    version_id, 
+                    grid_result_id, 
                     geom,
-                    plz,
-                    bcid,
-                    kcid,
                     line_name,
                     std_type,
                     from_bus,
                     to_bus,
                     length_km
-                    ) 
-                VALUES(
-                %(v)s, 
-                ST_SetSRID(%(geom)s::geometry,3035),
-                %(plz)s, 
-                %(bcid)s, 
-                %(kcid)s, 
-                %(line_name)s,
-                %(std_type)s,
-                %(from_bus)s,
-                %(to_bus)s,
-                %(length_km)s
+                ) 
+                VALUES (
+                    (
+                        SELECT grid_result_id
+                        FROM grid_result
+                        WHERE version_id = %(v)s
+                        AND plz = %(plz)s
+                        AND kcid = %(kcid)s
+                        AND bcid = %(bcid)s
+                    ),
+                    ST_SetSRID(%(geom)s::geometry,3035),
+                    %(line_name)s,
+                    %(std_type)s,
+                    %(from_bus)s,
+                    %(to_bus)s,
+                    %(length_km)s
                 ); """
         self.cur.execute(line_insertion_query, {
             "v": VERSION_ID,

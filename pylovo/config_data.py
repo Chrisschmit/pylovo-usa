@@ -139,19 +139,16 @@ ON public.grid_result (version_id, plz, bcid, kcid)
 """,
     "lines_result": """CREATE TABLE IF NOT EXISTS public.lines_result
 (
-    version_id varchar(10) NOT NULL,
+    grid_result_id bigint PRIMARY KEY,
     geom geometry(LineString,3035),
-    plz integer,
-    bcid integer,
-    kcid integer,
     line_name varchar(15),
     std_type varchar(15),
     from_bus integer,
     to_bus integer,
     length_km numeric,
     CONSTRAINT fk_lines_result_grid_result
-        FOREIGN KEY (version_id, plz, kcid, bcid)
-        REFERENCES public.grid_result (version_id, plz, kcid, bcid)
+        FOREIGN KEY (grid_result_id)
+        REFERENCES public.grid_result (grid_result_id)
         ON DELETE CASCADE
 )""",
     "buildings_result": """
