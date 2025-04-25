@@ -1335,7 +1335,7 @@ class PgReaderWriter:
 
             INSERT INTO transformer_positions (grid_result_id, geom, osm_id, comment)
             VALUES (
-                (SELECT grid_result_id FROM grid_result WHERE version_id = %(v)s AND plz = %(p)s AND kcid = %(k)s AND bcid = %(b)s),
+                (SELECT grid_result_id FROM grid_result WHERE version_id = %(v)s AND plz = %(pc)s AND kcid = %(k)s AND bcid = %(count)s),
                 (SELECT center FROM buildings_tem WHERE vertice_id = %(t)s),
                 (SELECT osm_id FROM buildings_tem WHERE vertice_id = %(t)s),
                 'Normal'

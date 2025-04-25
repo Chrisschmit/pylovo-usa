@@ -149,10 +149,10 @@ CREATE_QUERIES = {
     plz integer NOT NULL,
     transformer_rated_power bigint,
     model_status integer,
-    ont_vertice_id bigint UNIQUE, -- from connection_id
+    ont_vertice_id bigint,
     grid json,
     CONSTRAINT cluster_identifier UNIQUE (version_id, kcid, bcid, plz),
-    CONSTRAINT unique_g_rid_result_id_version_id UNIQUE (version_id, grid_result_id),
+    CONSTRAINT unique_grid_result_id_version_id UNIQUE (version_id, grid_result_id),
     CONSTRAINT fk_grid_result_version_id_plz
         FOREIGN KEY (version_id, plz)
         REFERENCES public.postcode_result (version_id, postcode_result_plz)
@@ -211,11 +211,6 @@ ON public.grid_result (version_id, plz, bcid, kcid)
 );
 CREATE INDEX idx_buildings_result_grid_result_id
 ON public.buildings_result (grid_result_id);
-
-ALTER TABLE public.grid_result ADD CONSTRAINT fk_ont_vertice_id
-    FOREIGN KEY (ont_vertice_id)
-    REFERENCES public.buildings_result (connection_point)
-    ON DELETE CASCADE
 """,
     "sample_set": """CREATE TABLE IF NOT EXISTS public.sample_set
 (
