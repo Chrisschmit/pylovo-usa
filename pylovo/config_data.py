@@ -139,7 +139,7 @@ ON public.grid_result (version_id, plz, bcid, kcid)
 """,
     "lines_result": """CREATE TABLE IF NOT EXISTS public.lines_result
 (
-    grid_result_id bigint PRIMARY KEY,
+    grid_result_id bigint NOT NULL,
     geom geometry(LineString,3035),
     line_name varchar(15),
     std_type varchar(15),
@@ -327,10 +327,7 @@ ON public.buildings_result (grid_result_id)
 )""",
     "transformer_classified": """CREATE TABLE IF NOT EXISTS public.transformer_classified 
 (
-    version_id varchar(10) NOT NULL, 
-    plz integer,
-    kcid integer,
-    bcid integer,
+    grid_result_id bigint NOT NULL,
     geom geometry(Point,3035),
     kmedoid_clusters integer,
     kmedoid_representative_grid bool,
@@ -339,13 +336,14 @@ ON public.buildings_result (grid_result_id)
     gmm_clusters integer,
     gmm_representative_grid bool,
     classification_id integer NOT NULL,
+    CONSTRAINT pk_grid_result_id PRIMARY KEY (grid_result_id, classification_id),
     CONSTRAINT fk_transformer_classified_classification_id
         FOREIGN KEY (classification_id)
         REFERENCES public.classification_version (classification_id)
         ON DELETE CASCADE,
     CONSTRAINT fk_transformer_classified_grid_result
-        FOREIGN KEY (version_id, plz, kcid, bcid)
-        REFERENCES public.grid_result (version_id, plz, kcid, bcid)
+        FOREIGN KEY (grid_result_id)
+        REFERENCES public.grid_result (grid_result_id)
         ON DELETE CASCADE
 )""",
     "ags_log": """CREATE TABLE IF NOT EXISTS public.ags_log

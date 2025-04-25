@@ -178,6 +178,18 @@ class DatabaseCommunication:
                                               left_on=['version_id', 'plz', 'kcid', 'bcid'],
                                               right_on=['version_id', 'plz', 'kcid', 'bcid'])
         
+        query = """
+                SELECT grid_result_id, version_id, plz, kcid, bcid
+                FROM public.grid_result
+                WHERE version_id=%(v)s;"""
+        params = {"v": VERSION_ID}
+        df_grid_result = pd.read_sql_query(query, con=self.sqla_engine, params=params)
+
+        df_transformers_classified  = pd.merge(df_grid_result, df_transformers_classified, how='right',
+                                               left_on=['version_id', 'plz', 'kcid', 'bcid'],
+                                               right_on=['version_id', 'plz', 'kcid', 'bcid'])
+        
+        df_transformers_classified.drop(columns=['version_id', 'plz', 'kcid', 'bcid'], inplace=True)
 
         # add classification id
         df_transformers_classified['classification_id'] = CLASSIFICATION_VERSION
