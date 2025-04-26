@@ -186,7 +186,7 @@ CREATE TABLE IF NOT EXISTS public.buildings_result
 (
     classification_id integer NOT NULL,
     plz integer NOT NULL,
-    ags integer,
+    ags bigint,
     bin_no int,
     bins numeric,
     perc_bin numeric,
