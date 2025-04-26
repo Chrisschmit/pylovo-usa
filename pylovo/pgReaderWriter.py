@@ -2077,7 +2077,7 @@ class PgReaderWriter:
                 center, peak_load_in_kw, vertice_id, floors, bt.connection_point
                 FROM buildings_tem bt
                 JOIN grid_result gr
-                ON bt.version_id = gr.version_id AND bt.plz = gr.plz AND bt.kcid = gr.kcid AND bt.bcid = gr.bcid
+                ON bt.plz = gr.plz AND bt.kcid = gr.kcid AND bt.bcid = gr.bcid and gr.version_id = '{VERSION_ID}'
                 WHERE peak_load_in_kw != 0 AND peak_load_in_kw != -1;"""
         self.cur.execute(query)
 
@@ -2433,8 +2433,8 @@ class PgReaderWriter:
         return cable_length
 
     def save_net(self, plz:int, kcid:int, bcid:int, json_string:str) -> None:
-        insert_query = ("""INSERT INTO grid_result (grid) VALUES (%s)
-        WHERE version_id = %s AND plz = %s AND kcid = %s AND bcid = %s;""")
+        insert_query = ("""UPDATE grid_result SET grid = %s
+                           WHERE version_id = %s AND plz = %s AND kcid = %s AND bcid = %s;""")
         self.cur.execute(insert_query, vars=(json_string, VERSION_ID, plz, kcid, bcid))
 
     def read_net(self, plz: int, kcid: int, bcid: int) -> pp.pandapowerNet:
