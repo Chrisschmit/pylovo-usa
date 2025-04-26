@@ -255,7 +255,7 @@ class GridParameters:
                    max_vsw_of_a_branch
                   )
                   VALUES (
-                  (SELECT grid_result_id FROM grid_results WHERE version_id = %(version_id)s AND plz = %(plz)s AND bcid = %(bcid)s AND kcid = %(kcid)s),
+                  (SELECT grid_result_id FROM grid_result WHERE version_id = %(version_id)s AND plz = %(plz)s AND bcid = %(bcid)s AND kcid = %(kcid)s),
                   %(no_connection_buses)s,
                   %(no_branches)s,
                   %(no_house_connections)s,
@@ -396,7 +396,7 @@ def get_no_branches(networkx_graph, pandapower_net) -> int:
     return no_branches
 
 
-def get_distances_in_graph(pandapower_net, networkx_graph) -> (float, float):
+def get_distances_in_graph(pandapower_net, networkx_graph) -> tuple[float, float]:
     """
     distances in the graph:
     - average trafo distance: distance from each house connection to the trafo
@@ -433,7 +433,7 @@ def get_trafo_power(pandapower_net) -> float:
     return df_trafo.iloc[0]
 
 
-def calc_resistance(pandapower_net, networkx_graph) -> (float, float, float, float, float):
+def calc_resistance(pandapower_net, networkx_graph) -> tuple[float, float, float, float, float]:
     """
     this function calculates the resistance and reactance in ohm of the network
     (Verbrauchersummenwiderstand accoding to Kerber 2010 p. 44)

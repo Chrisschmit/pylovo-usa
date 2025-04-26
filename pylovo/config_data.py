@@ -158,7 +158,7 @@ CREATE_QUERIES = {
         REFERENCES public.postcode_result (version_id, postcode_result_plz)
         ON DELETE CASCADE
 );
-CREATE INDEX idx_grid_results_version_id_plz_bcid_kcid
+CREATE INDEX idx_grid_result_version_id_plz_bcid_kcid
 ON public.grid_result (version_id, plz, bcid, kcid)
 """,
     "lines_result": """CREATE TABLE IF NOT EXISTS public.lines_result
@@ -198,7 +198,7 @@ ON public.grid_result (version_id, plz, bcid, kcid)
     peak_load_in_kw numeric,
     vertice_id integer,
     floors integer,
-    connection_point integer UNIQUE,
+    connection_point integer,
     CONSTRAINT buildings_result_pkey PRIMARY KEY (version_id, osm_id),
     CONSTRAINT fk_buildings_result_grid_result
         FOREIGN KEY (version_id, grid_result_id)
