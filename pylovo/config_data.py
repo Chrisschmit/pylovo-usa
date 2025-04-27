@@ -215,21 +215,6 @@ ON public.buildings_result (grid_result_id);
     "municipal_register": """CREATE TABLE IF NOT EXISTS public.municipal_register     
 (
     plz integer,
-    pop numeric,
-    area numeric,
-    lat numeric,
-    lon numeric,
-    ags integer,
-    name_city varchar(86),
-    fed_state integer,
-    regio7 integer,
-    regio5 integer,
-    pop_den numeric,
-    CONSTRAINT municipal_register_pkey PRIMARY KEY (plz, ags)
-)""",
-    "municipal_register": """CREATE TABLE IF NOT EXISTS public.municipal_register     
-(
-    plz integer,
     pop bigint,
     area double precision,
     lat double precision,
