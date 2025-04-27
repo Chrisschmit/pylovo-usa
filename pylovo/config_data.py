@@ -227,20 +227,26 @@ ON public.buildings_result (grid_result_id);
     pop_den numeric,
     CONSTRAINT municipal_register_pkey PRIMARY KEY (plz, ags)
 )""",
-    "sample_set": """CREATE TABLE IF NOT EXISTS public.sample_set
+    "municipal_register": """CREATE TABLE IF NOT EXISTS public.municipal_register     
 (
-    classification_id integer NOT NULL,
     plz integer,
-    pop numeric,
-    area numeric,
-    lat numeric,
-    lon numeric,
-    ags integer,
-    name_city varchar(86),
+    pop bigint,
+    area double precision,
+    lat double precision,
+    lon double precision,
+    ags bigint,
+    name_city text,
     fed_state integer,
     regio7 integer,
     regio5 integer,
-    pop_den numeric,
+    pop_den double precision,
+    CONSTRAINT municipal_register_pkey PRIMARY KEY (plz, ags)
+)""",
+    "sample_set": """CREATE TABLE IF NOT EXISTS public.sample_set
+(
+    classification_id integer NOT NULL,
+    plz integer NOT NULL,
+    ags bigint,
     bin_no int,
     bins numeric,
     perc_bin numeric,
@@ -250,6 +256,10 @@ ON public.buildings_result (grid_result_id);
     CONSTRAINT fk_sample_set_classification_id
         FOREIGN KEY (classification_id)
         REFERENCES public.classification_version (classification_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_sample_set_plz
+        FOREIGN KEY (plz, ags)
+        REFERENCES public.municipal_register (plz, ags)
         ON DELETE CASCADE
 )""",
     "clustering_parameters": """CREATE TABLE IF NOT EXISTS public.clustering_parameters

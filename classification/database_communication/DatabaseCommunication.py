@@ -89,9 +89,10 @@ class DatabaseCommunication:
         """
         query = """
                 WITH plz_table(plz) AS (
-                    SELECT plz, pop, area, lat, lon, ags, name_city, regio7, regio5, pop_den
-                    FROM public.sample_set
-                    WHERE classification_id= %(c)s
+                    SELECT ss.plz, mr.pop, mr.area, mr.lat, mr.lon, ss.ags, mr.name_city, mr.regio7, mr.regio5, mr.pop_den
+                    FROM public.sample_set ss
+                    JOIN public.municipal_register mr ON ss.plz = mr.plz AND ss.ags = mr.ags
+                    WHERE ss.classification_id = %(c)s
                 ),
                 clustering AS (
                     SELECT version_id, plz, kcid, bcid, cp.*
@@ -188,7 +189,7 @@ class DatabaseCommunication:
         df_transformers_classified  = pd.merge(df_grid_result, df_transformers_classified, how='right',
                                                left_on=['version_id', 'plz', 'kcid', 'bcid'],
                                                right_on=['version_id', 'plz', 'kcid', 'bcid'])
-        
+
         df_transformers_classified.drop(columns=['version_id', 'plz', 'kcid', 'bcid'], inplace=True)
 
         # add classification id

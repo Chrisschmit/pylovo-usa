@@ -121,6 +121,10 @@ def get_samples_with_regiostar(samples_per_class, regiostar_plz):
     for i in samples_per_class:
         reg_i_selected = get_samples_within_regiostar_class(i, samples_per_class[i], regiostar_plz)
         reg_selected = pd.concat([reg_selected, reg_i_selected])
+    # Drop columns before returning
+    reg_selected = reg_selected.drop(columns=[
+        'pop', 'area', 'lat', 'lon', 'name_city', 'fed_state', 'regio7', 'regio5', 'pop_den'
+    ], errors='ignore') 
     return reg_selected
 
 
@@ -190,9 +194,10 @@ def get_sample_set() -> pd.DataFrame:
     sqlalchemy_engine = create_engine(
         f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}")
     cur = conn.cursor()
-    query = f"""SELECT plz, pop, area, lat, lon, ags, name_city, fed_state, regio7, regio5, pop_den
-    FROM public.sample_set
-    WHERE classification_id = {CLASSIFICATION_VERSION};"""
+    query = f"""SELECT ss.plz, mr.pop, mr.area, mr.lat, mr.lon, ss.ags, mr.name_city, mr.fed_state, mr.regio7, mr.regio5, mr.pop_den
+    FROM public.sample_set ss
+    JOIN public.municipal_register mr ON ss.plz = mr.plz AND ss.ags = mr.ags
+    WHERE ss.classification_id = {CLASSIFICATION_VERSION};"""
     cur.execute(query)
     sample_set = cur.fetchall()
     df_sample_set = pd.DataFrame(sample_set, columns=MUNICIPAL_REGISTER)
