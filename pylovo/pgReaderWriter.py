@@ -2088,16 +2088,6 @@ class PgReaderWriter:
 
         self.cur.execute(query, vars={"p": plz})
 
-        # Clear temporary tables
-        query = """DELETE FROM buildings_tem"""
-        self.cur.execute(query)
-        query = """DELETE FROM ways_tem"""
-        self.cur.execute(query)
-        query = """DELETE FROM ways_tem_vertices_pgr"""
-        self.cur.execute(query)
-
-        self.conn.commit()
-
     def remove_duplicate_buildings(self):
         """
         * Remove buildings without geometry or osm_id
@@ -2798,3 +2788,15 @@ class PgReaderWriter:
         et = time.time()
         self.logger.debug(f"Elapsed time for dist_matrix creation: {et - st}")
         return localid2vid, dist_matrix, vid2localid
+
+    def create_temp_tables(self) -> None:
+        for query in TEMP_CREATE_QUERIES.values():
+            self.cur.execute(query)
+
+    def drop_temp_tables(self) -> None:
+        for table_name in TEMP_CREATE_QUERIES.keys():
+            self.cur.execute(f"DROP TABLE IF EXISTS {table_name}")
+        self.cur.execute("DROP TABLE IF EXISTS ways_tem_vertices_pgr")
+
+    def commit_changes(self):
+        self.conn.commit()

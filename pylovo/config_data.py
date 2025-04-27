@@ -286,22 +286,6 @@ ON public.buildings_result (grid_result_id);
         REFERENCES public.grid_result (grid_result_id)
         ON DELETE CASCADE
 )""",
-    "buildings_tem": """CREATE TABLE IF NOT EXISTS public.buildings_tem
-(
-    osm_id varchar,
-    area numeric,
-    type varchar(80),
-    geom geometry(Geometry,3035),  -- needs to be geometry as multipoint & multipolygon get inserted here
-    houses_per_building integer,
-    center geometry(Point,3035),
-    peak_load_in_kw numeric,
-    plz integer,
-    vertice_id bigint,
-    bcid integer,
-    kcid integer,
-    floors integer,
-    connection_point integer
-)""",
     "transformers": """CREATE TABLE IF NOT EXISTS public.transformers
 (
     osm_id varchar PRIMARY KEY,
@@ -377,17 +361,6 @@ ON public.buildings_result (grid_result_id);
         REFERENCES public.postcode_result (version_id, postcode_result_plz)
         ON DELETE CASCADE
 )""",
-    "ways_tem": """CREATE TABLE IF NOT EXISTS public.ways_tem
-(
-    clazz integer,
-    source integer,
-    target integer,
-    cost double precision,
-    reverse_cost double precision,
-    geom geometry(LineString,3035),
-    way_id integer,
-    plz integer
-)""",
     # old name: grid_parameters
     # saves grid parameters for a whole plz for visualization
     "parameters_per_plz": """CREATE TABLE IF NOT EXISTS public.parameters_per_plz
@@ -406,5 +379,35 @@ ON public.buildings_result (grid_result_id);
         FOREIGN KEY (version_id, plz)
         REFERENCES public.postcode_result (version_id, postcode_result_plz)
         ON DELETE CASCADE
+)""",
+}
+
+TEMP_CREATE_QUERIES = {
+    "buildings_tem": """CREATE TABLE IF NOT EXISTS public.buildings_tem
+(
+    osm_id varchar,
+    area numeric,
+    type varchar(80),
+    geom geometry(Geometry,3035),  -- needs to be geometry as multipoint & multipolygon get inserted here
+    houses_per_building integer,
+    center geometry(Point,3035),
+    peak_load_in_kw numeric,
+    plz integer,
+    vertice_id bigint,
+    bcid integer,
+    kcid integer,
+    floors integer,
+    connection_point integer
+)""",
+    "ways_tem": """CREATE TABLE IF NOT EXISTS public.ways_tem
+(
+    clazz integer,
+    source integer,
+    target integer,
+    cost double precision,
+    reverse_cost double precision,
+    geom geometry(LineString,3035),
+    way_id integer,
+    plz integer
 )""",
 }
