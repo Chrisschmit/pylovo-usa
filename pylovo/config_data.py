@@ -212,6 +212,21 @@ ON public.grid_result (version_id, plz, bcid, kcid)
 CREATE INDEX idx_buildings_result_grid_result_id
 ON public.buildings_result (grid_result_id);
 """,
+    "municipal_register": """CREATE TABLE IF NOT EXISTS public.municipal_register     
+(
+    plz integer,
+    pop numeric,
+    area numeric,
+    lat numeric,
+    lon numeric,
+    ags integer,
+    name_city varchar(86),
+    fed_state integer,
+    regio7 integer,
+    regio5 integer,
+    pop_den numeric,
+    CONSTRAINT municipal_register_pkey PRIMARY KEY (plz, ags)
+)""",
     "sample_set": """CREATE TABLE IF NOT EXISTS public.sample_set
 (
     classification_id integer NOT NULL,
@@ -236,21 +251,6 @@ ON public.buildings_result (grid_result_id);
         FOREIGN KEY (classification_id)
         REFERENCES public.classification_version (classification_id)
         ON DELETE CASCADE
-)""",
-    "municipal_register": """CREATE TABLE IF NOT EXISTS public.municipal_register     
-(
-    plz integer,
-    pop numeric,
-    area numeric,
-    lat numeric,
-    lon numeric,
-    ags integer,
-    name_city varchar(86),
-    fed_state integer,
-    regio7 integer,
-    regio5 integer,
-    pop_den numeric,
-    CONSTRAINT municipal_register_pkey PRIMARY KEY (plz, ags)
 )""",
     "clustering_parameters": """CREATE TABLE IF NOT EXISTS public.clustering_parameters
 (
