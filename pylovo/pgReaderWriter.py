@@ -96,7 +96,6 @@ class PgReaderWriter:
         else:
             self.logger.debug("Incorrect settlement type number specified.")
             return
-        # application_area_tuple = (1, 2, 3, 4, 5) # TODO:check selection
 
         query = """SELECT equipment_data.s_max_kva , cost_eur
             FROM public.equipment_data
@@ -215,10 +214,10 @@ class PgReaderWriter:
             pp.create_std_type(
                 net,
                 {
-                    "r_ohm_per_km": r_ohm_per_km,
-                    "x_ohm_per_km": x_ohm_per_km,
-                    "max_i_ka": max_i_ka,
-                    "c_nf_per_km": 0,  # Set to zero for our standard grids
+                    "r_ohm_per_km": float(r_ohm_per_km),
+                    "x_ohm_per_km": float(x_ohm_per_km),
+                    "max_i_ka": float(max_i_ka),
+                    "c_nf_per_km": float(0),  # Set to zero for our standard grids
                     "q_mm2": q_mm2
                 },
                 name=pp_name,
