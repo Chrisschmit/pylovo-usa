@@ -194,7 +194,7 @@ class PgReaderWriter:
         return Pd, load_units, load_type
 
     def create_cable_std_type(self, net: pp.pandapowerNet) -> None:
-        """Create standard cable types from equipment_data table."""
+        """Create standard pandapower cable types from equipment_data table."""
         query = """
             SELECT name, r_mohm_per_km/1000.0 as r_ohm_per_km, x_mohm_per_km/1000.0 as x_ohm_per_km, 
                    max_i_a/1000.0 as max_i_ka
@@ -209,7 +209,7 @@ class PgReaderWriter:
         # Create standard type for each cable in the database
         for cable in cables:
             name, r_ohm_per_km, x_ohm_per_km, max_i_ka = cable
-            pp_name = name.replace('_', ' ')
+            pp_name = name.replace('_', ' ') # Extract name
             q_mm2 = int(name.split("_")[-1])  # Extract cross-section from name
 
             pp.create_std_type(
@@ -218,7 +218,7 @@ class PgReaderWriter:
                     "r_ohm_per_km": r_ohm_per_km,
                     "x_ohm_per_km": x_ohm_per_km,
                     "max_i_ka": max_i_ka,
-                    "c_nf_per_km": 0,  # Always zero
+                    "c_nf_per_km": 0,  # Set to zero for our standard grids
                     "q_mm2": q_mm2
                 },
                 name=pp_name,
