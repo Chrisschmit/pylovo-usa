@@ -2133,13 +2133,14 @@ class PgReaderWriter:
             self.logger.info(f"Version: {VERSION_ID} (created for the first time)")
 
     def insert_parameter_tables(self, consumer_categories: pd.DataFrame):
+        self.cur.execute("SELECT count(*) FROM consumer_categories")
+        categories_exist = self.cur.fetchone()[0]
         with self.sqla_engine.begin() as conn:
-            conn.execute(text("DELETE FROM consumer_categories"))
-            consumer_categories.to_sql(
-                name="consumer_categories", con=conn, if_exists="append", index=False
-            )
-
-        self.logger.debug("Parameter tables are inserted")
+            if not categories_exist:
+                consumer_categories.to_sql(
+                    name="consumer_categories", con=conn, if_exists="append", index=False
+                )
+                self.logger.debug("Parameter tables are inserted")
 
     def analyse_basic_parameters(self, plz: int):
         cluster_list = self.get_list_from_plz(plz)
@@ -2630,16 +2631,6 @@ class PgReaderWriter:
         :param plz: Postal code
         :param version_id: Version ID
         """
-        tables = [
-            "grid_result", "buildings_result", "parameters_per_plz",
-            "lines_result", "transformer_positions", "ways_result"
-        ]
-
-        for table in tables:
-            query = f"DELETE FROM {table} WHERE version_id = %(v)s AND plz = %(p)s;"
-            self.cur.execute(query, {"v": version_id, "p": plz})
-            self.conn.commit()
-
         query = """DELETE FROM postcode_result
         WHERE version_id = %(v)s AND postcode_result_plz = %(p)s;"""
         self.cur.execute(query, {"v": version_id, "p": int(plz)})
@@ -2648,14 +2639,9 @@ class PgReaderWriter:
 
     def delete_version_from_all_tables(self, version_id: str) -> None:
         """Delete all entries of the given version ID from all tables."""
-        tables = [
-            "grid_result", "buildings_result", "parameters_per_plz",
-            "lines_result", "postcode_result", "transformer_positions", "ways_result", "version"
-        ]
-        for table in tables:
-            query = f"DELETE FROM {table} WHERE version_id = %(v)s;"
-            self.cur.execute(query, {"v": version_id})
-            self.conn.commit()
+        query = f"DELETE FROM version WHERE version_id = %(v)s;"
+        self.cur.execute(query, {"v": version_id})
+        self.conn.commit()
         self.logger.info(f"Version {version_id} deleted from all tables")
     
     def delete_classification_version_from_related_tables(self, classification_id: str) -> None:
@@ -2665,18 +2651,11 @@ class PgReaderWriter:
 
         :param classification_id: ID of the classification version to delete
         """
-        tables = [
-            "transformer_classified",
-            "sample_set",
-            "classification_version"
-        ]
-
-        for table in tables:
-            query = f"DELETE FROM {table} WHERE classification_id = %(cid)s;"
-            self.cur.execute(query, {"cid": classification_id})
-            self.conn.commit()
+        query = f"DELETE FROM classification_version WHERE classification_id = %(cid)s;"
+        self.cur.execute(query, {"cid": classification_id})
+        self.conn.commit()
         
-        self.logger.info(f"Deleted classification ID {classification_id} from related tables: {', '.join(tables)}.")
+        self.logger.info(f"Deleted classification ID {classification_id}.")
 
     def delete_plz_from_sample_set_table(self, classification_id: str, plz: int) -> None:
         """
