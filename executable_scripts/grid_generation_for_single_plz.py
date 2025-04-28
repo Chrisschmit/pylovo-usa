@@ -13,7 +13,7 @@ from raw_data.preprocessing_scripts.import_building_data import *
 from pylovo.GridGenerator import GridGenerator
 
 # enter a plz to generate grid for:
-plz = "80804"
+plz = "80803"
 analyze_grids = False
 plot_results = False
 
