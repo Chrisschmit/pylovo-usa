@@ -86,11 +86,11 @@ CREATE_QUERIES = {
 (
     name varchar(100) PRIMARY KEY,
     s_max_kva integer,
-    max_i_a integer,
-    r_mohm_per_km integer,
-    x_mohm_per_km integer,
-    z_mohm_per_km integer,
-    cost_eur integer,
+    max_i_a numeric,
+    r_mohm_per_km numeric,
+    x_mohm_per_km numeric,
+    z_mohm_per_km numeric,
+    cost_eur numeric,
     typ varchar(50),
     application_area integer
 )""",
