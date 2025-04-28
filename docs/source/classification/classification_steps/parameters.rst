@@ -36,7 +36,7 @@ has the attributes
 
 that are calculated in the function:
 
-.. autofunction:: classification.parameter_calculation.GridParameters.GridParameters.calc_parameters_per_plz
+.. autofunction:: classification.parameter_calculation.GridParameters.GridParameters.calc_plz_parameters
 
 To calculate the parameters for all grids in the classification version use:
 

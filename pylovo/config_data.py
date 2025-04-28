@@ -363,7 +363,7 @@ ON public.buildings_result (grid_result_id);
 )""",
     # old name: grid_parameters
     # saves grid parameters for a whole plz for visualization
-    "parameters_per_plz": """CREATE TABLE IF NOT EXISTS public.parameters_per_plz
+    "plz_parameters": """CREATE TABLE IF NOT EXISTS public.plz_parameters
 (
     version_id varchar(10) NOT NULL,
     plz integer NOT NULL,
@@ -375,7 +375,7 @@ ON public.buildings_result (grid_result_id);
     max_distance_per_trafo json,
     avg_distance_per_trafo json,
     CONSTRAINT parameters_pkey PRIMARY KEY (version_id, plz),
-    CONSTRAINT fk_parameters_per_plz_version_id_plz
+    CONSTRAINT fk_plz_parameters_version_id_plz
         FOREIGN KEY (version_id, plz)
         REFERENCES public.postcode_result (version_id, postcode_result_plz)
         ON DELETE CASCADE

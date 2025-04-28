@@ -2197,11 +2197,11 @@ class PgReaderWriter:
         load_count_string = json.dumps(load_count_dict)
         bus_count_string = json.dumps(bus_count_dict)
 
-        self.insert_parameters_per_plz(plz, trafo_string, load_count_string, bus_count_string)
+        self.insert_plz_parameters(plz, trafo_string, load_count_string, bus_count_string)
 
 
-    def insert_parameters_per_plz(self, plz: int, trafo_string: str, load_count_string: str, bus_count_string: str):
-        update_query = """INSERT INTO public.parameters_per_plz (version_id, plz, trafo_num, load_count_per_trafo, bus_count_per_trafo)
+    def insert_plz_parameters(self, plz: int, trafo_string: str, load_count_string: str, bus_count_string: str):
+        update_query = """INSERT INTO public.plz_parameters (version_id, plz, trafo_num, load_count_per_trafo, bus_count_per_trafo)
         VALUES(%s, %s, %s, %s, %s);"""  # TODO: check - should values be updated for same plz and version if analysis is started? And Add a column
         self.cur.execute(
             update_query,
@@ -2249,7 +2249,7 @@ class PgReaderWriter:
         self.logger.info("analyse_cables finished.")
         cable_length_string = json.dumps(cable_length_dict)
 
-        update_query = """UPDATE public.parameters_per_plz
+        update_query = """UPDATE public.plz_parameters
         SET cable_length = %(c)s 
         WHERE version_id = %(v)s AND plz = %(p)s;"""
         self.cur.execute(
@@ -2368,7 +2368,7 @@ class PgReaderWriter:
         trafo_max_distance_string = json.dumps(trafo_max_distance_dict)
         trafo_avg_distance_string = json.dumps(trafo_avg_distance_dict)
 
-        update_query = """UPDATE public.parameters_per_plz
+        update_query = """UPDATE public.plz_parameters
         SET sim_peak_load_per_trafo = %(l)s, max_distance_per_trafo = %(m)s, avg_distance_per_trafo = %(a)s
         WHERE version_id = %(v)s AND plz = %(p)s;
         """
@@ -2386,7 +2386,7 @@ class PgReaderWriter:
         self.logger.debug("per trafo analysis finished")
 
     def read_trafo_dict(self, plz: int) -> dict:
-        read_query = """SELECT trafo_num FROM public.parameters_per_plz 
+        read_query = """SELECT trafo_num FROM public.plz_parameters 
         WHERE version_id = %(v)s AND plz = %(p)s;"""
         self.cur.execute(read_query, {"v": VERSION_ID, "p": plz})
         trafo_num_dict = self.cur.fetchall()[0][0]
@@ -2395,7 +2395,7 @@ class PgReaderWriter:
 
     def read_per_trafo_dict(self, plz: int) -> tuple[list[dict], list[str], dict]:
         read_query = """SELECT load_count_per_trafo, bus_count_per_trafo, sim_peak_load_per_trafo,
-        max_distance_per_trafo, avg_distance_per_trafo FROM public.parameters_per_plz 
+        max_distance_per_trafo, avg_distance_per_trafo FROM public.plz_parameters 
         WHERE version_id = %(v)s AND plz = %(p)s;"""
         self.cur.execute(read_query, {"v": VERSION_ID, "p": plz})
         result = self.cur.fetchall()
@@ -2416,7 +2416,7 @@ class PgReaderWriter:
         return data_list, data_labels, trafo_dict
 
     def read_cable_dict(self, plz: int) -> dict:
-        read_query = """SELECT cable_length FROM public.parameters_per_plz
+        read_query = """SELECT cable_length FROM public.plz_parameters
         WHERE version_id = %(v)s AND plz = %(p)s;"""
         self.cur.execute(read_query, {"v": VERSION_ID, "p": plz})
         cable_length = self.cur.fetchall()[0][0]
