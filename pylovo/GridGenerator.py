@@ -5,6 +5,7 @@ import pandapower as pp
 from pylovo import pgReaderWriter as pg, utils
 from pylovo.config_data import *
 from pylovo.config_version import *
+from classification.config_loader import CLASSIFICATION_VERSION
 
 
 class ResultExistsError(Exception):
@@ -348,14 +349,20 @@ class GridGenerator:
             self.save_net(net, kcid, bcid)
 
     def analyse_results(self):
-        self.logger.info("start basic result analysis")
-        self.pgr.analyse_basic_parameters(self.plz)
-        self.logger.info("start cable counting")
-        self.pgr.analyse_cables(self.plz)
-        self.logger.info("start per trafo analysis")
-        self.pgr.analyse_per_trafo_parameters(self.plz)
-        self.logger.info("result analysis finished")
-        self.pgr.conn.commit()
+        try:
+            self.logger.info("Start basic result analysis")
+            self.pgr.analyse_basic_parameters(self.plz)
+            self.logger.info("Start cable counting")
+            self.pgr.analyse_cables(self.plz)
+            self.logger.info("Start per trafo analysis")
+            self.pgr.analyse_per_trafo_parameters(self.plz)
+            self.logger.info("Result analysis finished")
+            self.pgr.conn.commit()
+        except Exception as e:
+            self.logger.error(f"Error during analysis for PLZ {self.plz}: {e}")
+            self.logger.info(f"Skipped PLZ {self.plz} due to analysis error.")
+            self.pgr.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION),self.plz)  # delete from sample set
+            
 
 
     def save_net(self, net, kcid, bcid):
@@ -392,4 +399,10 @@ class GridGenerator:
                     self.analyse_results()
             except ResultExistsError:
                 print('Grids for this PLZ have already been generated.')
+            except Exception as e:
+                self.logger.error(f"Error during grid generation for PLZ {self.plz}: {e}")
+                self.logger.info(f"Skipped PLZ {self.plz} due to generation error.")
+                self.pgr.conn.rollback() # rollback the transaction
+                self.pgr.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION),self.plz)  # delete from sample set
+                continue
             print('-------------------- end', self.plz, '-----------------------------')

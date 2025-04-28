@@ -2520,6 +2520,41 @@ class PgReaderWriter:
             self.cur.execute(query, {"v": version_id})
             self.conn.commit()
         self.logger.info(f"Version {version_id} deleted from all tables")
+    
+    def delete_classification_version_from_related_tables(self, classification_id: str) -> None:
+        """
+        Deletes all rows with the given classification_id from related tables:
+        transformer_classified, sample_set, and classification_version.
+
+        :param classification_id: ID of the classification version to delete
+        """
+        tables = [
+            "transformer_classified",
+            "sample_set",
+            "classification_version"
+        ]
+
+        for table in tables:
+            query = f"DELETE FROM {table} WHERE classification_id = %(cid)s;"
+            self.cur.execute(query, {"cid": classification_id})
+            self.conn.commit()
+        
+        self.logger.info(f"Deleted classification ID {classification_id} from related tables: {', '.join(tables)}.")
+
+    def delete_plz_from_sample_set_table(self, classification_id: str, plz: int) -> None:
+        """
+        Deletes the row corresponding to the given classification ID and PLZ from the sample_set table.
+
+        :param classification_id: ID of the classification version
+        :param plz: Postal code to be removed
+        """
+        query = """
+        DELETE FROM sample_set
+        WHERE classification_id = %(cid)s AND plz = %(p)s;
+        """
+        self.cur.execute(query, {"cid": classification_id, "p": plz})
+        self.conn.commit()
+        self.logger.info(f"Deleted PLZ {plz} for classification ID {classification_id} from sample_set table.")
 
     def get_clustering_parameters_for_plz_list(self, plz_tuple: tuple) -> pd.DataFrame:
         """get clustering parameter for multiple plz"""
