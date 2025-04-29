@@ -178,7 +178,7 @@ def plot_factor_analysis(df_plz_parameters: pd.DataFrame, n_comps: int) -> None:
     plt.show()
 
 
-def get_parameters_for_clustering(df_plz_parameters: pd.DataFrame, n_comps: int) -> None:
+def get_parameters_for_clustering(df_plz_parameters: pd.DataFrame, n_comps: int) -> list:
     """calculate the mathematically ideal set of parameters
     with the varimax rotated factor analysis
 
@@ -196,8 +196,13 @@ def get_parameters_for_clustering(df_plz_parameters: pd.DataFrame, n_comps: int)
     fa.fit(X)
 
     df_components_fa = pd.DataFrame(fa.components_.T, index=feature_names)
+    parameters = []
     for column in df_components_fa:
-        print(df_components_fa[column].abs().idxmax())
+        parameter = df_components_fa[column].abs().idxmax()
+        parameters.append(parameter)
+        print(parameter)
+
+    return parameters
 
 
 def plot_eigendecomposition(df_plz_parameters: pd.DataFrame) -> None:
@@ -248,7 +253,7 @@ def plot_eigendecomposition(df_plz_parameters: pd.DataFrame) -> None:
 
 
 def plot_ch_index_for_clustering_algos(df_plz_parameters: pd.DataFrame,
-                                       no_of_clusters_allowed: range = range(3, 8)) -> None:
+                                       no_of_clusters_allowed: range = range(3, 8)) -> pd.DataFrame:
     """plot the calinski harabasz index for the indicated range of clusters and the clusterin algorithms kmeans,
     kmedoids, gmm
 
@@ -373,7 +378,7 @@ def plot_ch_index_for_clustering_algos(df_plz_parameters: pd.DataFrame,
     # plt.savefig('ch_index.png', dpi=600, bbox_inches='tight')
 
     # print optimal number of clusters
-    print(df_ch_comparison)
+    return df_ch_comparison
 
 
 def plot_db_index_for_clustering_algos(df_plz_parameters: pd.DataFrame,
