@@ -4,6 +4,7 @@ import os
 from classification.apply_clustering_for_QGIS_visualisation import apply_clustering_for_visualisation
 from classification.get_no_clusters_for_clustering import get_no_clusters_for_clustering
 from classification.get_parameters_for_clustering import get_parameters_for_clustering
+from classification.prepare_data_for_clustering import prepare_data_for_clustering
 
 # Define paths to YAML config files
 CONFIG_CLASSIFICATION_PATH = os.path.join(os.path.dirname(__file__), "config_classification.yaml")
@@ -128,7 +129,7 @@ def main():
     
     # Step 2: Run prepare_data_for_clustering.py
     print("\nRunning prepare_data_for_clustering.py...")
-    # prepare_data_for_clustering()
+    prepare_data_for_clustering()
 
     # Step 3: Ask user for manual input or automatic assignment
     if get_user_confirmation():
