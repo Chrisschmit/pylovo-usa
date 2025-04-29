@@ -541,7 +541,7 @@ def plot_stacked_distribution_of_clusters_per_regio_5(df_plz_parameters: pd.Data
                         title='Verteilung der Cluster über Regio5 Gem')
     plt.xlabel('Regionalstatistischer Gemeindetyp 5')
     labels = [item.get_text() for item in ax.get_xticklabels()]
-    labels = ['51 Metropole', '52 Großstadt', '53 Mittelstadt', '54 städt. Raum', '55 dörfl. Raum']
+    # labels = ['51 Metropole', '52 Großstadt', '53 Mittelstadt', '54 städt. Raum', '55 dörfl. Raum']
     ax.set_xticklabels(labels)
     plt.ylabel('Anteil je Klasse (normiert)')
     sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
