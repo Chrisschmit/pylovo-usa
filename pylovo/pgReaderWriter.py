@@ -2518,12 +2518,17 @@ class PgReaderWriter:
 
         column_names = ", ".join(select)
 
+        jt_prefix = join_table
+        parts = join_table.split(" ")
+        if len(parts) == 2:
+            jt_prefix = parts[1]
+
         query = (
                 f"""SELECT {column_names}
                     FROM public.{from_table}
                     JOIN public.{join_table}
                       ON {on[0]} = {on[1]}
-                    WHERE version_id = %(v)s """
+                    WHERE {jt_prefix}.version_id = %(v)s """
                 + filters
         )
         version = VERSION_ID
