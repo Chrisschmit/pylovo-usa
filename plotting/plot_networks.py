@@ -63,7 +63,7 @@ def plot_contextily(plz: str, kcid: int, bcid: int, zoomfactor: int = 19) -> Non
     ax.set_yticks([])
     # Buildings
     buildings_gdf = pg.get_geo_df_join(
-        ["version_id", "plz", "kcid", "bcid", "br.*"],
+        ["gr.version_id", "plz", "kcid", "bcid", "br.*"],
         "buildings_result br", "grid_result gr",
         ("br.grid_result_id", "gr.grid_result_id"),
     plz=int(plz))
