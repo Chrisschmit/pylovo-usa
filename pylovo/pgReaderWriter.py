@@ -2138,7 +2138,7 @@ class PgReaderWriter:
         with self.sqla_engine.begin() as conn:
             if not categories_exist:
                 consumer_categories.to_sql(
-                    name="consumer_categories", con=conn, if_exists="fail", index=False
+                    name="consumer_categories", con=conn, if_exists="append", index=False
                 )
                 self.logger.debug("Parameter tables are inserted")
 
