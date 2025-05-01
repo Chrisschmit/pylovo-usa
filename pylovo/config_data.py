@@ -212,20 +212,26 @@ ON public.grid_result (version_id, plz, bcid, kcid)
 CREATE INDEX idx_buildings_result_grid_result_id
 ON public.buildings_result (grid_result_id);
 """,
-    "sample_set": """CREATE TABLE IF NOT EXISTS public.sample_set
+    "municipal_register": """CREATE TABLE IF NOT EXISTS public.municipal_register     
 (
-    classification_id integer NOT NULL,
     plz integer,
-    pop numeric,
-    area numeric,
-    lat numeric,
-    lon numeric,
-    ags integer,
-    name_city varchar(86),
+    pop bigint,
+    area double precision,
+    lat double precision,
+    lon double precision,
+    ags bigint,
+    name_city text,
     fed_state integer,
     regio7 integer,
     regio5 integer,
-    pop_den numeric,
+    pop_den double precision,
+    CONSTRAINT municipal_register_pkey PRIMARY KEY (plz, ags)
+)""",
+    "sample_set": """CREATE TABLE IF NOT EXISTS public.sample_set
+(
+    classification_id integer NOT NULL,
+    plz integer NOT NULL,
+    ags bigint,
     bin_no int,
     bins numeric,
     perc_bin numeric,
@@ -235,22 +241,11 @@ ON public.buildings_result (grid_result_id);
     CONSTRAINT fk_sample_set_classification_id
         FOREIGN KEY (classification_id)
         REFERENCES public.classification_version (classification_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_sample_set_plz
+        FOREIGN KEY (plz, ags)
+        REFERENCES public.municipal_register (plz, ags)
         ON DELETE CASCADE
-)""",
-    "municipal_register": """CREATE TABLE IF NOT EXISTS public.municipal_register     
-(
-    plz integer,
-    pop numeric,
-    area numeric,
-    lat numeric,
-    lon numeric,
-    ags integer,
-    name_city varchar(86),
-    fed_state integer,
-    regio7 integer,
-    regio5 integer,
-    pop_den numeric,
-    CONSTRAINT municipal_register_pkey PRIMARY KEY (plz, ags)
 )""",
     "clustering_parameters": """CREATE TABLE IF NOT EXISTS public.clustering_parameters
 (
@@ -290,22 +285,6 @@ ON public.buildings_result (grid_result_id);
         FOREIGN KEY (grid_result_id)
         REFERENCES public.grid_result (grid_result_id)
         ON DELETE CASCADE
-)""",
-    "buildings_tem": """CREATE TABLE IF NOT EXISTS public.buildings_tem
-(
-    osm_id varchar,
-    area numeric,
-    type varchar(80),
-    geom geometry(Geometry,3035),  -- needs to be geometry as multipoint & multipolygon get inserted here
-    houses_per_building integer,
-    center geometry(Point,3035),
-    peak_load_in_kw numeric,
-    plz integer,
-    vertice_id bigint,
-    bcid integer,
-    kcid integer,
-    floors integer,
-    connection_point integer
 )""",
     "transformers": """CREATE TABLE IF NOT EXISTS public.transformers
 (
@@ -382,20 +361,9 @@ ON public.buildings_result (grid_result_id);
         REFERENCES public.postcode_result (version_id, postcode_result_plz)
         ON DELETE CASCADE
 )""",
-    "ways_tem": """CREATE TABLE IF NOT EXISTS public.ways_tem
-(
-    clazz integer,
-    source integer,
-    target integer,
-    cost double precision,
-    reverse_cost double precision,
-    geom geometry(LineString,3035),
-    way_id integer,
-    plz integer
-)""",
     # old name: grid_parameters
     # saves grid parameters for a whole plz for visualization
-    "parameters_per_plz": """CREATE TABLE IF NOT EXISTS public.parameters_per_plz
+    "plz_parameters": """CREATE TABLE IF NOT EXISTS public.plz_parameters
 (
     version_id varchar(10) NOT NULL,
     plz integer NOT NULL,
@@ -407,9 +375,39 @@ ON public.buildings_result (grid_result_id);
     max_distance_per_trafo json,
     avg_distance_per_trafo json,
     CONSTRAINT parameters_pkey PRIMARY KEY (version_id, plz),
-    CONSTRAINT fk_parameters_per_plz_version_id_plz
+    CONSTRAINT fk_plz_parameters_version_id_plz
         FOREIGN KEY (version_id, plz)
         REFERENCES public.postcode_result (version_id, postcode_result_plz)
         ON DELETE CASCADE
+)""",
+}
+
+TEMP_CREATE_QUERIES = {
+    "buildings_tem": """CREATE TABLE IF NOT EXISTS public.buildings_tem
+(
+    osm_id varchar,
+    area numeric,
+    type varchar(80),
+    geom geometry(Geometry,3035),  -- needs to be geometry as multipoint & multipolygon get inserted here
+    houses_per_building integer,
+    center geometry(Point,3035),
+    peak_load_in_kw numeric,
+    plz integer,
+    vertice_id bigint,
+    bcid integer,
+    kcid integer,
+    floors integer,
+    connection_point integer
+)""",
+    "ways_tem": """CREATE TABLE IF NOT EXISTS public.ways_tem
+(
+    clazz integer,
+    source integer,
+    target integer,
+    cost double precision,
+    reverse_cost double precision,
+    geom geometry(LineString,3035),
+    way_id integer,
+    plz integer
 )""",
 }

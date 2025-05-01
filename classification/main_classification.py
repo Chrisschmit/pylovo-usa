@@ -1,8 +1,10 @@
-import subprocess
 import yaml
 import os
-import re
-import sys
+
+from classification.apply_clustering_for_QGIS_visualisation import apply_clustering_for_visualisation
+from classification.get_no_clusters_for_clustering import get_no_clusters_for_clustering
+from classification.get_parameters_for_clustering import get_parameters_for_clustering
+from classification.prepare_data_for_clustering import prepare_data_for_clustering
 
 # Define paths to YAML config files
 CONFIG_CLASSIFICATION_PATH = os.path.join(os.path.dirname(__file__), "config_classification.yaml")
@@ -19,33 +21,6 @@ def save_yaml(filepath, data):
     """Save a YAML file."""
     with open(filepath, "w", encoding="utf-8") as file:
         yaml.dump(data, file, default_flow_style=False, sort_keys=False)
-
-
-def run_script(script_name):
-    """Runs a Python script inside the classification module, streams output"""
-    process = subprocess.Popen(
-        [sys.executable, "-m", f"classification.{script_name}"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True
-    )
-
-    output_lines = []
-
-    for line in process.stdout:
-        print(line, end="")  # Always print logs live
-
-        # Only store output if it's not prepare_data_for_clustering
-        if script_name != "prepare_data_for_clustering":
-            output_lines.append(line)
-
-    process.wait()
-
-    if process.returncode != 0:
-        print(f"\nError while running {script_name}. Exit code: {process.returncode}")
-        sys.exit(1)
-
-    return "".join(output_lines) if script_name != "prepare_data_for_clustering" else None
 
 
 def get_user_confirmation():
@@ -110,11 +85,8 @@ def get_custom_cluster_numbers():
 
 def update_list_of_clustering_parameters():
     """Runs get_parameters_for_clustering and updates LIST_OF_CLUSTERING_PARAMETERS in config_clustering.yaml."""
-    output = run_script("get_parameters_for_clustering")
-    
-    # Extract clustering parameters from the output 
-    params = [line.strip() for line in output.split("\n") if line.strip() and "Database connection" not in line]
-    
+    params = get_parameters_for_clustering()
+
     # Update YAML file
     config = load_yaml(CONFIG_CLUSTERING_PATH)
     config["LIST_OF_CLUSTERING_PARAMETERS"] = params
@@ -124,29 +96,17 @@ def update_list_of_clustering_parameters():
 
 def update_number_of_clusters():
     """Runs get_no_clusters_for_clustering and updates cluster numbers in config_clustering.yaml."""
-    output = run_script("get_no_clusters_for_clustering")
+    df_no_clusters = get_no_clusters_for_clustering()
+
+    def get_no_clusters_from_df(algo: str) -> int:
+        return int(df_no_clusters[df_no_clusters["algorithm"] == algo]["no_clusters"].iloc[0])
 
     # Define the direct mapping from algorithm names to YAML keys
-    cluster_mappings = {
-        "kmeans": "N_CLUSTERS_KMEANS",
-        "KMedoids": "N_CLUSTERS_KMEDOID",
-        "GMM tied": "N_CLUSTERS_GMM"
+    cluster_counts = {
+        "N_CLUSTERS_KMEANS": get_no_clusters_from_df("kmeans"),
+        "N_CLUSTERS_KMEDOID": get_no_clusters_from_df("KMedoids"),
+        "N_CLUSTERS_GMM": get_no_clusters_from_df("GMM tied")
     }
-
-    cluster_counts = {}
-
-    for line in output.split("\n"):
-        # Match table lines with the format: algorithm, no_clusters, ch_index
-        match = re.match(r"^\s*\d+\s+([A-Za-z\s]+)\s+(\d+)\s+[\d.]+", line)
-        if match:
-            algorithm, num_clusters = match.groups()
-            algorithm = algorithm.strip()  
-
-            # Only update parameters that are in our mapping
-            if algorithm in cluster_mappings:
-                yaml_key = cluster_mappings[algorithm]
-                cluster_counts[yaml_key] = int(num_clusters)
-
 
     # Load existing YAML configuration
     config = load_yaml(CONFIG_CLUSTERING_PATH)
@@ -169,7 +129,7 @@ def main():
     
     # Step 2: Run prepare_data_for_clustering.py
     print("\nRunning prepare_data_for_clustering.py...")
-    run_script("prepare_data_for_clustering")
+    prepare_data_for_clustering()
 
     # Step 3: Ask user for manual input or automatic assignment
     if get_user_confirmation():
@@ -194,7 +154,7 @@ def main():
 
     # Step 5: Run apply_clustering_for_QGIS_visualisation.py
     print("\nRunning apply_clustering_for_QGIS_visualisation.py...")
-    run_script("apply_clustering_for_QGIS_visualisation")
+    apply_clustering_for_visualisation()
     
 
     print("\nClassification process completed successfully!")

@@ -2088,16 +2088,6 @@ class PgReaderWriter:
 
         self.cur.execute(query, vars={"p": plz})
 
-        # Clear temporary tables
-        query = """DELETE FROM buildings_tem"""
-        self.cur.execute(query)
-        query = """DELETE FROM ways_tem"""
-        self.cur.execute(query)
-        query = """DELETE FROM ways_tem_vertices_pgr"""
-        self.cur.execute(query)
-
-        self.conn.commit()
-
     def remove_duplicate_buildings(self):
         """
         * Remove buildings without geometry or osm_id
@@ -2143,13 +2133,14 @@ class PgReaderWriter:
             self.logger.info(f"Version: {VERSION_ID} (created for the first time)")
 
     def insert_parameter_tables(self, consumer_categories: pd.DataFrame):
+        self.cur.execute("SELECT count(*) FROM consumer_categories")
+        categories_exist = self.cur.fetchone()[0]
         with self.sqla_engine.begin() as conn:
-            conn.execute(text("DELETE FROM consumer_categories"))
-            consumer_categories.to_sql(
-                name="consumer_categories", con=conn, if_exists="append", index=False
-            )
-
-        self.logger.debug("Parameter tables are inserted")
+            if not categories_exist:
+                consumer_categories.to_sql(
+                    name="consumer_categories", con=conn, if_exists="fail", index=False
+                )
+                self.logger.debug("Parameter tables are inserted")
 
     def analyse_basic_parameters(self, plz: int):
         cluster_list = self.get_list_from_plz(plz)
@@ -2206,11 +2197,11 @@ class PgReaderWriter:
         load_count_string = json.dumps(load_count_dict)
         bus_count_string = json.dumps(bus_count_dict)
 
-        self.insert_parameters_per_plz(plz, trafo_string, load_count_string, bus_count_string)
+        self.insert_plz_parameters(plz, trafo_string, load_count_string, bus_count_string)
 
 
-    def insert_parameters_per_plz(self, plz: int, trafo_string: str, load_count_string: str, bus_count_string: str):
-        update_query = """INSERT INTO public.parameters_per_plz (version_id, plz, trafo_num, load_count_per_trafo, bus_count_per_trafo)
+    def insert_plz_parameters(self, plz: int, trafo_string: str, load_count_string: str, bus_count_string: str):
+        update_query = """INSERT INTO public.plz_parameters (version_id, plz, trafo_num, load_count_per_trafo, bus_count_per_trafo)
         VALUES(%s, %s, %s, %s, %s);"""  # TODO: check - should values be updated for same plz and version if analysis is started? And Add a column
         self.cur.execute(
             update_query,
@@ -2258,7 +2249,7 @@ class PgReaderWriter:
         self.logger.info("analyse_cables finished.")
         cable_length_string = json.dumps(cable_length_dict)
 
-        update_query = """UPDATE public.parameters_per_plz
+        update_query = """UPDATE public.plz_parameters
         SET cable_length = %(c)s 
         WHERE version_id = %(v)s AND plz = %(p)s;"""
         self.cur.execute(
@@ -2377,7 +2368,7 @@ class PgReaderWriter:
         trafo_max_distance_string = json.dumps(trafo_max_distance_dict)
         trafo_avg_distance_string = json.dumps(trafo_avg_distance_dict)
 
-        update_query = """UPDATE public.parameters_per_plz
+        update_query = """UPDATE public.plz_parameters
         SET sim_peak_load_per_trafo = %(l)s, max_distance_per_trafo = %(m)s, avg_distance_per_trafo = %(a)s
         WHERE version_id = %(v)s AND plz = %(p)s;
         """
@@ -2395,7 +2386,7 @@ class PgReaderWriter:
         self.logger.debug("per trafo analysis finished")
 
     def read_trafo_dict(self, plz: int) -> dict:
-        read_query = """SELECT trafo_num FROM public.parameters_per_plz 
+        read_query = """SELECT trafo_num FROM public.plz_parameters 
         WHERE version_id = %(v)s AND plz = %(p)s;"""
         self.cur.execute(read_query, {"v": VERSION_ID, "p": plz})
         trafo_num_dict = self.cur.fetchall()[0][0]
@@ -2404,7 +2395,7 @@ class PgReaderWriter:
 
     def read_per_trafo_dict(self, plz: int) -> tuple[list[dict], list[str], dict]:
         read_query = """SELECT load_count_per_trafo, bus_count_per_trafo, sim_peak_load_per_trafo,
-        max_distance_per_trafo, avg_distance_per_trafo FROM public.parameters_per_plz 
+        max_distance_per_trafo, avg_distance_per_trafo FROM public.plz_parameters 
         WHERE version_id = %(v)s AND plz = %(p)s;"""
         self.cur.execute(read_query, {"v": VERSION_ID, "p": plz})
         result = self.cur.fetchall()
@@ -2425,7 +2416,7 @@ class PgReaderWriter:
         return data_list, data_labels, trafo_dict
 
     def read_cable_dict(self, plz: int) -> dict:
-        read_query = """SELECT cable_length FROM public.parameters_per_plz
+        read_query = """SELECT cable_length FROM public.plz_parameters
         WHERE version_id = %(v)s AND plz = %(p)s;"""
         self.cur.execute(read_query, {"v": VERSION_ID, "p": plz})
         cable_length = self.cur.fetchall()[0][0]
@@ -2527,12 +2518,17 @@ class PgReaderWriter:
 
         column_names = ", ".join(select)
 
+        jt_prefix = join_table
+        parts = join_table.split(" ")
+        if len(parts) == 2:
+            jt_prefix = parts[1]
+
         query = (
                 f"""SELECT {column_names}
                     FROM public.{from_table}
                     JOIN public.{join_table}
                       ON {on[0]} = {on[1]}
-                    WHERE version_id = %(v)s """
+                    WHERE {jt_prefix}.version_id = %(v)s """
                 + filters
         )
         version = VERSION_ID
@@ -2640,16 +2636,6 @@ class PgReaderWriter:
         :param plz: Postal code
         :param version_id: Version ID
         """
-        tables = [
-            "grid_result", "buildings_result", "parameters_per_plz",
-            "lines_result", "transformer_positions", "ways_result"
-        ]
-
-        for table in tables:
-            query = f"DELETE FROM {table} WHERE version_id = %(v)s AND plz = %(p)s;"
-            self.cur.execute(query, {"v": version_id, "p": plz})
-            self.conn.commit()
-
         query = """DELETE FROM postcode_result
         WHERE version_id = %(v)s AND postcode_result_plz = %(p)s;"""
         self.cur.execute(query, {"v": version_id, "p": int(plz)})
@@ -2658,14 +2644,9 @@ class PgReaderWriter:
 
     def delete_version_from_all_tables(self, version_id: str) -> None:
         """Delete all entries of the given version ID from all tables."""
-        tables = [
-            "grid_result", "buildings_result", "parameters_per_plz",
-            "lines_result", "postcode_result", "transformer_positions", "ways_result", "version"
-        ]
-        for table in tables:
-            query = f"DELETE FROM {table} WHERE version_id = %(v)s;"
-            self.cur.execute(query, {"v": version_id})
-            self.conn.commit()
+        query = f"DELETE FROM version WHERE version_id = %(v)s;"
+        self.cur.execute(query, {"v": version_id})
+        self.conn.commit()
         self.logger.info(f"Version {version_id} deleted from all tables")
     
     def delete_classification_version_from_related_tables(self, classification_id: str) -> None:
@@ -2675,18 +2656,11 @@ class PgReaderWriter:
 
         :param classification_id: ID of the classification version to delete
         """
-        tables = [
-            "transformer_classified",
-            "sample_set",
-            "classification_version"
-        ]
-
-        for table in tables:
-            query = f"DELETE FROM {table} WHERE classification_id = %(cid)s;"
-            self.cur.execute(query, {"cid": classification_id})
-            self.conn.commit()
+        query = f"DELETE FROM classification_version WHERE classification_id = %(cid)s;"
+        self.cur.execute(query, {"cid": classification_id})
+        self.conn.commit()
         
-        self.logger.info(f"Deleted classification ID {classification_id} from related tables: {', '.join(tables)}.")
+        self.logger.info(f"Deleted classification ID {classification_id}.")
 
     def delete_plz_from_sample_set_table(self, classification_id: str, plz: int) -> None:
         """
@@ -2798,3 +2772,15 @@ class PgReaderWriter:
         et = time.time()
         self.logger.debug(f"Elapsed time for dist_matrix creation: {et - st}")
         return localid2vid, dist_matrix, vid2localid
+
+    def create_temp_tables(self) -> None:
+        for query in TEMP_CREATE_QUERIES.values():
+            self.cur.execute(query)
+
+    def drop_temp_tables(self) -> None:
+        for table_name in TEMP_CREATE_QUERIES.keys():
+            self.cur.execute(f"DROP TABLE IF EXISTS {table_name}")
+        self.cur.execute("DROP TABLE IF EXISTS ways_tem_vertices_pgr")
+
+    def commit_changes(self):
+        self.conn.commit()

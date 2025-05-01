@@ -1,3 +1,4 @@
+import pandas as pd
 from factor_analyzer import FactorAnalyzer
 
 from classification.config_loader import NO_OF_CLUSTERS_ALLOWED
@@ -6,7 +7,7 @@ from plotting.plotting_classification import get_parameters_for_clustering
 from plotting.plotting_classification import plot_ch_index_for_clustering_algos
 
 
-def print_parameters_for_clustering_for_classification_version() -> None:
+def print_parameters_for_clustering_for_classification_version() -> list:
     """ print optimal clustering parameter for grid data of classification version
     """
     # get grid data
@@ -30,14 +31,17 @@ def print_parameters_for_clustering_for_classification_version() -> None:
     no_of_factors = (ev[0] > 1).sum()
 
     # print parameters
-    get_parameters_for_clustering(df_parameters_per_plz=df, n_comps=no_of_factors)
+    parameters = get_parameters_for_clustering(df_plz_parameters=df, n_comps=no_of_factors)
+    return parameters
 
 
-def get_best_no_of_clusters_ch_index_for_classification_version() -> None:
+def get_best_no_of_clusters_ch_index_for_classification_version() -> pd.DataFrame:
     """print and plot best number of clusters for cluster algorithms determined with CH index"""
     # import the dateset of grid parameters
     dc = DatabaseCommunication()
     df_parameters_of_grids = dc.get_clustering_parameters_for_classification_version()
 
-    plot_ch_index_for_clustering_algos(df_parameters_per_plz=df_parameters_of_grids,
-                                       no_of_clusters_allowed=NO_OF_CLUSTERS_ALLOWED)
+    df_ch_comparison = plot_ch_index_for_clustering_algos(df_plz_parameters=df_parameters_of_grids,
+                                                          no_of_clusters_allowed=NO_OF_CLUSTERS_ALLOWED)
+
+    return df_ch_comparison

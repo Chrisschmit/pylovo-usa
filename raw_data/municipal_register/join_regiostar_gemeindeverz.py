@@ -41,7 +41,7 @@ def municipal_register_to_db(regiostar_plz: pd.DataFrame) -> None:
         regiostar_plz.to_sql(
             'municipal_register', 
             con=sqlalchemy_engine, 
-            if_exists='replace', 
+            if_exists='append', 
             index=False
         )
     except Exception as e:

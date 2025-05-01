@@ -32,6 +32,8 @@ class GridGenerator:
 
     def generate_grid(self):
         self.check_if_results_exist()
+        self.pgr.create_temp_tables()
+
         self.cache_and_preprocess_static_objects()
         self.preprocess_ways()
         self.apply_kmeans_clustering()
@@ -39,6 +41,8 @@ class GridGenerator:
         self.install_cables()
         self.pgr.save_and_reset_tables(plz=self.plz)
 
+        self.pgr.drop_temp_tables()
+        self.pgr.commit_changes()
 
     def check_if_results_exist(self):
         postcode_count = self.pgr.count_postcode_result(self.plz)
