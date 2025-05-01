@@ -386,7 +386,10 @@ CREATE_QUERIES = {
         JOIN public.grid_result gr ON tp.grid_result_id = gr.grid_result_id
     )""",
     "buildings_result_with_grid": """CREATE OR REPLACE VIEW public.buildings_result_with_grid AS (
-        SELECT br.*, gr.kcid, gr.bcid, gr.plz
+        SELECT
+            (br.version_id || '_' || br.osm_id) AS id,
+            br.*,
+            gr.kcid, gr.bcid, gr.plz
         FROM public.buildings_result br
         JOIN public.grid_result gr ON br.grid_result_id = gr.grid_result_id
     )""",
