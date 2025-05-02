@@ -80,7 +80,7 @@ or using plotting functions (individual grids). For more details see :doc:`../..
 
 Step 5: Inspect grid parameters (optional)
 ==========================================
-In the package :code:`examples_grid_parameters` the parameters of the grids can be analysed. In the notebook
+In the package :code:`examples_plz_parameters` the parameters of the grids can be analysed. In the notebook
 :code:`analyse_clustering_parameters` a matrix of scatter plots called pairplot is shown to gain an overview of the data.
 
 .. image:: ../../images/classification/pairplot.png

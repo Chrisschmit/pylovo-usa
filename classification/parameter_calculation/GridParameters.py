@@ -49,7 +49,7 @@ class GridParameters:
         self.vsw_per_branch = None
         self.max_vsw_of_a_branch = None
 
-    def calc_grid_parameters(self) -> None:
+    def calc_plz_parameters(self) -> None:
         """calculate parameters of each grid
         save results to table 'clustering_parameters' on database
         """
@@ -230,38 +230,32 @@ class GridParameters:
         conn = psycopg2.connect(database=DBNAME, user=USER, password=PASSWORD, host=HOST, port=PORT)
         cur = conn.cursor()
         query = """INSERT INTO clustering_parameters (
-                  version_id,
-                  plz,
-                  bcid,
-                  kcid,
-                  no_connection_buses,
-                  no_branches,
-                  no_house_connections,
-                  no_house_connections_per_branch,
-                  no_households,
-                  no_household_equ,
-                  no_households_per_branch,
-                  max_no_of_households_of_a_branch,
-                  house_distance_km,
-                  transformer_mva,
-                  osm_trafo,
-                  max_trafo_dis,
-                  avg_trafo_dis,
-                  cable_length_km,
-                  cable_len_per_house,
-                  max_power_mw,
-                  simultaneous_peak_load_mw,
-                  resistance,
-                  reactance,
-                  ratio,
-                  vsw_per_branch,
-                  max_vsw_of_a_branch
+                   grid_result_id,
+                   no_connection_buses,
+                   no_branches,
+                   no_house_connections,
+                   no_house_connections_per_branch,
+                   no_households,
+                   no_household_equ,
+                   no_households_per_branch,
+                   max_no_of_households_of_a_branch,
+                   house_distance_km,
+                   transformer_mva,
+                   osm_trafo,
+                   max_trafo_dis,
+                   avg_trafo_dis,
+                   cable_length_km,
+                   cable_len_per_house,
+                   max_power_mw,
+                   simultaneous_peak_load_mw,
+                   resistance,
+                   reactance,
+                   ratio,
+                   vsw_per_branch,
+                   max_vsw_of_a_branch
                   )
-                         VALUES(
-                  %(version_id)s,
-                  %(plz)s,
-                  %(bcid)s,
-                  %(kcid)s,
+                  VALUES (
+                  (SELECT grid_result_id FROM grid_result WHERE version_id = %(version_id)s AND plz = %(plz)s AND bcid = %(bcid)s AND kcid = %(kcid)s),
                   %(no_connection_buses)s,
                   %(no_branches)s,
                   %(no_house_connections)s,
@@ -283,7 +277,7 @@ class GridParameters:
                   %(reactance)s,
                   %(ratio)s,
                   %(vsw_per_branch)s,
-                   %(max_vsw_of_a_branch)s);"""
+                  %(max_vsw_of_a_branch)s);"""
         cur.execute(query, {
             "version_id": self.version_id,
             "plz": self.plz,
@@ -402,7 +396,7 @@ def get_no_branches(networkx_graph, pandapower_net) -> int:
     return no_branches
 
 
-def get_distances_in_graph(pandapower_net, networkx_graph) -> (float, float):
+def get_distances_in_graph(pandapower_net, networkx_graph) -> tuple[float, float]:
     """
     distances in the graph:
     - average trafo distance: distance from each house connection to the trafo
@@ -439,7 +433,7 @@ def get_trafo_power(pandapower_net) -> float:
     return df_trafo.iloc[0]
 
 
-def calc_resistance(pandapower_net, networkx_graph) -> (float, float, float, float, float):
+def calc_resistance(pandapower_net, networkx_graph) -> tuple[float, float, float, float, float]:
     """
     this function calculates the resistance and reactance in ohm of the network
     (Verbrauchersummenwiderstand accoding to Kerber 2010 p. 44)

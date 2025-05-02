@@ -38,9 +38,10 @@ class DatabaseCommunication:
         :rtype: pd.DataFrame
         """
         query = """
-                SELECT * 
-                FROM public.clustering_parameters 
-                WHERE version_id = %(v)s AND plz = %(p)s;"""
+                SELECT version_id, plz, kcid, bcid, cp.*
+                FROM public.clustering_parameters cp 
+                JOIN public.grid_result gr ON cp.grid_result_id = gr.grid_result_id
+                WHERE gr.version_id = %(v)s AND gr.plz = %(p)s;"""
         params = {"v": VERSION_ID, "p": plz}
         df_query = pd.read_sql_query(query, con=self.conn, params=params, )
         columns = CLUSTERING_PARAMETERS
@@ -58,12 +59,13 @@ class DatabaseCommunication:
                     SELECT plz
                     FROM public.sample_set
                     WHERE classification_id= %(c)s
-                    ),
-                clustering AS(
-                    SELECT * 
-                    FROM public.clustering_parameters 
-                    WHERE version_id = %(v)s AND filtered = false
-                    )
+                ),
+                clustering AS (
+                    SELECT version_id, plz, kcid, bcid, cp.*
+                    FROM public.clustering_parameters cp 
+                    JOIN public.grid_result gr ON cp.grid_result_id = gr.grid_result_id
+                    WHERE gr.version_id = %(v)s AND cp.filtered = false
+                )
                 SELECT c.* 
                 FROM clustering c
                 JOIN plz_table p
@@ -87,15 +89,17 @@ class DatabaseCommunication:
         """
         query = """
                 WITH plz_table(plz) AS (
-                    SELECT plz, pop, area, lat, lon, ags, name_city, regio7, regio5, pop_den
-                    FROM public.sample_set
-                    WHERE classification_id= %(c)s
-                    ),
-                clustering AS(
-                    SELECT * 
-                    FROM public.clustering_parameters 
-                    WHERE version_id = %(v)s AND filtered = false
-                    )
+                    SELECT ss.plz, mr.pop, mr.area, mr.lat, mr.lon, ss.ags, mr.name_city, mr.regio7, mr.regio5, mr.pop_den
+                    FROM public.sample_set ss
+                    JOIN public.municipal_register mr ON ss.plz = mr.plz AND ss.ags = mr.ags
+                    WHERE ss.classification_id = %(c)s
+                ),
+                clustering AS (
+                    SELECT version_id, plz, kcid, bcid, cp.*
+                    FROM public.clustering_parameters cp 
+                    JOIN public.grid_result gr ON cp.grid_result_id = gr.grid_result_id
+                    WHERE gr.version_id = %(v)s AND cp.filtered = false
+                )
                 SELECT c.*, p.pop, p.area, p.lat, p.lon, p.ags, p.name_city, p.regio7, p.regio5, p.pop_den
                 FROM clustering c
                 JOIN plz_table p
@@ -117,7 +121,9 @@ class DatabaseCommunication:
         # load transformer positions from database, preserve geo-datatype of geom column
         query = """
                 SELECT version_id, plz, kcid, bcid, geom
-                FROM public.transformer_positions
+                FROM public.transformer_positions tp
+                JOIN public.grid_result gr
+                  ON tp.grid_result_id = gr.grid_result_id
                 WHERE version_id=%(v)s;"""
         params = {"v": VERSION_ID}
         df_transformer_positions = gpd.read_postgis(query, con=self.sqla_engine, params=params, )
@@ -173,6 +179,18 @@ class DatabaseCommunication:
                                               left_on=['version_id', 'plz', 'kcid', 'bcid'],
                                               right_on=['version_id', 'plz', 'kcid', 'bcid'])
         
+        query = """
+                SELECT grid_result_id, version_id, plz, kcid, bcid
+                FROM public.grid_result
+                WHERE version_id=%(v)s;"""
+        params = {"v": VERSION_ID}
+        df_grid_result = pd.read_sql_query(query, con=self.sqla_engine, params=params)
+
+        df_transformers_classified  = pd.merge(df_grid_result, df_transformers_classified, how='right',
+                                               left_on=['version_id', 'plz', 'kcid', 'bcid'],
+                                               right_on=['version_id', 'plz', 'kcid', 'bcid'])
+
+        df_transformers_classified.drop(columns=['version_id', 'plz', 'kcid', 'bcid'], inplace=True)
 
         # add classification id
         df_transformers_classified['classification_id'] = CLASSIFICATION_VERSION
@@ -198,18 +216,16 @@ class DatabaseCommunication:
         """apply maximum households per building threshold on clustering parameter table
         by indicating if the threshold is surpassed in the filtered column
         """
-        query = """WITH buildings(version_id, plz, bcid, kcid) AS (
-                        SELECT version_id, plz, bcid, kcid
-                        FROM public.buildings_result
-                        WHERE houses_per_building > %(h)s)
-                        
-            UPDATE public.clustering_parameters c
-            SET filtered = true
-            FROM buildings b
-            WHERE c.version_id = b.version_id AND 
-                c.plz = b.plz AND 
-                c.kcid = b.kcid AND
-                c.bcid = b.bcid;"""
+        query = """WITH buildings(grid_result_id) AS (
+                       SELECT DISTINCT grid_result_id
+                       FROM public.buildings_result
+                       WHERE houses_per_building > %(h)s
+                   )
+                   
+                   UPDATE public.clustering_parameters c
+                   SET filtered = true
+                   FROM buildings b
+                   WHERE c.grid_result_id = b.grid_result_id;"""
         self.cur.execute(query, {"h": THRESHOLD_HOUSEHOLDS_PER_BUILDING})
         print(self.cur.statusmessage)
         self.conn.commit()

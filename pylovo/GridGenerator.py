@@ -32,6 +32,8 @@ class GridGenerator:
 
     def generate_grid(self):
         self.check_if_results_exist()
+        self.pgr.create_temp_tables()
+
         self.cache_and_preprocess_static_objects()
         self.preprocess_ways()
         self.apply_kmeans_clustering()
@@ -39,6 +41,8 @@ class GridGenerator:
         self.install_cables()
         self.pgr.save_and_reset_tables(plz=self.plz)
 
+        self.pgr.drop_temp_tables()
+        self.pgr.commit_changes()
 
     def check_if_results_exist(self):
         postcode_count = self.pgr.count_postcode_result(self.plz)
@@ -159,8 +163,8 @@ class GridGenerator:
     def position_all_transformers(self):
         """
         Positions all transformers for each bcid cluster (brownfield with existing transformers and greenfield)
-        FROM: buildings_tem, building_clusters
-        INTO: buildings_tem, building_clusters
+        FROM: buildings_tem, grid_result
+        INTO: buildings_tem, grid_result
         """
         kcid_length = self.pgr.get_kcid_length()
 
@@ -198,7 +202,7 @@ class GridGenerator:
                     self.pgr.position_greenfield_transformers(self.plz, kcid, bcid)
                     self.logger.debug(f"Transformer positioning for kcid{kcid}, bcid{bcid} finished")
                     self.pgr.update_transformer_rated_power(self.plz, kcid, bcid, 1)
-                    self.logger.debug("Smax in building_clusters is updated.")
+                    self.logger.debug("transformer_rated_power in grid_result is updated.")
 
     def install_cables(self):
         """

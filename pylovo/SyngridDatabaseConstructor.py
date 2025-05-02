@@ -213,7 +213,7 @@ class SyngridDatabaseConstructor:
         """
         cur = self.pgr.conn.cursor()
 
-        # Path to your SQL file
+        # Path to your SQL file, which includes creation of the table
         sc_path = os.path.join(os.getcwd(), "raw_data", "ways", "ways_public_2po_4pgr.sql")
         file_size = os.path.getsize(sc_path)
 
@@ -286,6 +286,8 @@ class SyngridDatabaseConstructor:
 
         st = time.time()
 
+        cur = self.pgr.conn.cursor()
+
         # Transform to ways table
         query = """INSERT INTO ways
             SELECT  clazz,
@@ -296,8 +298,12 @@ class SyngridDatabaseConstructor:
                     ST_Transform(geom_way, 3035) as geom,
                     id AS way_id
             FROM public_2po_4pgr"""
-        cur = self.pgr.conn.cursor()
         cur.execute(query)
+
+        # Drop public_2po_4pgr table, as it is not needed anymore
+        query = "DROP TABLE public_2po_4pgr"
+        cur.execute(query)
+
         self.pgr.conn.commit()
 
         et = time.time()
