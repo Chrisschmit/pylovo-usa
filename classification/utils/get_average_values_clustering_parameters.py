@@ -12,11 +12,11 @@ from classification.config_loader import *
 from pylovo.config_data import *
 
 
-def get_all_clustering_parameters() -> pd.DataFrame:
+def get_clustering_parameters_for_kmeans_cluster_0() -> pd.DataFrame:
     """
-    Get all clustering parameters from the clustering_parameters table.
+    Get clustering parameters for rows where kmeans_clusters = 0 in transformer_classified.
 
-    :return: A DataFrame with all rows from clustering_parameters.
+    :return: A DataFrame with matched clustering parameters.
     """
     # Connect to the database
     conn = pg.connect(
@@ -26,9 +26,20 @@ def get_all_clustering_parameters() -> pd.DataFrame:
     try:
         # Run the query
         query = """
-                SELECT *
-                FROM public.clustering_parameters;
-                """
+            SELECT cp.*
+            FROM public.clustering_parameters cp
+            JOIN (
+                SELECT version_id, plz, kcid, bcid
+                FROM public.transformer_classified
+                WHERE kmeans_clusters = 0
+                GROUP BY version_id, plz, kcid, bcid
+            ) tc
+            ON cp.version_id = tc.version_id
+            AND cp.plz = tc.plz
+            AND cp.kcid = tc.kcid
+            AND cp.bcid = tc.bcid;
+        """
+
         df = pd.read_sql_query(query, con=conn)
 
     finally:
@@ -36,7 +47,6 @@ def get_all_clustering_parameters() -> pd.DataFrame:
         conn.close()
 
     return df
-
 
 def calculate_average_clustering_parameters(df: pd.DataFrame, parameters: list) -> dict:
     """
@@ -56,7 +66,7 @@ def calculate_average_clustering_parameters(df: pd.DataFrame, parameters: list) 
 
 def main():
     # Get all clustering parameters
-    df_clustering_parameters = get_all_clustering_parameters()
+    df_clustering_parameters = get_clustering_parameters_for_kmeans_cluster_0()
 
     # Calculate average values using LIST_OF_CLUSTERING_PARAMETERS
     averages = calculate_average_clustering_parameters(df_clustering_parameters, LIST_OF_CLUSTERING_PARAMETERS)
