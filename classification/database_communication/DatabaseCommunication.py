@@ -229,6 +229,32 @@ class DatabaseCommunication:
         self.cur.execute(query, {"h": THRESHOLD_HOUSEHOLDS_PER_BUILDING})
         print(self.cur.statusmessage)
         self.conn.commit()
+    
+    def apply_list_of_clustering_parameters_thresholds(self) -> None:
+        """
+        Apply thresholds on selected clustering parameters.
+        If a parameter less than its threshold, set filtered = true.
+        """
+
+        query = """
+            UPDATE public.clustering_parameters
+            SET filtered = true
+            WHERE avg_trafo_dis < %(avg_trafo_dis)s
+            OR no_house_connections < %(no_house_connections)s
+            OR vsw_per_branch < %(vsw_per_branch)s
+            OR no_households < %(no_households)s;
+        """
+
+        params = {
+            "avg_trafo_dis": THRESHOLD_AVG_TRAFO_DIS,
+            "no_house_connections": THRESHOLD_NO_HOUSE_CONNECTIONS,
+            "vsw_per_branch": THRESHOLD_VSW_PER_BRANCH,
+            "no_households": THRESHOLD_NO_HOUSEHOLDS
+        }
+
+        self.cur.execute(query, params)
+        print(self.cur.statusmessage)
+        self.conn.commit()
 
     def set_remaining_filter_values_false(self) -> None:
         """setting filtered value to false for grids that should not be filtered according to their parameters

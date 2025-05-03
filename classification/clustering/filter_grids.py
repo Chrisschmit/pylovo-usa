@@ -9,4 +9,5 @@ def apply_filter_to_grids():
     dc = DatabaseCommunication()
     dc.apply_max_trafo_dis_threshold()
     dc.apply_households_per_building_threshold()
+    dc.apply_list_of_clustering_parameters_thresholds()
     dc.set_remaining_filter_values_false()
