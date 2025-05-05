@@ -56,8 +56,7 @@ MUNICIPAL_REGISTER = ['plz', 'pop', 'area', 'lat', 'lon', 'ags', 'name_city', 'f
 
 # Database schema - table structure
 CREATE_QUERIES = {
-    "res": """CREATE TABLE IF NOT EXISTS public.res
-    (
+    "res": """CREATE TABLE IF NOT EXISTS public.res (
         osm_id varchar PRIMARY KEY,
         area numeric(23, 15),
         use varchar(80),
@@ -72,18 +71,19 @@ CREATE_QUERIES = {
         refurb_bas numeric(23, 15),
         refurb_win numeric(23, 15),
         geom geometry(MultiPolygon,3035)
-    )""",
-    "oth": """CREATE TABLE IF NOT EXISTS public.oth
-    (
+    )
+    """,
+    "oth": """CREATE TABLE IF NOT EXISTS public.oth (
         osm_id varchar PRIMARY KEY,
         area numeric(23, 15),
         use varchar(80),
         comment varchar(80),
         free_walls integer,
         geom geometry(MultiPolygon,3035)
-    )""",
-    "equipment_data": """CREATE TABLE IF NOT EXISTS public.equipment_data
-    (
+    )
+    """,
+    "equipment_data": """
+    CREATE TABLE IF NOT EXISTS public.equipment_data (
         name varchar(100) PRIMARY KEY,
         s_max_kva integer,
         max_i_a integer,
@@ -93,9 +93,9 @@ CREATE_QUERIES = {
         cost_eur integer,
         typ varchar(50),
         application_area integer
-    )""",
-    "version": """CREATE TABLE IF NOT EXISTS public.version
-    (
+    )
+    """,
+    "version": """CREATE TABLE IF NOT EXISTS public.version (
         version_id varchar(10) PRIMARY KEY,
         version_comment varchar, 
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -103,17 +103,19 @@ CREATE_QUERIES = {
         cable_cost_dict varchar,
         connection_available_cables varchar,   
         other_parameters varchar
-    )""",
-    "classification_version": """CREATE TABLE IF NOT EXISTS public.classification_version
-    (
+    )
+    """,
+    "classification_version": """
+    CREATE TABLE IF NOT EXISTS public.classification_version (
         classification_id integer NOT NULL,
         version_comment varchar, 
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         classification_region varchar,
         CONSTRAINT classification_pkey PRIMARY KEY (classification_id)
-    )""",
-    "postcode": """CREATE TABLE IF NOT EXISTS public.postcode
-    (
+    )
+    """,
+    "postcode": """
+    CREATE TABLE IF NOT EXISTS public.postcode (
         postcode_id integer NOT NULL,
         plz int UNIQUE NOT NULL,
         note varchar,
@@ -121,9 +123,10 @@ CREATE_QUERIES = {
         population integer,
         geom geometry(MultiPolygon,3035),
         CONSTRAINT "plz-5stellig_pkey" PRIMARY KEY (postcode_id)
-    )""",
-    "postcode_result": """CREATE TABLE IF NOT EXISTS public.postcode_result
-    (   
+    )
+    """,
+    "postcode_result": """
+    CREATE TABLE IF NOT EXISTS public.postcode_result (   
         version_id varchar(10) NOT NULL,
         postcode_result_plz integer NOT NULL,
         settlement_type integer,
@@ -138,10 +141,11 @@ CREATE_QUERIES = {
             FOREIGN KEY (postcode_result_plz)
             REFERENCES public.postcode (plz)
             ON DELETE CASCADE
-    )""",
+    )
+    """,
     # old name: building_clusters, got merged with grids
-    "grid_result": """CREATE TABLE IF NOT EXISTS public.grid_result
-    (
+    "grid_result": """
+    CREATE TABLE IF NOT EXISTS public.grid_result (
         grid_result_id SERIAL PRIMARY KEY,
         version_id varchar(10) NOT NULL,
         kcid integer NOT NULL,
@@ -161,8 +165,8 @@ CREATE_QUERIES = {
     CREATE INDEX idx_grid_result_version_id_plz_bcid_kcid
     ON public.grid_result (version_id, plz, bcid, kcid)
     """,
-    "lines_result": """CREATE TABLE IF NOT EXISTS public.lines_result
-    (
+    "lines_result": """
+    CREATE TABLE IF NOT EXISTS public.lines_result (
         grid_result_id bigint NOT NULL,
         geom geometry(LineString,3035),
         line_name varchar(15),
@@ -174,9 +178,10 @@ CREATE_QUERIES = {
             FOREIGN KEY (grid_result_id)
             REFERENCES public.grid_result (grid_result_id)
             ON DELETE CASCADE
-    )""",
-    "consumer_categories": """CREATE TABLE IF NOT EXISTS public.consumer_categories
-    (
+    )
+    """,
+    "consumer_categories": """
+    CREATE TABLE IF NOT EXISTS public.consumer_categories (
         consumer_category_id integer PRIMARY KEY,
         definition varchar(30) UNIQUE NOT NULL,
         peak_load numeric(10,2),
@@ -184,9 +189,10 @@ CREATE_QUERIES = {
         peak_load_per_m2 numeric(10,2),
         yearly_consumption_per_m2 numeric(10,2),
         sim_factor numeric(10,2) NOT NULL
-    )""",
-    "buildings_result": """CREATE TABLE IF NOT EXISTS public.buildings_result
-    (
+    )
+    """,
+    "buildings_result": """
+    CREATE TABLE IF NOT EXISTS public.buildings_result (
         version_id varchar(10) NOT NULL,
         osm_id varchar NOT NULL,
         grid_result_id bigint NOT NULL,
@@ -211,9 +217,8 @@ CREATE_QUERIES = {
     );
     CREATE INDEX idx_buildings_result_grid_result_id
     ON public.buildings_result (grid_result_id);
-""",
-    "municipal_register": """CREATE TABLE IF NOT EXISTS public.municipal_register     
-    (
+    """,
+    "municipal_register": """CREATE TABLE IF NOT EXISTS public.municipal_register (
         plz integer,
         pop bigint,
         area double precision,
@@ -226,9 +231,9 @@ CREATE_QUERIES = {
         regio5 integer,
         pop_den double precision,
         CONSTRAINT municipal_register_pkey PRIMARY KEY (plz, ags)
-    )""",
-    "sample_set": """CREATE TABLE IF NOT EXISTS public.sample_set
-    (
+    )
+    """,
+    "sample_set": """CREATE TABLE IF NOT EXISTS public.sample_set (
         classification_id integer NOT NULL,
         plz integer NOT NULL,
         ags bigint,
@@ -246,9 +251,9 @@ CREATE_QUERIES = {
             FOREIGN KEY (plz, ags)
             REFERENCES public.municipal_register (plz, ags)
             ON DELETE CASCADE
-    )""",
-    "clustering_parameters": """CREATE TABLE IF NOT EXISTS public.clustering_parameters
-    (
+    )
+    """,
+    "clustering_parameters": """CREATE TABLE IF NOT EXISTS public.clustering_parameters (
         grid_result_id bigint PRIMARY KEY,
         
         no_connection_buses integer,
@@ -285,18 +290,19 @@ CREATE_QUERIES = {
             FOREIGN KEY (grid_result_id)
             REFERENCES public.grid_result (grid_result_id)
             ON DELETE CASCADE
-    )""",
-    "transformers": """CREATE TABLE IF NOT EXISTS public.transformers
-    (
+    )
+    """,
+    "transformers": """CREATE TABLE IF NOT EXISTS public.transformers (
         osm_id varchar PRIMARY KEY,
         area double precision,
         power varchar,
         geom_type varchar,
         within_shopping boolean,
         geom geometry(MultiPoint, 3035)
-    )""",
-    "transformer_positions": """CREATE TABLE IF NOT EXISTS public.transformer_positions 
-    (
+    )
+    """,
+    "transformer_positions": """
+    CREATE TABLE IF NOT EXISTS public.transformer_positions (
         grid_result_id bigint PRIMARY KEY,
         geom geometry(Point,3035),
         osm_id varchar UNIQUE,
@@ -308,9 +314,10 @@ CREATE_QUERIES = {
         CONSTRAINT fk_tp_osm_id
             FOREIGN KEY (osm_id)
             REFERENCES public.transformers (osm_id)
-    )""",
-    "transformer_classified": """CREATE TABLE IF NOT EXISTS public.transformer_classified 
-    (
+    )
+    """,
+    "transformer_classified": """
+    CREATE TABLE IF NOT EXISTS public.transformer_classified (
         grid_result_id bigint NOT NULL,
         geom geometry(Point,3035),
         kmedoid_clusters integer,
@@ -329,13 +336,15 @@ CREATE_QUERIES = {
             FOREIGN KEY (grid_result_id)
             REFERENCES public.grid_result (grid_result_id)
             ON DELETE CASCADE
-    )""",
-    "ags_log": """CREATE TABLE IF NOT EXISTS public.ags_log
-    (
+    )
+    """,
+    "ags_log": """
+    CREATE TABLE IF NOT EXISTS public.ags_log (
         ags bigint PRIMARY KEY
-    )""",
-        "ways": """CREATE TABLE IF NOT EXISTS public.ways
-    (
+    )
+    """,
+    "ways": """
+    CREATE TABLE IF NOT EXISTS public.ways (
         clazz integer,
         source integer,
         target integer,
@@ -343,9 +352,10 @@ CREATE_QUERIES = {
         reverse_cost double precision,
         geom geometry(LineString,3035),
         way_id integer PRIMARY KEY
-    )""",
-    "ways_result": """CREATE TABLE IF NOT EXISTS public.ways_result
-    (
+    )
+    """,
+    "ways_result": """
+    CREATE TABLE IF NOT EXISTS public.ways_result (
         version_id varchar(10) NOT NULL,
         clazz integer,
         source integer,
@@ -360,11 +370,12 @@ CREATE_QUERIES = {
             FOREIGN KEY (version_id, plz)
             REFERENCES public.postcode_result (version_id, postcode_result_plz)
             ON DELETE CASCADE
-    )""",
+    )
+    """,
     # old name: grid_parameters
     # saves grid parameters for a whole plz for visualization
-    "plz_parameters": """CREATE TABLE IF NOT EXISTS public.plz_parameters
-    (
+    "plz_parameters": """
+    CREATE TABLE IF NOT EXISTS public.plz_parameters (
         version_id varchar(10) NOT NULL,
         plz integer NOT NULL,
         trafo_num json,
@@ -379,20 +390,42 @@ CREATE_QUERIES = {
             FOREIGN KEY (version_id, plz)
             REFERENCES public.postcode_result (version_id, postcode_result_plz)
             ON DELETE CASCADE
-    )""",
-    "transformer_positions_with_grid": """CREATE OR REPLACE VIEW public.transformer_positions_with_grid AS (
+    )
+    """,
+    "transformer_positions_with_grid": """
+    CREATE OR REPLACE VIEW public.transformer_positions_with_grid AS (
         SELECT tp.*, gr.version_id, gr.kcid, gr.bcid, gr.plz
         FROM public.transformer_positions tp
         JOIN public.grid_result gr ON tp.grid_result_id = gr.grid_result_id
-    )""",
-    "buildings_result_with_grid": """CREATE OR REPLACE VIEW public.buildings_result_with_grid AS (
+    )
+    """,
+    "transformer_classified_with_grid": """
+    CREATE OR REPLACE VIEW public.transformer_classified_with_grid AS (
+        SELECT tc.*, gr.version_id, gr.kcid, gr.bcid, gr.plz
+        FROM public.transformer_classified tc
+        JOIN public.grid_result gr ON tc.grid_result_id = gr.grid_result_id
+    )
+    """,
+    "buildings_result_with_grid": """
+    CREATE OR REPLACE VIEW public.buildings_result_with_grid AS (
         SELECT
             (br.version_id || '_' || br.osm_id) AS id,
             br.*,
             gr.kcid, gr.bcid, gr.plz
         FROM public.buildings_result br
         JOIN public.grid_result gr ON br.grid_result_id = gr.grid_result_id
-    )""",
+    )
+    """,
+    "lines_result_with_grid": """
+    CREATE OR REPLACE VIEW public.lines_result_with_grid AS (
+        SELECT
+            ROW_NUMBER() OVER () AS id,
+            lr.*,
+            gr.version_id, gr.kcid, gr.bcid, gr.plz
+        FROM public.lines_result lr
+        JOIN public.grid_result gr ON lr.grid_result_id = gr.grid_result_id
+    )
+    """
 }
 
 TEMP_CREATE_QUERIES = {
