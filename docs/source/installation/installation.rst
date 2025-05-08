@@ -8,7 +8,7 @@ Setup Repository and Environment
 
 ::
 
-    python3.12 -m venv pylovo-env-3-12
+    python3.12 -m venv pylovo-env
 
 Alternatively, you can use `pyenv <https://github.com/pyenv/pyenv>`_ or `virtualenv <https://virtualenv.pypa.io/en/latest/index.html#>`_ to use Python 3.12.
 
