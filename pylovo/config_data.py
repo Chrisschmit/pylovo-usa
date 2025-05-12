@@ -167,6 +167,7 @@ CREATE_QUERIES = {
     """,
     "lines_result": """
     CREATE TABLE IF NOT EXISTS public.lines_result (
+        lines_result_id SERIAL PRIMARY KEY,
         grid_result_id bigint NOT NULL,
         geom geometry(LineString,3035),
         line_name varchar(15),
@@ -419,8 +420,14 @@ CREATE_QUERIES = {
     "lines_result_with_grid": """
     CREATE OR REPLACE VIEW public.lines_result_with_grid AS (
         SELECT
-            ROW_NUMBER() OVER () AS id,
-            lr.*,
+            lr.lines_result_id as id,
+            lr.grid_result_id,
+            lr.geom,
+            lr.line_name,
+            lr.std_type,
+            lr.from_bus,
+            lr.to_bus,
+            lr.length_km,
             gr.version_id, gr.kcid, gr.bcid, gr.plz
         FROM public.lines_result lr
         JOIN public.grid_result gr ON lr.grid_result_id = gr.grid_result_id
