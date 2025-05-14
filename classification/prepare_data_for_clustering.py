@@ -15,7 +15,7 @@ from pylovo.GridGenerator import GridGenerator
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 
-def prepare_data_for_clustering() -> None:
+def prepare_data_for_clustering(additional_filtering: bool = False) -> None:
     # %% 1. create a sample set of PLZ for your classification
     # This takes a few seconds
 
@@ -52,7 +52,7 @@ def prepare_data_for_clustering() -> None:
     print("--- %s seconds parameter calculation---" % (time.time() - start_time))
 
     # %% 5. filter values
-    apply_filter_to_grids()
+    apply_filter_to_grids(additional_filtering=additional_filtering)
 
 
 def main():
