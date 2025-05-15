@@ -249,36 +249,36 @@ ON public.buildings_result (grid_result_id);
 )""",
     "clustering_parameters": """CREATE TABLE IF NOT EXISTS public.clustering_parameters
 (
-    grid_result_id bigint PRIMARY KEY,
+    grid_result_id integer PRIMARY KEY,
     
     no_connection_buses integer,
     no_branches integer,
     
     no_house_connections integer,
-    no_house_connections_per_branch numeric,
+    no_house_connections_per_branch double precision,
     no_households integer,
-    no_household_equ numeric,
-    no_households_per_branch numeric,
-    max_no_of_households_of_a_branch numeric,
-    house_distance_km numeric,
+    no_household_equ double precision,
+    no_households_per_branch double precision,
+    max_no_of_households_of_a_branch double precision,
+    house_distance_km double precision,
     
-    transformer_mva numeric,
-    osm_trafo bool,
+    transformer_mva double precision,
+    osm_trafo boolean,
     
-    max_trafo_dis numeric,
-    avg_trafo_dis numeric,
+    max_trafo_dis double precision,
+    avg_trafo_dis double precision,
     
-    cable_length_km numeric,
-    cable_len_per_house numeric,
+    cable_length_km double precision,
+    cable_len_per_house double precision,
     
-    max_power_mw numeric,
-    simultaneous_peak_load_mw numeric,
+    max_power_mw double precision,
+    simultaneous_peak_load_mw double precision,
     
-    resistance numeric,
-    reactance numeric,
-    ratio numeric,
-    vsw_per_branch numeric,
-    max_vsw_of_a_branch numeric,
+    resistance double precision,
+    reactance double precision,
+    ratio double precision,
+    vsw_per_branch double precision,
+    max_vsw_of_a_branch double precision,
     
     filtered boolean,
     CONSTRAINT fk_clustering_parameters_grid_result
