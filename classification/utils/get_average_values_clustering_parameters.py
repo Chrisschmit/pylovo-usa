@@ -16,6 +16,12 @@ def get_clustering_parameters_for_kmeans_cluster_0() -> pd.DataFrame:
     """
     Get clustering parameters for rows where kmeans_clusters = 0 in transformer_classified.
 
+    Cluster 0 are the filling grids that mainly arise due to methodological limitations as described in our first paper - see the paragraph below:
+
+    Improvements in methodology — As elaborated in [5.2], allocation of buildings to a transformer within predefined system boundaries (postcodes)
+    can lead to isolated building clusters depending on the greenfield or brownfield placement assumptions. As a consequence, some unrealistically
+    small grids might be generated in the next step and this will be addressed in later iterations of the clustering methodology in the pylovo tool.
+    
     :return: A DataFrame with matched clustering parameters.
     """
     # Connect to the database
