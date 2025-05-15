@@ -32,17 +32,12 @@ class GridGenerator:
 
     def generate_grid(self):
         self.check_if_results_exist()
-        self.pgr.create_temp_tables()
-
         self.cache_and_preprocess_static_objects()
         self.preprocess_ways()
         self.apply_kmeans_clustering()
         self.position_all_transformers()
         self.install_cables()
         self.pgr.save_and_reset_tables(plz=self.plz)
-
-        self.pgr.drop_temp_tables()
-        self.pgr.commit_changes()
 
     def check_if_results_exist(self):
         postcode_count = self.pgr.count_postcode_result(self.plz)
@@ -394,6 +389,8 @@ class GridGenerator:
         :param analyze_grids: option to analyse the results after grid generation, defaults to False
         :type analyze_grids: bool
         """
+        self.pgr.create_temp_tables() # create temp tables for the grid generation
+        
         for index, row in df_plz.iterrows():
             self.plz = str(row['plz'])
             print('-------------------- start', self.plz, '---------------------------')
@@ -410,3 +407,6 @@ class GridGenerator:
                 self.pgr.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION),self.plz)  # delete from sample set
                 continue
             print('-------------------- end', self.plz, '-----------------------------')
+        
+        self.pgr.drop_temp_tables() # drop temp tables
+        self.pgr.commit_changes() # commit the changes to the database

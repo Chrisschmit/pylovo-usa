@@ -2003,6 +2003,16 @@ class PgReaderWriter:
 
         self.cur.execute(query, vars={"p": plz})
 
+        # Clear temporary tables
+        query = """TRUNCATE TABLE buildings_tem"""
+        self.cur.execute(query)
+        query = """TRUNCATE TABLE ways_tem"""
+        self.cur.execute(query)
+        query = """TRUNCATE TABLE ways_tem_vertices_pgr"""
+        self.cur.execute(query)
+
+        self.conn.commit()
+
     def remove_duplicate_buildings(self):
         """
         * Remove buildings without geometry or osm_id
