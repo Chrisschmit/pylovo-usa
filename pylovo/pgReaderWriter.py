@@ -27,7 +27,7 @@ class PgReaderWriter:
     Use this class to interact with the database and to utilize connection resources.
     """
 
-    # Konstruktor
+    # Constructor
     def __init__(
             self, dbname=DBNAME, user=USER, pw=PASSWORD, host=HOST, port=PORT, **kwargs
         ):
@@ -87,16 +87,15 @@ class PgReaderWriter:
             Settlement type: 1=City, 2=Village, 3=Rural
         Returns: Typical transformer capacities and costs depending on the settlement type
         """
-        # if settlement_type == 1:
-        #     application_area_tuple = (1, 2, 3)
-        # elif settlement_type == 2:
-        #     application_area_tuple = (2, 3, 4)
-        # elif settlement_type == 3:
-        #     application_area_tuple = (3, 4, 5)
-        # else:
-        #     print("Incorrect settlement type number specified.")
-        #     return
-        application_area_tuple = (1, 2, 3, 4, 5) # TODO:check selection
+        if settlement_type == 1:
+            application_area_tuple = (1, 2, 3)
+        elif settlement_type == 2:
+            application_area_tuple = (2, 3, 4)
+        elif settlement_type == 3:
+            application_area_tuple = (3, 4, 5)
+        else:
+            self.logger.debug("Incorrect settlement type number specified.")
+            return
 
         query = """SELECT equipment_data.s_max_kva , cost_eur
             FROM public.equipment_data
@@ -178,101 +177,54 @@ class PgReaderWriter:
             connection_nodes,
         )
 
-    def get_consumer_simultaneous_load_dict(
-            self, consumer_list: list, buildings_df: pd.DataFrame
-        ) -> tuple[dict, dict, dict]:
-        Pd = {
-            consumer: 0 for consumer in consumer_list
-        }  # dict of all vertices in bc, 0 as default
+    def get_consumer_simultaneous_load_dict(self, consumer_list: list, buildings_df: pd.DataFrame) -> tuple[dict, dict, dict]:
+        Pd = {consumer: 0 for consumer in consumer_list}  # dict of all vertices in bc, 0 as default
         load_units = {consumer: 0 for consumer in consumer_list}
         load_type = {consumer: "SFH" for consumer in consumer_list}
 
         for row in buildings_df.itertuples():
             load_units[row.vertice_id] = row.houses_per_building
             load_type[row.vertice_id] = row.type
-            gzf = CONSUMER_CATEGORIES.loc[
-                CONSUMER_CATEGORIES.definition == row.type, "sim_factor"
-            ].item()
+            gzf = CONSUMER_CATEGORIES.loc[CONSUMER_CATEGORIES.definition == row.type, "sim_factor"].item()
 
-            Pd[row.vertice_id] = utils.oneSimultaneousLoad(
-                row.peak_load_in_kw * 1e-3, row.houses_per_building, gzf
-            )  # simultaneous load of each building in mW
+            # Determine simultaneous load of each building in MW
+            Pd[row.vertice_id] = utils.oneSimultaneousLoad(row.peak_load_in_kw * 1e-3, row.houses_per_building, gzf)
 
         return Pd, load_units, load_type
 
     def create_cable_std_type(self, net: pp.pandapowerNet) -> None:
-        pp.create_std_type(
-            net,
-            {
-                "r_ohm_per_km": 1.15,
-                "x_ohm_per_km": 0.09,
-                "max_i_ka": 0.103,
-                "c_nf_per_km": 0,
-                "q_mm2": 16,
-            },
-            name="NYY 4x16 SE",
-            element="line",
-        )
-        pp.create_std_type(
-            net,
-            {
-                "r_ohm_per_km": 0.524,
-                "x_ohm_per_km": 0.085,
-                "max_i_ka": 0.159,
-                "c_nf_per_km": 0,
-                "q_mm2": 35,
-            },
-            name="NYY 4x35 SE",
-            element="line",
-        )
-        pp.create_std_type(
-            net,
-            {
-                "r_ohm_per_km": 0.164,
-                "x_ohm_per_km": 0.08,
-                "max_i_ka": 0.313,
-                "c_nf_per_km": 0,
-                "q_mm2": 185,
-            },
-            name="NAYY 4x185 SE",
-            element="line",
-        )
-        pp.create_std_type(
-            net,
-            {
-                "r_ohm_per_km": 0.32,
-                "x_ohm_per_km": 0.082,
-                "max_i_ka": 0.215,
-                "c_nf_per_km": 0,
-                "q_mm2": 95,
-            },
-            name="NAYY 4x95 SE",
-            element="line",
-        )
-        pp.create_std_type(
-            net,
-            {
-                "r_ohm_per_km": 0.268,
-                "x_ohm_per_km": 0.082,
-                "max_i_ka": 0.232,
-                "c_nf_per_km": 0,
-                "q_mm2": 70,
-            },
-            name="NYY 4x70 SE",
-            element="line",
-        )
-        pp.create_std_type(
-            net,
-            {
-                "r_ohm_per_km": 0.193,
-                "x_ohm_per_km": 0.082,
-                "max_i_ka": 0.280,
-                "c_nf_per_km": 0,
-                "q_mm2": 95,
-            },
-            name="NYY 4x95 SE",
-            element="line",
-        )
+        """Create standard pandapower cable types from equipment_data table."""
+        query = """
+            SELECT name, r_mohm_per_km/1000.0 as r_ohm_per_km, x_mohm_per_km/1000.0 as x_ohm_per_km, 
+                   max_i_a/1000.0 as max_i_ka
+            FROM public.equipment_data
+            WHERE typ = 'Cable'
+        """
+
+        # Execute query and fetch cable data
+        self.cur.execute(query)
+        cables = self.cur.fetchall()
+
+        # Create standard type for each cable in the database
+        for cable in cables:
+            name, r_ohm_per_km, x_ohm_per_km, max_i_ka = cable
+            pp_name = name.replace('_', ' ') # Extract name
+            q_mm2 = int(name.split("_")[-1])  # Extract cross-section from name
+
+            pp.create_std_type(
+                net,
+                {
+                    "r_ohm_per_km": float(r_ohm_per_km),
+                    "x_ohm_per_km": float(x_ohm_per_km),
+                    "max_i_ka": float(max_i_ka),
+                    "c_nf_per_km": float(0),  # Set to zero for our standard grids
+                    "q_mm2": q_mm2
+                },
+                name=pp_name,
+                element="line",
+            )
+
+        self.logger.debug(f"Created {len(cables)} standard cable types from equipment_data table")
         return None
 
     def create_lvmv_bus(self, plz: int, kcid: int, bcid: int, net: pp.pandapowerNet) -> None:
@@ -1234,7 +1186,7 @@ class PgReaderWriter:
             # Skip empty transformers
             if not pre_result_dict[transformer_id]:
                 self.logger.debug(f"Transformer {transformer_id} has no assigned consumer, deleted")
-                self.delete_transformers([transformer_id])
+                self.delete_transformers_from_buildings_tem([transformer_id])
                 continue
 
             # Create building cluster with sequential negative ID
@@ -1268,7 +1220,6 @@ class PgReaderWriter:
         The optimal location minimizes the sum of distance*load from each vertex to others.
 
         Args:
-            pgr: PostgreSQL reader/writer instance
             plz: Postcode
             kcid: Kmeans cluster ID
             bcid: Building cluster ID
@@ -1603,40 +1554,6 @@ class PgReaderWriter:
             UPDATE buildings_tem SET floors = 1 WHERE floors ISNULL;"""
         self.cur.execute(query, {"v": VERSION_ID, "plz": plz})
 
-
-    def set_residential_buildings_table_from_osmid(self, plz: int, buildings: list) -> None:
-        """
-        * Fills buildings_tem with residential buildings which are inside the selected polygon
-        * Sets the postcode cluster to first plz that intersects
-        :param shape:
-        :return:
-        """
-
-        # Fill table
-        query = """INSERT INTO buildings_tem (osm_id, area, type, geom, center, floors)
-                SELECT osm_id, area, building_t, geom, ST_Centroid(geom), floors::int FROM res
-                WHERE res.osm_id = ANY(%(buildings)s);
-                UPDATE buildings_tem SET plz = %(p)s WHERE plz ISNULL;"""
-        self.cur.execute(query, {"v": VERSION_ID, "p": plz, "buildings": buildings})
-
-    def set_other_buildings_table_from_osmid(self, plz: int, buildings: list) -> None:
-        """
-        * Fills buildings_tem with other buildings which are inside the selected polygon
-        * Sets the postcode cluster to first plz that intersects shapefile
-        * Sets all floors to 1
-        :param shape:
-        :return:
-        """
-
-        # Fill table
-        query = """INSERT INTO buildings_tem(osm_id, area, type, geom, center)
-                SELECT osm_id, area, use, geom, ST_Centroid(geom) FROM oth AS o 
-                WHERE o.use in ('Commercial', 'Public')
-                AND o.osm_id = ANY(%(buildings)s);
-            UPDATE buildings_tem SET plz = %(p)s WHERE plz ISNULL;
-            UPDATE buildings_tem SET floors = 1 WHERE floors ISNULL;"""
-        self.cur.execute(query, {"v": VERSION_ID, "p": plz, "buildings": buildings})
-
     def get_connected_component(self) -> tuple[np.ndarray, np.ndarray]:
         """
         Reads from ways_tem
@@ -1781,14 +1698,12 @@ class PgReaderWriter:
                     if cluster_dict:
                         current_valid_amount = len(valid_cluster_dict)
                         valid_cluster_dict.update({x + current_valid_amount: y for x, y in cluster_dict.items()})
-                        valid_cluster_dict = dict(enumerate(valid_cluster_dict.values()))
+                        valid_cluster_dict = dict(enumerate(valid_cluster_dict.values())) # reindexing the dict with enumerate
 
                     # Process invalid clusters
                     if invalid_cluster_dict:
                         current_invalid_amount = len(invalid_trans_cluster_dict)
-                        invalid_trans_cluster_dict.update(
-                            {x + current_invalid_amount: y for x, y in invalid_cluster_dict.items()}
-                        )
+                        invalid_trans_cluster_dict.update({x + current_invalid_amount: y for x, y in invalid_cluster_dict.items()})
                         invalid_trans_cluster_dict = dict(enumerate(invalid_trans_cluster_dict.values()))
 
                     # Check if clustering is complete
@@ -2038,7 +1953,7 @@ class PgReaderWriter:
                 DELETE FROM ways_tem_vertices_pgr WHERE id IN %(v)s;"""
         self.cur.execute(query, {"v": tuple(map(int, vertices))})
 
-    def delete_transformers(self, vertices: list) -> None:
+    def delete_transformers_from_buildings_tem(self, vertices: list) -> None:
         """
         Deletes selected transformers from buildings_tem
         :param vertices:

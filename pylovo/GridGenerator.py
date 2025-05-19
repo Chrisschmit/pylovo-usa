@@ -148,7 +148,7 @@ class GridGenerator:
         if conn_building_count <= 1 or conn_building_count is None:
             # Remove isolated or empty components
             self.pgr.delete_ways(vertices)
-            self.pgr.delete_transformers(vertices)
+            self.pgr.delete_transformers_from_buildings_tem(vertices)
             self.logger.debug("Empty/isolated component removed. Ways and transformers deleted from temporary tables.")
         elif conn_building_count >= LARGE_COMPONENT_LOWER_BOUND:
             # K-means applied to large component to define subgroups with cluster ids
