@@ -1968,7 +1968,7 @@ class PgReaderWriter:
                     AND kcid = %(k)s AND bcid ISNULL;"""
         self.cur.execute(query, {"p": plz, "k": kcid})
 
-    def save_and_reset_tables(self, plz: int):
+    def save_tables(self, plz: int):
 
         # finding duplicates that violate the buildings_result_pkey constraint
         # the key of building result is (version_id, osm_id, plz)
@@ -2003,14 +2003,13 @@ class PgReaderWriter:
 
         self.cur.execute(query, vars={"p": plz})
 
-        # Clear temporary tables
-        query = """TRUNCATE TABLE buildings_tem"""
-        self.cur.execute(query)
-        query = """TRUNCATE TABLE ways_tem"""
-        self.cur.execute(query)
-        query = """TRUNCATE TABLE ways_tem_vertices_pgr"""
-        self.cur.execute(query)
-
+    def reset_tables(self):
+        """
+        Clears the temporary tables.
+        """
+        self.cur.execute("TRUNCATE TABLE buildings_tem")
+        self.cur.execute("TRUNCATE TABLE ways_tem")
+        self.cur.execute("TRUNCATE TABLE ways_tem_vertices_pgr")
         self.conn.commit()
 
     def remove_duplicate_buildings(self):

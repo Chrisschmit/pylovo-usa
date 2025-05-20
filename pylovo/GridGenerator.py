@@ -37,7 +37,7 @@ class GridGenerator:
         self.apply_kmeans_clustering()
         self.position_all_transformers()
         self.install_cables()
-        self.pgr.save_and_reset_tables(plz=self.plz)
+        
 
     def check_if_results_exist(self):
         postcode_count = self.pgr.count_postcode_result(self.plz)
@@ -396,6 +396,8 @@ class GridGenerator:
             print('-------------------- start', self.plz, '---------------------------')
             try:
                 self.generate_grid()
+                self.pgr.save_tables(plz=self.plz) # Save data from temporary tables to result tables
+                self.pgr.reset_tables() # Reset temporary tables
                 if analyze_grids:
                     self.analyse_results()
             except ResultExistsError:
@@ -407,6 +409,7 @@ class GridGenerator:
                 self.pgr.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION),self.plz)  # delete from sample set
                 continue
             print('-------------------- end', self.plz, '-----------------------------')
+        
         
         self.pgr.drop_temp_tables() # drop temp tables
         self.pgr.commit_changes() # commit the changes to the database
@@ -427,6 +430,7 @@ class GridGenerator:
 
         try:
             self.generate_grid()
+            self.pgr.save_tables(plz=self.plz) # Save data from temporary tables to result tables
             if analyze_grids:
                 self.analyse_results()
         except ResultExistsError:
