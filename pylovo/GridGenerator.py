@@ -410,3 +410,35 @@ class GridGenerator:
         
         self.pgr.drop_temp_tables() # drop temp tables
         self.pgr.commit_changes() # commit the changes to the database
+    
+    def generate_grid_for_single_plz(self, plz: str, analyze_grids: bool = False) -> None:
+        """
+        Generates the grid for a single PLZ.
+
+        :param plz: Postal code for which the grid should be generated.
+        :type plz: str
+        :param analyze_grids: Option to analyze the results after grid generation, defaults to False.
+        :type analyze_grids: bool
+        """
+        self.plz = plz
+        print('-------------------- start', self.plz, '---------------------------')
+        
+        self.pgr.create_temp_tables()  # create temp tables for the grid generation
+
+        try:
+            self.generate_grid()
+            if analyze_grids:
+                self.analyse_results()
+        except ResultExistsError:
+            print('Grids for this PLZ have already been generated.')
+        except Exception as e:
+            self.logger.error(f"Error during grid generation for PLZ {self.plz}: {e}")
+            self.logger.info(f"Skipped PLZ {self.plz} due to generation error.")
+            self.pgr.conn.rollback()  # rollback the transaction
+            self.pgr.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION), self.plz)  # delete from sample set
+            return
+
+        self.pgr.drop_temp_tables()  # drop temp tables
+        self.pgr.commit_changes()    # commit the changes to the database
+
+        print('-------------------- end', self.plz, '-----------------------------')
