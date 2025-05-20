@@ -14,15 +14,30 @@ from pylovo.config_data import *
 
 def get_clustering_parameters_for_kmeans_cluster_0() -> pd.DataFrame:
     """
-    Get clustering parameters for rows where kmeans_clusters = 0 in transformer_classified.
+    Get clustering parameters for entries assigned to cluster 0 in transformer_classified.
 
-    Cluster 0 are the filling grids that mainly arise due to methodological limitations as described in our first paper - see the paragraph below:
+    Allocation of buildings to a transformer within predefined system boundaries (postcodes)
+    can lead to isolated building clusters, depending on the greenfield or brownfield placement
+    assumptions. As a consequence, some unrealistically small grids might be generated.
 
-    Improvements in methodology — As elaborated in [5.2], allocation of buildings to a transformer within predefined system boundaries (postcodes)
-    can lead to isolated building clusters depending on the greenfield or brownfield placement assumptions. As a consequence, some unrealistically
-    small grids might be generated in the next step and this will be addressed in later iterations of the clustering methodology in the pylovo tool.
-    
-    :return: A DataFrame with matched clustering parameters.
+    Cluster 0 consists of filling grids that mainly arise due to these methodological
+    limitations. To address this, additional filtering steps are applied in the clustering
+    methodology.
+
+    The current clustering algorithm is applied to grids within 100 postcodes. The selected
+    clustering parameters are:
+        - avg_trafo_dis 
+        - no_house_connections 
+        - vsw_per_branch
+        - no_households
+
+    The average values of these parameters for entries in Cluster 0 are:
+        - avg_trafo_dis: 0.115
+        - no_house_connections: 14.332
+        - vsw_per_branch: 0.258
+        - no_households: 35.316
+
+    :return: A DataFrame with clustering parameters for cluster 0 entries.
     """
     # Connect to the database
     conn = pg.connect(
