@@ -11,6 +11,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 - Add new changes here before merging into the next official version.
 
+## [0.3.0] - 2025-05-23
+### Changed
+- Refine codebase for better readability and maintainability
+- Restructure database: reduce redundancies, add primary & foreign keys, add views, edit datatypes, rename columns
+- Improve transformer queries and pipelines
+- Improve pipelines of the classification module and enable its automated and stable use
+
 ## [0.2.1] - 2025-02-18
 ### Fixed
 - Fix buggy issue templates for github
