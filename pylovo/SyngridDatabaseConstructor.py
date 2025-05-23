@@ -37,7 +37,7 @@ class SyngridDatabaseConstructor:
         with self.pgr.conn.cursor() as cur:
             cur.execute(
                 """SELECT table_name FROM information_schema.tables
-                   WHERE table_schema = 'public'"""
+                   WHERE table_schema = %s""", (TARGET_SCHEMA,)
             )
             table_name_list = [tup[0] for tup in cur.fetchall()]
 
@@ -199,7 +199,7 @@ class SyngridDatabaseConstructor:
                 con=self.pgr.sqla_engine,
                 if_exists="append",
                 index=False,
-                schema="public",
+                schema=TARGET_SCHEMA,
             )
 
             et = time.time()
