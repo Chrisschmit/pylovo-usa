@@ -32,17 +32,12 @@ class GridGenerator:
 
     def generate_grid(self):
         self.check_if_results_exist()
-        self.pgr.create_temp_tables()
-
         self.cache_and_preprocess_static_objects()
         self.preprocess_ways()
         self.apply_kmeans_clustering()
         self.position_all_transformers()
         self.install_cables()
-        self.pgr.save_and_reset_tables(plz=self.plz)
-
-        self.pgr.drop_temp_tables()
-        self.pgr.commit_changes()
+        
 
     def check_if_results_exist(self):
         postcode_count = self.pgr.count_postcode_result(self.plz)
@@ -394,11 +389,15 @@ class GridGenerator:
         :param analyze_grids: option to analyse the results after grid generation, defaults to False
         :type analyze_grids: bool
         """
+        self.pgr.create_temp_tables() # create temp tables for the grid generation
+        
         for index, row in df_plz.iterrows():
             self.plz = str(row['plz'])
             print('-------------------- start', self.plz, '---------------------------')
             try:
                 self.generate_grid()
+                self.pgr.save_tables(plz=self.plz) # Save data from temporary tables to result tables
+                self.pgr.reset_tables() # Reset temporary tables
                 if analyze_grids:
                     self.analyse_results()
             except ResultExistsError:
@@ -410,3 +409,40 @@ class GridGenerator:
                 self.pgr.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION),self.plz)  # delete from sample set
                 continue
             print('-------------------- end', self.plz, '-----------------------------')
+        
+        
+        self.pgr.drop_temp_tables() # drop temp tables
+        self.pgr.commit_changes() # commit the changes to the database
+    
+    def generate_grid_for_single_plz(self, plz: str, analyze_grids: bool = False) -> None:
+        """
+        Generates the grid for a single PLZ.
+
+        :param plz: Postal code for which the grid should be generated.
+        :type plz: str
+        :param analyze_grids: Option to analyze the results after grid generation, defaults to False.
+        :type analyze_grids: bool
+        """
+        self.plz = plz
+        print('-------------------- start', self.plz, '---------------------------')
+        
+        self.pgr.create_temp_tables()  # create temp tables for the grid generation
+
+        try:
+            self.generate_grid()
+            self.pgr.save_tables(plz=self.plz) # Save data from temporary tables to result tables
+            if analyze_grids:
+                self.analyse_results()
+        except ResultExistsError:
+            print('Grids for this PLZ have already been generated.')
+        except Exception as e:
+            self.logger.error(f"Error during grid generation for PLZ {self.plz}: {e}")
+            self.logger.info(f"Skipped PLZ {self.plz} due to generation error.")
+            self.pgr.conn.rollback()  # rollback the transaction
+            self.pgr.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION), self.plz)  # delete from sample set
+            return
+
+        self.pgr.drop_temp_tables()  # drop temp tables
+        self.pgr.commit_changes()    # commit the changes to the database
+
+        print('-------------------- end', self.plz, '-----------------------------')
