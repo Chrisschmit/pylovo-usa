@@ -14,7 +14,6 @@ from pylovo.GridGenerator import GridGenerator
 
 # enter a plz to generate grid for:
 plz = "80803"
-analyze_grids = False
 plot_results = False
 
 # timing of the script
@@ -27,10 +26,8 @@ gg = GridGenerator(plz=plz)
 import_buildings_for_single_plz(gg)
 
 # generate a grid for the specified region
-gg.generate_grid()
+gg.generate_grid_for_single_plz(plz=plz, analyze_grids=False)
 
-if analyze_grids:
-    gg.analyse_results()
 if plot_results:
     ### plot data from the generated grids
     pg = gg.pgr

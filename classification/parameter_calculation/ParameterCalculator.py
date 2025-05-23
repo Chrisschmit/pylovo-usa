@@ -26,4 +26,4 @@ class ParameterCalculator:
         for kcid, bcid in cluster_list:
             gp = GridParameters(self.plz, bcid, kcid, self.pg)
             print(bcid, kcid)
-            gp.calc_grid_parameters()
+            gp.calc_plz_parameters()

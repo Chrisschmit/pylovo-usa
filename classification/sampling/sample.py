@@ -4,7 +4,7 @@ import pandas as pd
 import psycopg2
 from sqlalchemy import create_engine
 
-from classification.config_classification import *
+from classification.config_loader import *
 from pylovo.GridGenerator import GridGenerator
 from pylovo.config_data import *
 
@@ -33,7 +33,7 @@ def check_if_classification_version_exists():
     cur = conn.cursor()
     count_query = f"""SELECT COUNT(*) 
             FROM classification_version 
-            WHERE "classification_id" = '{CLASSIFICATION_VERSION}'"""
+            WHERE "classification_id" = {CLASSIFICATION_VERSION}"""
     cur.execute(count_query)
     version_exists = cur.fetchone()[0]
     if version_exists:
@@ -44,7 +44,7 @@ def check_if_classification_version_exists():
     else:
         # create new version
         insert_query = f"""INSERT INTO classification_version (classification_id, version_comment, classification_region) VALUES
-        ('{CLASSIFICATION_VERSION}', '{VERSION_COMMENT}', '{CLASSIFICATION_REGION}')"""
+        ({CLASSIFICATION_VERSION}, '{VERSION_COMMENT}', '{CLASSIFICATION_REGION}')"""
         cur.execute(insert_query)
         print(cur.statusmessage)
         conn.commit()
@@ -121,6 +121,10 @@ def get_samples_with_regiostar(samples_per_class, regiostar_plz):
     for i in samples_per_class:
         reg_i_selected = get_samples_within_regiostar_class(i, samples_per_class[i], regiostar_plz)
         reg_selected = pd.concat([reg_selected, reg_i_selected])
+    # Drop columns before returning
+    reg_selected = reg_selected.drop(columns=[
+        'pop', 'area', 'lat', 'lon', 'name_city', 'fed_state', 'regio7', 'regio5', 'pop_den'
+    ], errors='ignore') 
     return reg_selected
 
 
@@ -131,7 +135,6 @@ def sample_set_to_db(regiostar_samples_result: pd.DataFrame):
     :type regiostar_samples_result: pd.DataFrame
 
     """
-    regiostar_samples_result = regiostar_samples_result.rename(columns={'name_city': 'name'})
     conn = psycopg2.connect(database=DBNAME, user=USER, password=PASSWORD, host=HOST, port=PORT)
     sqlalchemy_engine = create_engine(
         f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}")
@@ -191,9 +194,10 @@ def get_sample_set() -> pd.DataFrame:
     sqlalchemy_engine = create_engine(
         f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}")
     cur = conn.cursor()
-    query = f"""SELECT plz, pop, area, lat, lon, ags, name, fed_state, regio7, regio5, pop_den
-    FROM public.sample_set
-    WHERE classification_id = '{CLASSIFICATION_VERSION}';"""
+    query = f"""SELECT ss.plz, mr.pop, mr.area, mr.lat, mr.lon, ss.ags, mr.name_city, mr.fed_state, mr.regio7, mr.regio5, mr.pop_den
+    FROM public.sample_set ss
+    JOIN public.municipal_register mr ON ss.plz = mr.plz AND ss.ags = mr.ags
+    WHERE ss.classification_id = {CLASSIFICATION_VERSION};"""
     cur.execute(query)
     sample_set = cur.fetchall()
     df_sample_set = pd.DataFrame(sample_set, columns=MUNICIPAL_REGISTER)

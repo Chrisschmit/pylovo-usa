@@ -8,7 +8,7 @@ Setup Repository and Environment
 
 ::
 
-    python3.12 -m venv pylovo-env-3-12
+    python3.12 -m venv pylovo-env
 
 Alternatively, you can use `pyenv <https://github.com/pyenv/pyenv>`_ or `virtualenv <https://virtualenv.pypa.io/en/latest/index.html#>`_ to use Python 3.12.
 
@@ -134,22 +134,70 @@ If you want more control over your input data follow instructions below:
 
 (Optional) Preprocess transformers from OSM data
 ------------------------------------------------
-1. Copy the code from ``substations_bayern_query_overpass.txt`` into the OSM API `overpass turbo <https://overpass-turbo.eu/>`_. The file is in the ``raw_data`` package. Run the script in Overpass Turbo and export the results as a GeoJSON named ``substations_bayern.geojson``, then save it in the ``raw_data`` package.
+By default the database is populated with preloaded data of transformers in Bavaria.
 
-   The query searches for the keywords "transformer" and "substation" in the area "Bayern." Substations from "Deutsche Bahn" as well as "historic" and "abandoned" substations are excluded. This query yields around 22,000 results. More information about transformer locations can be found on `OpenInfrastructureMap <https://openinframap.org/#12.73/48.18894/11.58542/>`_.
+If you want to fetch up-to-date data upon running ``executable_scripts/main_constructor.py`` data from OSM, delete the
+``raw_data/transformer_data/processed_trafos/*_trafos_processed.geojson`` file before running the script.
 
-2. A second Overpass query is to be performed. Repeat the previous steps for ``shopping_mall_query_overpass.txt``.
+If you want to fetch up-to-date data upon running ``executable_scripts/main_constructor.py`` from a different area
+then change the ``RELATION_ID`` in ``raw_data/preprocessing_scripts/process_trafos.py`` to the relation ID
+of the desired area.
 
-   The query searches for all places tagged with keywords indicating that nearby transformers do not belong to the LV grid (for example, "shopping malls" are likely directly connected to the MV grid). Other filters include land use related to the oil industry (e.g., refineries), power plants (e.g., solar fields), military training areas, landuse "rail," landuse "education," and large surface parking.
+Note: Processing transformer data can take around 50 minutes for entire German states.
 
-   Make any changes to the Overpass queries that you see fit.
+How to find desired relation ID
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1. Go to `OpenStreetMap <https://www.openstreetmap.org/>`_.
 
-3. Open the ``process_trafos.py`` script. At the top, there are constants you can change: ``AREA_THRESHOLD``, ``MIN_DISTANCE_BETWEEN_TRAFOS``, ``VOLTAGE_THRESHOLD``, and ``EPSG``.
+2. Search for the desired location (area). For example: "*Munich*".
 
-   - The script imports the GeoJSON files from steps 1 and 2, transforming the geodata according to the EPSG projection to calculate distances and areas. Transformers can be points or polygons.
-   - First, any transformers that overlap are deleted. This often occurs in "Umspannwerke" (HV transformers) where multiple tags exist for the same location.
-   - Second, all transformers larger than the ``AREA_THRESHOLD`` are deleted. LV transformers are either points or have smaller dimensions.
+3. Select the area from the list of results.
 
+4. Copy the relation ID from the URL (after *relation/*) or copy it from the left sidebar (usually between brackets).
+
+   **URL example:** https\://www.openstreetmap.org/relation/**62428**
+
+   **Sidebar example:** Relation: Munich (**62428**)
+
+How to add more transformer data after database has already been constructed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To add more transformers from different areas after ``executable_scripts/main_constructor.py`` has been run, i.e. the database
+has been constructed, simply run the ``raw_data/preprocessing_scripts/process_trafos.py`` script as shown in the example.
+
+Example:
+
+::
+
+    $ python -m raw_data.preprocessing_scripts.process_trafos --relation-id 62611
+    Selected relation ID: 62611
+    Corresponding area: Baden-Württemberg
+    Do you want to continue? [Y/n]
+
+How to configure transformer processing
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Open the ``raw_data/preprocessing_scripts/process_trafos.py`` script. At the top, there are constants you can change: ``AREA_THRESHOLD``, ``MIN_DISTANCE_BETWEEN_TRAFOS``, ``VOLTAGE_THRESHOLD``, and ``EPSG``.
+
+  - The script fetches GeoJSON files form the Overpass API. (saved in ``raw_data/transformer_data/fetched_trafos``)
+
+  - Then it imports the files, transforming the geodata according to the EPSG projection to calculate distances and areas. Transformers can be points or polygons.
+
+  - First, any transformers that overlap are deleted. This often occurs in "Umspannwerke" (HV transformers) where multiple tags exist for the same location.
+
+  - Second, all transformers larger than the ``AREA_THRESHOLD`` are deleted. LV transformers are either points or have smaller dimensions.
+
+  - Finally, the processed data gets saved (into ``raw_data/transformer_data/processed_trafos``) and inserted into the database.
+
+What do the queries do that fetch transformer data?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+They can be found in ``raw_data/transformer_data``.
+
+Assuming *Bayern* is selected:
+
+ - ``substations_query.txt``: The query searches for the keywords "transformer" and "substation" in the area "Bayern." Substations from "Deutsche Bahn" as well as "historic" and "abandoned" substations are excluded. This query yields around 22,000 results. More information about transformer locations can be found on `OpenInfrastructureMap <https://openinframap.org/#12.73/48.18894/11.58542/>`_.
+
+ - ``shopping_mall_query.txt``: The query searches for all places tagged with keywords indicating that nearby transformers do not belong to the LV grid (for example, "shopping malls" are likely directly connected to the MV grid). Other filters include land use related to the oil industry (e.g., refineries), power plants (e.g., solar fields), military training areas, landuse "rail," landuse "education," and large surface parking.
+
+Make any changes to the Overpass queries that you see fit.
 
 (Optional) Preprocess ways from OSM data
 ---------------------------------------

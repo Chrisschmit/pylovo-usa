@@ -62,7 +62,11 @@ def plot_contextily(plz: str, kcid: int, bcid: int, zoomfactor: int = 19) -> Non
     ax.set_xticks([])
     ax.set_yticks([])
     # Buildings
-    buildings_gdf = pg.get_geo_df(table="buildings_result", plz=int(plz))
+    buildings_gdf = pg.get_geo_df_join(
+        ["gr.version_id", "plz", "kcid", "bcid", "br.*"],
+        "buildings_result br", "grid_result gr",
+        ("br.grid_result_id", "gr.grid_result_id"),
+    plz=int(plz))
     buildings_8_gdf = buildings_gdf[buildings_gdf.bcid == bcid]
     buildings_8_gdf = buildings_8_gdf[buildings_8_gdf.kcid == kcid]
     # cables / lines
@@ -72,7 +76,12 @@ def plot_contextily(plz: str, kcid: int, bcid: int, zoomfactor: int = 19) -> Non
     ax = buildings_8_gdf.plot(ax=ax, column="peak_load_in_kw", cmap="YlOrBr",
                               legend=True, legend_kwds={'label': "Peak load in kW"})
     # trafo
-    trafo_gdf = pg.get_geo_df(table="transformer_positions", plz=int(plz), bcid=bcid)
+    trafo_gdf = pg.get_geo_df_join(
+        ["geom"],
+        "transformer_positions tp", "grid_result gr",
+        ("tp.grid_result_id", "gr.grid_result_id"),
+        plz=int(plz), bcid=bcid
+    )
     ax.scatter(trafo_gdf.loc[0].geom.x, trafo_gdf.loc[0].geom.y, marker=(5, 0), s=80, color="blue", label="Transformer")
     # basemap
     cx.add_basemap(ax, crs=buildings_8_gdf.crs.to_string(), zoom=zoomfactor, source=cx.providers.OpenStreetMap.Mapnik)
