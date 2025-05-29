@@ -316,6 +316,8 @@ class SyngridDatabaseConstructor:
         cur = self.pgr.conn.cursor()
         sc_path = os.path.join(os.getcwd(), "pylovo", "dump_functions.sql")
         with open(sc_path, 'r') as sc_file:
-            print("Executing dump_functions.sql script.")
-            cur.execute(sc_file.read())
+            print(f"Executing dump_functions.sql script with schema '{TARGET_SCHEMA}'.")
+            sql = sc_file.read()
+            rendered_sql = sql.replace('{schema}', TARGET_SCHEMA)
+            cur.execute(rendered_sql)
             self.pgr.conn.commit()

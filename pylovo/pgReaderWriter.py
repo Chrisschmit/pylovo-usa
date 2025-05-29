@@ -61,7 +61,7 @@ class PgReaderWriter:
         """
         Returns: A dataframe with self-defined consumer categories and typical values
         """
-        query = """SELECT * FROM public.consumer_categories"""
+        query = f"""SELECT * FROM {TARGET_SCHEMA}.consumer_categories"""
         cc_df = pd.read_sql_query(query, self.conn)
         cc_df.set_index("definition", drop=False, inplace=True)
         cc_df.sort_index(inplace=True)
@@ -74,7 +74,7 @@ class PgReaderWriter:
             plz:
         Returns: Settlement type: 1=City, 2=Village, 3=Rural
         """
-        settlement_query = """SELECT settlement_type FROM public.postcode_result
+        settlement_query = f"""SELECT settlement_type FROM {TARGET_SCHEMA}.postcode_result
             WHERE postcode_result_plz = %(p)s 
             LIMIT 1; """
         self.cur.execute(settlement_query, {"p": plz})
@@ -98,8 +98,8 @@ class PgReaderWriter:
             self.logger.debug("Incorrect settlement type number specified.")
             return
 
-        query = """SELECT equipment_data.s_max_kva , cost_eur
-            FROM public.equipment_data
+        query = f"""SELECT equipment_data.s_max_kva , cost_eur
+            FROM {TARGET_SCHEMA}.equipment_data
             WHERE typ = 'Transformer' AND application_area IN %(tuple)s
             ORDER BY s_max_kva;"""
 
@@ -120,7 +120,7 @@ class PgReaderWriter:
             kcid: kmeans_cluster ID
         Returns: A dataframe with all building information
         """
-        buildings_query = """SELECT * FROM public.buildings_tem 
+        buildings_query = f"""SELECT * FROM {TARGET_SCHEMA}.buildings_tem 
                         WHERE connection_point IS NOT NULL
                         AND kcid = %(k)s
                         AND bcid ISNULL;"""
@@ -195,10 +195,10 @@ class PgReaderWriter:
 
     def create_cable_std_type(self, net: pp.pandapowerNet) -> None:
         """Create standard pandapower cable types from equipment_data table."""
-        query = """
+        query = f"""
             SELECT name, r_mohm_per_km/1000.0 as r_ohm_per_km, x_mohm_per_km/1000.0 as x_ohm_per_km, 
                    max_i_a/1000.0 as max_i_ka
-            FROM public.equipment_data
+            FROM {TARGET_SCHEMA}.equipment_data
             WHERE typ = 'Cable'
         """
 
@@ -809,8 +809,8 @@ class PgReaderWriter:
             bcid: building cluster ID
         Returns: A dataframe with all building information
         """
-        count_query = """SELECT DISTINCT connection_point
-                        FROM public.buildings_tem
+        count_query = f"""SELECT DISTINCT connection_point
+                        FROM {TARGET_SCHEMA}.buildings_tem
                         WHERE vertice_id IS NOT NULL
                             AND bcid = %(b)s 
                             AND kcid = %(k)s;"""
@@ -824,8 +824,8 @@ class PgReaderWriter:
         return cp
 
     def get_single_connection_point_from_bc(self, kcid: int, bcid: int) -> int:
-        count_query = """SELECT connection_point
-                                FROM public.buildings_tem AS b
+        count_query = f"""SELECT connection_point
+                                FROM {TARGET_SCHEMA}.buildings_tem AS b
                                 WHERE b.vertice_id IS NOT NULL
                                     AND b.bcid = %(b)s 
                                     AND b.kcid = %(k)s
@@ -844,8 +844,8 @@ class PgReaderWriter:
         Returns: The distance matrix of the buildings as np.array and the mapping between vertice_id and local ID as dict
         """
 
-        costmatrix_query = """SELECT * FROM pgr_dijkstraCostMatrix(
-                            'SELECT way_id as id, source, target, cost, reverse_cost FROM public.ways_tem',
+        costmatrix_query = f"""SELECT * FROM pgr_dijkstraCostMatrix(
+                            'SELECT way_id as id, source, target, cost, reverse_cost FROM {TARGET_SCHEMA}.ways_tem',
                             (SELECT array_agg(DISTINCT b.connection_point) FROM (SELECT * FROM buildings_tem 
                             WHERE kcid = %(k)s
                             AND bcid ISNULL
@@ -864,8 +864,8 @@ class PgReaderWriter:
         """
         # Creates a distance matrix from the buildings in the postcode cluster or smaller in the building cluster
 
-        costmatrix_query = """SELECT * FROM pgr_dijkstraCostMatrix(
-                            'SELECT way_id as id, source, target, cost, reverse_cost FROM public.ways_tem',
+        costmatrix_query = f"""SELECT * FROM pgr_dijkstraCostMatrix(
+                            'SELECT way_id as id, source, target, cost, reverse_cost FROM {TARGET_SCHEMA}.ways_tem',
                             (SELECT array_agg(DISTINCT b.connection_point) FROM (SELECT * FROM buildings_tem 
                                 WHERE kcid = %(k)s
                                 AND bcid = %(b)s
@@ -886,7 +886,7 @@ class PgReaderWriter:
             transformer_rated_power: Apparent power of the selected transformer
         """
         # Insert references to building elements in which cluster they are.
-        building_query = """UPDATE public.buildings_tem 
+        building_query = f"""UPDATE {TARGET_SCHEMA}.buildings_tem 
         SET bcid = %(bc)s 
         WHERE plz = %(pc)s 
         AND kcid = %(kc)s 
@@ -1309,7 +1309,7 @@ class PgReaderWriter:
         Updates ways_tem
         :return:
         """
-        query = """SELECT public.draw_way_connections();"""
+        query = f"""SELECT {TARGET_SCHEMA}.draw_way_connections();"""
         self.cur.execute(query)
 
     def calculate_sim_load(self, conn_list: Union[tuple, list]) -> Decimal:
@@ -1754,13 +1754,13 @@ class PgReaderWriter:
         Updates ways_tem, creates pgr network topology in new tables:
         :return:
         """
-        connection_query = """ SELECT public.draw_home_connections(); """
+        connection_query = f""" SELECT {TARGET_SCHEMA}.draw_home_connections(); """
         self.cur.execute(connection_query)
 
         topology_query = """select pgr_createTopology('ways_tem', 0.01, id:='way_id', the_geom:='geom', clean:=true) """
         self.cur.execute(topology_query)
 
-        # add_buildings_query = '''SELECT public.add_buildings();'''
+        # add_buildings_query = '''SELECT {TARGET_SCHEMA}.add_buildings();'''
         # self.cur.execute(add_buildings_query)
         # self.conn.commit()
 
@@ -1800,7 +1800,7 @@ class PgReaderWriter:
         Updates buildings_tem with the vertice_id s from ways_tem_vertices_pgr
         :return:
         """
-        query = """UPDATE public.buildings_tem b
+        query = f"""UPDATE {TARGET_SCHEMA}.buildings_tem b
                 SET vertice_id = (SELECT id FROM ways_tem_vertices_pgr AS v 
                 WHERE ST_Equals(v.the_geom,b.center));"""
         self.cur.execute(query)
@@ -2126,7 +2126,7 @@ class PgReaderWriter:
 
 
     def insert_plz_parameters(self, plz: int, trafo_string: str, load_count_string: str, bus_count_string: str):
-        update_query = """INSERT INTO public.plz_parameters (version_id, plz, trafo_num, load_count_per_trafo, bus_count_per_trafo)
+        update_query = f"""INSERT INTO {TARGET_SCHEMA}.plz_parameters (version_id, plz, trafo_num, load_count_per_trafo, bus_count_per_trafo)
         VALUES(%s, %s, %s, %s, %s);"""  # TODO: check - should values be updated for same plz and version if analysis is started? And Add a column
         self.cur.execute(
             update_query,
@@ -2174,7 +2174,7 @@ class PgReaderWriter:
         self.logger.info("analyse_cables finished.")
         cable_length_string = json.dumps(cable_length_dict)
 
-        update_query = """UPDATE public.plz_parameters
+        update_query = f"""UPDATE {TARGET_SCHEMA}.plz_parameters
         SET cable_length = %(c)s 
         WHERE version_id = %(v)s AND plz = %(p)s;"""
         self.cur.execute(
@@ -2293,7 +2293,7 @@ class PgReaderWriter:
         trafo_max_distance_string = json.dumps(trafo_max_distance_dict)
         trafo_avg_distance_string = json.dumps(trafo_avg_distance_dict)
 
-        update_query = """UPDATE public.plz_parameters
+        update_query = f"""UPDATE {TARGET_SCHEMA}.plz_parameters
         SET sim_peak_load_per_trafo = %(l)s, max_distance_per_trafo = %(m)s, avg_distance_per_trafo = %(a)s
         WHERE version_id = %(v)s AND plz = %(p)s;
         """
@@ -2311,7 +2311,7 @@ class PgReaderWriter:
         self.logger.debug("per trafo analysis finished")
 
     def read_trafo_dict(self, plz: int) -> dict:
-        read_query = """SELECT trafo_num FROM public.plz_parameters 
+        read_query = f"""SELECT trafo_num FROM {TARGET_SCHEMA}.plz_parameters 
         WHERE version_id = %(v)s AND plz = %(p)s;"""
         self.cur.execute(read_query, {"v": VERSION_ID, "p": plz})
         trafo_num_dict = self.cur.fetchall()[0][0]
@@ -2319,8 +2319,8 @@ class PgReaderWriter:
         return trafo_num_dict
 
     def read_per_trafo_dict(self, plz: int) -> tuple[list[dict], list[str], dict]:
-        read_query = """SELECT load_count_per_trafo, bus_count_per_trafo, sim_peak_load_per_trafo,
-        max_distance_per_trafo, avg_distance_per_trafo FROM public.plz_parameters 
+        read_query = f"""SELECT load_count_per_trafo, bus_count_per_trafo, sim_peak_load_per_trafo,
+        max_distance_per_trafo, avg_distance_per_trafo FROM {TARGET_SCHEMA}.plz_parameters 
         WHERE version_id = %(v)s AND plz = %(p)s;"""
         self.cur.execute(read_query, {"v": VERSION_ID, "p": plz})
         result = self.cur.fetchall()
@@ -2341,7 +2341,7 @@ class PgReaderWriter:
         return data_list, data_labels, trafo_dict
 
     def read_cable_dict(self, plz: int) -> dict:
-        read_query = """SELECT cable_length FROM public.plz_parameters
+        read_query = f"""SELECT cable_length FROM {TARGET_SCHEMA}.plz_parameters
         WHERE version_id = %(v)s AND plz = %(p)s;"""
         self.cur.execute(read_query, {"v": VERSION_ID, "p": plz})
         cable_length = self.cur.fetchall()[0][0]
@@ -2403,7 +2403,7 @@ class PgReaderWriter:
         else:
             filters = ""
         query = (
-                f"""SELECT * FROM public.{table}
+                f"""SELECT * FROM {TARGET_SCHEMA}.{table}
                     WHERE version_id = %(v)s """
                 + filters
         )
@@ -2450,8 +2450,8 @@ class PgReaderWriter:
 
         query = (
                 f"""SELECT {column_names}
-                    FROM public.{from_table}
-                    JOIN public.{join_table}
+                    FROM {TARGET_SCHEMA}.{from_table}
+                    JOIN {TARGET_SCHEMA}.{join_table}
                       ON {on[0]} = {on[1]}
                     WHERE {jt_prefix}.version_id = %(v)s """
                 + filters
@@ -2604,14 +2604,14 @@ class PgReaderWriter:
 
     def get_clustering_parameters_for_plz_list(self, plz_tuple: tuple) -> pd.DataFrame:
         """get clustering parameter for multiple plz"""
-        query = """
+        query = f"""
                 WITH plz_table(plz) AS (
                     VALUES (%(p)s)
                 ),
                 clustering AS (
                     SELECT version_id, plz, kcid, bcid, cp.*
-                    FROM public.clustering_parameters cp 
-                    JOIN public.grid_result gr ON cp.grid_result_id = gr.grid_result_id
+                    FROM {TARGET_SCHEMA}.clustering_parameters cp 
+                    JOIN {TARGET_SCHEMA}.grid_result gr ON cp.grid_result_id = gr.grid_result_id
                     WHERE version_id = %(v)s
                 )
                 SELECT c.* 
@@ -2626,8 +2626,8 @@ class PgReaderWriter:
 
     def get_municipal_register_for_plz(self, plz: str) -> pd.DataFrame:
         """get entry of table municipal register for given PLZ"""
-        query = """SELECT * 
-        FROM public.municipal_register
+        query = f"""SELECT * 
+        FROM {TARGET_SCHEMA}.municipal_register
         WHERE plz = %(p)s;"""
         self.cur.execute(query, {"p": plz})
         register = self.cur.fetchall()
@@ -2636,8 +2636,8 @@ class PgReaderWriter:
 
     def get_municipal_register(self) -> pd.DataFrame:
         """get municipal register """
-        query = """SELECT * 
-        FROM public.municipal_register;"""
+        query = f"""SELECT * 
+        FROM {TARGET_SCHEMA}.municipal_register;"""
         self.cur.execute(query)
         register = self.cur.fetchall()
         df_register = pd.DataFrame(register, columns=MUNICIPAL_REGISTER)
@@ -2649,8 +2649,8 @@ class PgReaderWriter:
         :return: table with column of ags
         :rtype: DataFrame
          """
-        query = """SELECT * 
-        FROM public.ags_log;"""
+        query = f"""SELECT * 
+        FROM {TARGET_SCHEMA}.ags_log;"""
         df_query = pd.read_sql_query(query, con=self.conn, )
         return df_query
 

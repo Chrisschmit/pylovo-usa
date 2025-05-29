@@ -194,8 +194,8 @@ def get_sample_set() -> pd.DataFrame:
         f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}")
     cur = conn.cursor()
     query = f"""SELECT ss.plz, mr.pop, mr.area, mr.lat, mr.lon, ss.ags, mr.name_city, mr.fed_state, mr.regio7, mr.regio5, mr.pop_den
-    FROM public.sample_set ss
-    JOIN public.municipal_register mr ON ss.plz = mr.plz AND ss.ags = mr.ags
+    FROM {TARGET_SCHEMA}.sample_set ss
+    JOIN {TARGET_SCHEMA}.municipal_register mr ON ss.plz = mr.plz AND ss.ags = mr.ags
     WHERE ss.classification_id = {CLASSIFICATION_VERSION};"""
     cur.execute(query)
     sample_set = cur.fetchall()
