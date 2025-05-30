@@ -1,4 +1,3 @@
-import warnings
 import os
 import sys
 import pandas as pd
@@ -8,7 +7,7 @@ import psycopg2 as pg
 PROJECT_ROOT = os.path.abspath(os.path.join(os.getcwd(), "../../.."))
 sys.path.append(PROJECT_ROOT)
 
-from classification.config_loader import *
+from pylovo.config_loader import *
 from pylovo.config_data import *
 
 

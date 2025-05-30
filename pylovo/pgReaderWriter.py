@@ -8,6 +8,7 @@ import geopandas as gpd
 import pandapower as pp
 import pandapower.topology as top
 import psycopg2 as pg
+import numpy as np
 from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import squareform
 from shapely.geometry import LineString
@@ -15,7 +16,7 @@ from sqlalchemy import create_engine, text
 
 from pylovo import utils
 from pylovo.config_data import *
-from pylovo.config_version import *
+from pylovo.config_loader import *
 
 import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)

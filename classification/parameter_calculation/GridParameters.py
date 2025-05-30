@@ -11,8 +11,8 @@ from sklearn.metrics.pairwise import haversine_distances
 
 from classification.parameter_calculation.sim_factor import calculate_line_with_sim_factor
 from pylovo.config_data import *
-from pylovo.config_version import PEAK_LOAD_HOUSEHOLD
-from pylovo.config_version import VERSION_ID
+from pylovo.config_loader import PEAK_LOAD_HOUSEHOLD
+from pylovo.config_loader import VERSION_ID
 
 
 class GridParameters:

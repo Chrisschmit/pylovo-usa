@@ -1,6 +1,6 @@
 from classification.parameter_calculation.GridParameters import GridParameters
 from pylovo.GridGenerator import GridGenerator
-from pylovo.config_version import VERSION_ID
+from pylovo.config_loader import VERSION_ID
 
 
 class ParameterCalculator:

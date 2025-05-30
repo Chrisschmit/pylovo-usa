@@ -1,7 +1,7 @@
 from plotting.config_plots import ACCESS_TOKEN_PLOTLY
 from pylovo.GridGenerator import GridGenerator
 from pylovo.config_data import *
-from pylovo.config_version import *
+from pylovo.config_loader import *
 
 import os
 import sys

@@ -1,20 +1,20 @@
 # Config Version 1
 CLASSIFICATION_VERSION: 1
-VERSION_COMMENT: "set sample with inspected building quality"
+CLASSIFICATION_VERSION_COMMENT: "set sample with inspected building quality"
 CLASSIFICATION_REGION: Bayern
 NO_OF_CLUSTERS_ALLOWED: [3, 4, 5, 6, 7]
 N_SAMPLES: 100  # default value
 
 # Config Version 2 (commented out)
 # CLASSIFICATION_VERSION: 2
-# VERSION_COMMENT: "classification Germany"
+# CLASSIFICATION_VERSION_COMMENT: "classification Germany"
 # CLASSIFICATION_REGION: Germany
 # NO_OF_CLUSTERS_ALLOWED: [3, 4, 5, 6, 7]
 # N_SAMPLES: 100  # default value
 
 # Config Version 4 (active)
 CLASSIFICATION_VERSION: 4
-VERSION_COMMENT: "test thesis code handover BRB"
+CLASSIFICATION_VERSION_COMMENT: "test thesis code handover BRB"
 CLASSIFICATION_REGION: Bayern
 NO_OF_CLUSTERS_ALLOWED: [3, 4, 5, 6, 7]
 N_SAMPLES: 7

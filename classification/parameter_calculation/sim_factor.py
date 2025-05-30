@@ -1,7 +1,7 @@
 import networkx as nx
 import pandas as pd
 
-from pylovo.config_version import SIM_FACTOR
+from pylovo.config_loader import SIM_FACTOR
 from pylovo.utils import oneSimultaneousLoad
 
 

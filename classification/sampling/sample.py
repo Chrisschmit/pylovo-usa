@@ -4,7 +4,7 @@ import pandas as pd
 import psycopg2
 from sqlalchemy import create_engine
 
-from classification.config_loader import *
+from pylovo.config_loader import *
 from pylovo.GridGenerator import GridGenerator
 from pylovo.config_data import *
 
@@ -43,8 +43,8 @@ def check_if_classification_version_exists():
     # conn.commit()
     else:
         # create new version
-        insert_query = f"""INSERT INTO classification_version (classification_id, version_comment, classification_region) VALUES
-        ({CLASSIFICATION_VERSION}, '{VERSION_COMMENT}', '{CLASSIFICATION_REGION}')"""
+        insert_query = f"""INSERT INTO classification_version (classification_id, classification_version_comment, classification_region) VALUES
+        ({CLASSIFICATION_VERSION}, '{CLASSIFICATION_VERSION_COMMENT}', '{CLASSIFICATION_REGION}')"""
         cur.execute(insert_query)
         print(cur.statusmessage)
         conn.commit()
