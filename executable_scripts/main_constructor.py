@@ -3,7 +3,7 @@ This script creates a pylovo database and fills with raw data from referenced fi
 Do not use SyngridDatabaseConstructor unless you want to create a new database.
 """
 
-from pylovo.config_data import LOG_LEVEL
+from pylovo.config_loader import LOG_LEVEL
 from raw_data.municipal_register.join_regiostar_gemeindeverz import create_municipal_register
 from pylovo.SyngridDatabaseConstructor import SyngridDatabaseConstructor
 from pylovo import utils

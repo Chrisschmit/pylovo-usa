@@ -1,59 +1,3 @@
-import os
-from dotenv import load_dotenv, find_dotenv
-
-load_dotenv(find_dotenv(), override=True)
-
-# Database connection configuration
-DBNAME = os.getenv("DBNAME", "pylovo_db_local")
-USER = os.getenv("USER", "postgres")
-HOST = os.getenv("HOST", "localhost")
-PORT = os.getenv("PORT", "5432")
-PASSWORD = os.getenv("PASSWORD", "postgres")
-
-# Directory where the result csv and json files be saved
-RESULT_DIR = os.path.join(os.getcwd(), "results")
-
-# Toggles whether the grid json files will be saved in a folder or just in the db
-SAVE_GRID_FOLDER = False
-
-# Logging configuration for PgReaderWriter & GridGenerator
-LOG_LEVEL = "INFO"
-
-CSV_FILE_LIST = [
-    {"path": os.path.join("raw_data", "equipment_data.csv"), "table_name": "equipment_data"},
-    {"path": os.path.join("raw_data", "postcode.csv"), "table_name": "postcode"},
-]
-
-CLUSTERING_PARAMETERS = ["version_id",
-                         "plz",
-                         "bcid",
-                         "kcid",
-                         "no_connection_buses",
-                         "no_branches",
-                         "no_house_connections",
-                         "no_house_connections_per_branch",
-                         "no_households",
-                         "no_household_equ",
-                         "no_households_per_branch",
-                         "max_no_of_households_of_a_branch",
-                         "house_distance_km",
-                         "transformer_mva",
-                         "osm_trafo",
-                         "max_trafo_dis",
-                         "avg_trafo_dis",
-                         "cable_length_km",
-                         "cable_len_per_house",
-                         "max_power_mw",
-                         "simultaneous_peak_load_mw",
-                         "resistance",
-                         "reactance",
-                         "ratio",
-                         "vsw_per_branch",
-                         "max_vsw_of_a_branch"]
-
-MUNICIPAL_REGISTER = ['plz', 'pop', 'area', 'lat', 'lon', 'ags', 'name_city', 'fed_state', 'regio7', 'regio5',
-                      'pop_den']
-
 # Database schema - table structure
 CREATE_QUERIES = {
     "res": """CREATE TABLE IF NOT EXISTS public.res (
@@ -108,7 +52,7 @@ CREATE_QUERIES = {
     "classification_version": """
     CREATE TABLE IF NOT EXISTS public.classification_version (
         classification_id integer NOT NULL,
-        version_comment varchar, 
+        classification_version_comment varchar, 
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         classification_region varchar,
         CONSTRAINT classification_pkey PRIMARY KEY (classification_id)

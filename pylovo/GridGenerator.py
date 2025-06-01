@@ -2,8 +2,8 @@ import warnings
 from pathlib import Path
 
 import pandapower as pp
+import numpy as np
 from pylovo import pgReaderWriter as pg, utils
-from pylovo.config_data import *
 from pylovo.config_loader import *
 
 

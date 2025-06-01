@@ -6,7 +6,6 @@ from sqlalchemy import create_engine
 
 from pylovo.config_loader import *
 from pylovo.GridGenerator import GridGenerator
-from pylovo.config_data import *
 
 # According to the population distribution and energy consumption
 # it is defined how many samples are to be choosen per class

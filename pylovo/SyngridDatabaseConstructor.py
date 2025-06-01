@@ -3,11 +3,11 @@ import time
 import warnings
 from pathlib import Path
 
-import pandas as pd
 import psycopg2 as pg
 import psycopg2.errors
 import sqlparse
 
+from pylovo.config_loader import *
 from pylovo.config_data import *
 from pylovo.pgReaderWriter import PgReaderWriter
 from raw_data.preprocessing_scripts.process_trafos import process_trafos, get_trafos_processed_3035_geojson_path, \

@@ -6,7 +6,6 @@ from sqlalchemy import create_engine
 
 from classification.clustering.clustering_algorithms import *
 from pylovo.config_loader import *
-from pylovo.config_data import *
 
 
 class DatabaseCommunication:

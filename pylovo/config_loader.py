@@ -1,6 +1,7 @@
 import yaml
 import os
 import pandas as pd
+from dotenv import load_dotenv, find_dotenv
 
 def load_yaml_config(filepath: str):
     """Loads a YAML configuration file."""
@@ -13,9 +14,29 @@ def load_yaml_config(filepath: str):
         return yaml.safe_load(file)
 
 # Load all configurations with correct paths
+CONFIG_DATA = load_yaml_config("config_data.yaml")
 CONFIG_VERSION = load_yaml_config("config_version.yaml")
 CONFIG_CLASSIFICATION = load_yaml_config("../classification/config_classification.yaml")
 CONFIG_CLUSTERING = load_yaml_config("../classification/clustering/config_clustering.yaml")
+
+# Load database connection configuration from CONFIG_DATA
+load_dotenv(find_dotenv(), override=True)
+DBNAME = os.getenv("DBNAME", CONFIG_DATA["DBNAME"])
+USER = os.getenv("USER", CONFIG_DATA["USER"])
+HOST = os.getenv("HOST", CONFIG_DATA["HOST"])
+PORT = os.getenv("PORT", CONFIG_DATA["PORT"])
+PASSWORD = os.getenv("PASSWORD", CONFIG_DATA["PASSWORD"])
+
+# Assign other variables from CONFIG_DATA
+RESULT_DIR = os.path.join(os.getcwd(), "results")
+SAVE_GRID_FOLDER = CONFIG_DATA["SAVE_GRID_FOLDER"]
+LOG_LEVEL = CONFIG_DATA["LOG_LEVEL"]
+CLUSTERING_PARAMETERS = CONFIG_DATA["CLUSTERING_PARAMETERS"]
+MUNICIPAL_REGISTER = CONFIG_DATA["MUNICIPAL_REGISTER"]
+CSV_FILE_LIST = [
+    {"path": os.path.join("raw_data", "equipment_data.csv"), "table_name": "equipment_data"},
+    {"path": os.path.join("raw_data", "postcode.csv"), "table_name": "postcode"},
+]
 
 # Assign all variables from CONFIG_VERSION
 VERSION_ID = CONFIG_VERSION["VERSION_ID"]
@@ -24,6 +45,7 @@ PLOT_COLOR_DICT = CONFIG_VERSION["PLOT_COLOR_DICT"]
 CONNECTION_AVAILABLE_CABLES = CONFIG_VERSION["CONNECTION_AVAILABLE_CABLES"]
 CABLE_COST_DICT = CONFIG_VERSION["CABLE_COST_DICT"]
 SIM_FACTOR = CONFIG_VERSION["SIM_FACTOR"]
+PEAK_LOAD_HOUSEHOLD = CONFIG_VERSION["PEAK_LOAD_HOUSEHOLD"]
 CONSUMER_CATEGORIES = pd.DataFrame(CONFIG_VERSION["CONSUMER_CATEGORIES"])
 LARGE_COMPONENT_LOWER_BOUND = CONFIG_VERSION["LARGE_COMPONENT_LOWER_BOUND"]
 LARGE_COMPONENT_DIVIDER = CONFIG_VERSION["LARGE_COMPONENT_DIVIDER"]
