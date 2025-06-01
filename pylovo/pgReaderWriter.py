@@ -15,7 +15,7 @@ from shapely.geometry import LineString
 from sqlalchemy import create_engine, text
 
 from pylovo import utils
-from pylovo.config_data import *
+from pylovo.config_table_structure import *
 from pylovo.config_loader import *
 
 import warnings
