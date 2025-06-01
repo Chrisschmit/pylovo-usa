@@ -41,14 +41,14 @@ CABLE_COST_DICT:
 # installed_power * (sim_factor + (1 - sim_factor) * (load_count ** (-3 / 4)))
 SIM_FACTOR: {Residential: 0.07, Public: 0.6, Commercial: 0.5}
 
-# format: consumer_category_id: [definition, peak_load, yearly_consumption, peak_load_per_m2, yearly_consumption_per_m2, sim_factor]
+PEAK_LOAD_HOUSEHOLD: 30.00
 CONSUMER_CATEGORIES:
   - {consumer_category_id: 1, definition: Commercial, peak_load: null, yearly_consumption: null, peak_load_per_m2: 79.00, yearly_consumption_per_m2: 245.70, sim_factor: 0.50}
   - {consumer_category_id: 2, definition: Public, peak_load: null, yearly_consumption: null, peak_load_per_m2: 29.00, yearly_consumption_per_m2: 155.70, sim_factor: 0.60}
-  - {consumer_category_id: 9, definition: SFH, peak_load: &PEAK_LOAD_HOUSEHOLD 30.00, yearly_consumption: 0.00, peak_load_per_m2: null, yearly_consumption_per_m2: null, sim_factor: 0.07}
-  - {consumer_category_id: 10, definition: MFH, peak_load: *PEAK_LOAD_HOUSEHOLD, yearly_consumption: 0.00, peak_load_per_m2: null, yearly_consumption_per_m2: null, sim_factor: 0.07}
-  - {consumer_category_id: 11, definition: TH, peak_load: *PEAK_LOAD_HOUSEHOLD, yearly_consumption: 0.00, peak_load_per_m2: null, yearly_consumption_per_m2: null, sim_factor: 0.07}
-  - {consumer_category_id: 12, definition: AB, peak_load: *PEAK_LOAD_HOUSEHOLD, yearly_consumption: 0.00, peak_load_per_m2: null, yearly_consumption_per_m2: null, sim_factor: 0.07}
+  - {consumer_category_id: 9, definition: SFH, peak_load: 30.00, yearly_consumption: 0.00, peak_load_per_m2: null, yearly_consumption_per_m2: null, sim_factor: 0.07}
+  - {consumer_category_id: 10, definition: MFH, peak_load: 30.00, yearly_consumption: 0.00, peak_load_per_m2: null, yearly_consumption_per_m2: null, sim_factor: 0.07}
+  - {consumer_category_id: 11, definition: TH, peak_load: 30.00, yearly_consumption: 0.00, peak_load_per_m2: null, yearly_consumption_per_m2: null, sim_factor: 0.07}
+  - {consumer_category_id: 12, definition: AB, peak_load: 30.00, yearly_consumption: 0.00, peak_load_per_m2: null, yearly_consumption_per_m2: null, sim_factor: 0.07}
 
 # Larger components are divided by k-means clustering in roughly LARGE_COMPONENT_DIVIDER sizes
 LARGE_COMPONENT_LOWER_BOUND: 2000
