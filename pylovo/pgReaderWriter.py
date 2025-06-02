@@ -40,6 +40,7 @@ class PgReaderWriter:
                 database=dbname, user=user, password=pw, host=host, port=port
             )
             self.cur = self.conn.cursor()
+            self.cur.execute(f"SET search_path TO {TARGET_SCHEMA}, public;")
             self.db_path = f"postgresql+psycopg2://{user}:{pw}@{host}:{port}/{dbname}"
             self.sqla_engine = create_engine(self.db_path)
         except pg.OperationalError as err:

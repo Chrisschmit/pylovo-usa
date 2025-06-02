@@ -108,7 +108,7 @@ class SyngridDatabaseConstructor:
                     f"PG:dbname={DBNAME} user={USER} password={PASSWORD} host={HOST} port={PORT}",
                     file_path,
                     "-nln",
-                    table_name,
+                    f"{TARGET_SCHEMA}.{table_name}",  # explicitly tells ogr2ogr where to append (for the case of table already existing)
                     "-nlt",
                     # "MULTIPOLYGON",
                     "PROMOTE_TO_MULTI",
@@ -116,6 +116,7 @@ class SyngridDatabaseConstructor:
                     "EPSG:3035",
                     "-lco",
                     "geometry_name=geom",
+                    "-lco", f"SCHEMA={TARGET_SCHEMA}", # ensures creation happens in correct schema
             ]
             if skip_failures:
                 command.append("-skipfailures")
