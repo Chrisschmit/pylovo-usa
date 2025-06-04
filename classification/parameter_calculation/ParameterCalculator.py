@@ -1,5 +1,5 @@
 from classification.parameter_calculation.GridParameters import GridParameters
-from pylovo.GridGenerator import GridGenerator
+from pylovo import pgReaderWriter as pg
 from pylovo.config_loader import VERSION_ID
 
 
@@ -7,8 +7,8 @@ class ParameterCalculator:
     def __init__(self, plz):
         self.plz = plz
         # connect to database
-        self.gg = GridGenerator(plz=plz)
-        self.pg = self.gg.pgr
+        self.pg = pg.PgReaderWriter()
+        
 
     def calc_parameters_for_grids(self) -> None:
         """
