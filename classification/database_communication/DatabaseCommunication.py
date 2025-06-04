@@ -3,6 +3,7 @@ import pandas as pd
 import psycopg2 as pg
 from geoalchemy2 import Geometry, WKTElement
 from sqlalchemy import create_engine
+from pylovo import pgReaderWriter as pg
 
 from classification.clustering.clustering_algorithms import *
 from pylovo.config_loader import *
@@ -15,12 +16,10 @@ class DatabaseCommunication:
     """
 
     def __init__(self, **kwargs):
-        self.conn = pg.connect(
-            database=DBNAME, user=USER, password=PASSWORD, host=HOST, port=PORT
-        )
-        self.cur = self.conn.cursor()
-        self.db_path = f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}"
-        self.sqla_engine = create_engine(self.db_path)
+        self.pg = pg.PgReaderWriter()
+        self.cur = self.pg.cur
+        self.conn= self.pg.conn
+        self.sqla_engine= self.pg.sqla_engine
 
         print("Database connection is constructed. ")
 

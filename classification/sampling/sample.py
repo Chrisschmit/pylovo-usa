@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import psycopg2
 from sqlalchemy import create_engine
+from pylovo import pgReaderWriter as pg
 
 from pylovo.config_loader import *
 from pylovo.GridGenerator import GridGenerator
@@ -19,6 +20,7 @@ samples_per_class_pop = {
     77: 16,
 }
 
+pg = pg.PgReaderWriter()
 
 def check_if_classification_version_exists():
     """checks whether classification version already exists.
@@ -26,10 +28,7 @@ def check_if_classification_version_exists():
 
     :raises Exception: if classification version already exists
     """
-    conn = psycopg2.connect(database=DBNAME, user=USER, password=PASSWORD, host=HOST, port=PORT)
-    sqlalchemy_engine = create_engine(
-        f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}")
-    cur = conn.cursor()
+    cur = pg.cur
     count_query = f"""SELECT COUNT(*) 
             FROM classification_version 
             WHERE "classification_id" = {CLASSIFICATION_VERSION}"""
@@ -46,7 +45,7 @@ def check_if_classification_version_exists():
         ({CLASSIFICATION_VERSION}, '{CLASSIFICATION_VERSION_COMMENT}', '{CLASSIFICATION_REGION}')"""
         cur.execute(insert_query)
         print(cur.statusmessage)
-        conn.commit()
+        pg.conn.commit()
         print(f"Classification version: {CLASSIFICATION_VERSION} was added")
 
 
@@ -56,8 +55,6 @@ def get_municipal_register_as_dataframe() -> pd.DataFrame:
     :return: municipal register
     :rtype: pd.DataFrame
     """
-    gg = GridGenerator(plz='85375')
-    pg = gg.pgr
     regiostar_plz = pg.get_municipal_register()
     return regiostar_plz
 
@@ -134,13 +131,10 @@ def sample_set_to_db(regiostar_samples_result: pd.DataFrame):
     :type regiostar_samples_result: pd.DataFrame
 
     """
-    conn = psycopg2.connect(database=DBNAME, user=USER, password=PASSWORD, host=HOST, port=PORT)
-    sqlalchemy_engine = create_engine(
-        f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}")
-    cur = conn.cursor()
-    regiostar_samples_result.to_sql('sample_set', con=sqlalchemy_engine, if_exists='append', index=False)
+    cur = pg.cur
+    regiostar_samples_result.to_sql('sample_set', con=pg.sqla_engine, if_exists='append', index=False)
     print(cur.statusmessage)
-    conn.commit()
+    pg.conn.commit()
 
 
 def get_federal_state_id() -> int:
@@ -189,13 +183,10 @@ def get_sample_set() -> pd.DataFrame:
     :return: table of a complete sample set
     :rtype: pd.DataFrame
     """
-    conn = psycopg2.connect(database=DBNAME, user=USER, password=PASSWORD, host=HOST, port=PORT)
-    sqlalchemy_engine = create_engine(
-        f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}")
-    cur = conn.cursor()
+    cur = pg.cur
     query = f"""SELECT ss.plz, mr.pop, mr.area, mr.lat, mr.lon, ss.ags, mr.name_city, mr.fed_state, mr.regio7, mr.regio5, mr.pop_den
-    FROM {TARGET_SCHEMA}.sample_set ss
-    JOIN {TARGET_SCHEMA}.municipal_register mr ON ss.plz = mr.plz AND ss.ags = mr.ags
+    FROM sample_set ss
+    JOIN municipal_register mr ON ss.plz = mr.plz AND ss.ags = mr.ags
     WHERE ss.classification_id = {CLASSIFICATION_VERSION};"""
     cur.execute(query)
     sample_set = cur.fetchall()

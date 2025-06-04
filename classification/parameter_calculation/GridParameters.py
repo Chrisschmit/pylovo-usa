@@ -224,8 +224,6 @@ class GridParameters:
 
     def write_parameters_to_db(self):
         """writes parameters to database"""
-        conn = psycopg2.connect(database=DBNAME, user=USER, password=PASSWORD, host=HOST, port=PORT)
-        cur = conn.cursor()
         query = """INSERT INTO clustering_parameters (
                    grid_result_id,
                    no_connection_buses,
@@ -275,7 +273,7 @@ class GridParameters:
                   %(ratio)s,
                   %(vsw_per_branch)s,
                   %(max_vsw_of_a_branch)s);"""
-        cur.execute(query, {
+        self.pg.cur.execute(query, {
             "version_id": self.version_id,
             "plz": self.plz,
             "bcid": self.bcid,
@@ -303,8 +301,8 @@ class GridParameters:
             "vsw_per_branch": float(self.vsw_per_branch),
             "max_vsw_of_a_branch": float(self.max_vsw_of_a_branch)
         })
-        print(cur.statusmessage)
-        conn.commit()
+        print(self.pg.cur.statusmessage)
+        self.pg.conn.commit()
 
 
 def get_max_power(pandapower_net) -> float:

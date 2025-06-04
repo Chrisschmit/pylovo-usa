@@ -1,5 +1,6 @@
 import warnings
 from pathlib import Path
+import traceback
 
 import pandapower as pp
 import numpy as np
@@ -436,12 +437,13 @@ class GridGenerator:
             print('Grids for this PLZ have already been generated.')
         except Exception as e:
             self.logger.error(f"Error during grid generation for PLZ {self.plz}: {e}")
+            traceback.print_exc()
             self.logger.info(f"Skipped PLZ {self.plz} due to generation error.")
             self.pgr.conn.rollback()  # rollback the transaction
             self.pgr.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION), self.plz)  # delete from sample set
             return
 
-        self.pgr.drop_temp_tables()  # drop temp tables
+        #self.pgr.drop_temp_tables()  # drop temp tables
         self.pgr.commit_changes()    # commit the changes to the database
 
         print('-------------------- end', self.plz, '-----------------------------')

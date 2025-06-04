@@ -1329,7 +1329,6 @@ class PgReaderWriter:
 
         data = self.cur.fetchone()
         if data:
-            print("DEBUG: SCHEMA =", TARGET_SCHEMA, "| query result =", data)
             residential_load = Decimal(data[0])
             residential_count = Decimal(data[1])
             residential_factor = Decimal(data[2])
