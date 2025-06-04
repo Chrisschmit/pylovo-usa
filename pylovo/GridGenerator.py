@@ -443,7 +443,7 @@ class GridGenerator:
             self.pgr.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION), self.plz)  # delete from sample set
             return
 
-        #self.pgr.drop_temp_tables()  # drop temp tables
+        self.pgr.drop_temp_tables()  # drop temp tables
         self.pgr.commit_changes()    # commit the changes to the database
 
         print('-------------------- end', self.plz, '-----------------------------')
