@@ -1312,7 +1312,7 @@ class PgReaderWriter:
         Updates ways_tem
         :return:
         """
-        query = f"""SELECT draw_way_connections();"""
+        query = """SELECT draw_way_connections();"""
         self.cur.execute(query)
 
     def calculate_sim_load(self, conn_list: Union[tuple, list]) -> Decimal:
@@ -2129,7 +2129,7 @@ class PgReaderWriter:
 
 
     def insert_plz_parameters(self, plz: int, trafo_string: str, load_count_string: str, bus_count_string: str):
-        update_query = f"""INSERT INTO plz_parameters (version_id, plz, trafo_num, load_count_per_trafo, bus_count_per_trafo)
+        update_query = """INSERT INTO plz_parameters (version_id, plz, trafo_num, load_count_per_trafo, bus_count_per_trafo)
         VALUES(%s, %s, %s, %s, %s);"""  # TODO: check - should values be updated for same plz and version if analysis is started? And Add a column
         self.cur.execute(
             update_query,
@@ -2177,7 +2177,7 @@ class PgReaderWriter:
         self.logger.info("analyse_cables finished.")
         cable_length_string = json.dumps(cable_length_dict)
 
-        update_query = f"""UPDATE plz_parameters
+        update_query = """UPDATE plz_parameters
         SET cable_length = %(c)s 
         WHERE version_id = %(v)s AND plz = %(p)s;"""
         self.cur.execute(
@@ -2296,7 +2296,7 @@ class PgReaderWriter:
         trafo_max_distance_string = json.dumps(trafo_max_distance_dict)
         trafo_avg_distance_string = json.dumps(trafo_avg_distance_dict)
 
-        update_query = f"""UPDATE plz_parameters
+        update_query = """UPDATE plz_parameters
         SET sim_peak_load_per_trafo = %(l)s, max_distance_per_trafo = %(m)s, avg_distance_per_trafo = %(a)s
         WHERE version_id = %(v)s AND plz = %(p)s;
         """
@@ -2314,7 +2314,7 @@ class PgReaderWriter:
         self.logger.debug("per trafo analysis finished")
 
     def read_trafo_dict(self, plz: int) -> dict:
-        read_query = f"""SELECT trafo_num FROM plz_parameters 
+        read_query = """SELECT trafo_num FROM plz_parameters 
         WHERE version_id = %(v)s AND plz = %(p)s;"""
         self.cur.execute(read_query, {"v": VERSION_ID, "p": plz})
         trafo_num_dict = self.cur.fetchall()[0][0]
@@ -2322,7 +2322,7 @@ class PgReaderWriter:
         return trafo_num_dict
 
     def read_per_trafo_dict(self, plz: int) -> tuple[list[dict], list[str], dict]:
-        read_query = f"""SELECT load_count_per_trafo, bus_count_per_trafo, sim_peak_load_per_trafo,
+        read_query = """SELECT load_count_per_trafo, bus_count_per_trafo, sim_peak_load_per_trafo,
         max_distance_per_trafo, avg_distance_per_trafo FROM plz_parameters 
         WHERE version_id = %(v)s AND plz = %(p)s;"""
         self.cur.execute(read_query, {"v": VERSION_ID, "p": plz})
@@ -2344,7 +2344,7 @@ class PgReaderWriter:
         return data_list, data_labels, trafo_dict
 
     def read_cable_dict(self, plz: int) -> dict:
-        read_query = f"""SELECT cable_length FROM plz_parameters
+        read_query = """SELECT cable_length FROM plz_parameters
         WHERE version_id = %(v)s AND plz = %(p)s;"""
         self.cur.execute(read_query, {"v": VERSION_ID, "p": plz})
         cable_length = self.cur.fetchall()[0][0]
@@ -2471,7 +2471,7 @@ class PgReaderWriter:
 
     def get_grid_versions_with_plz(self, plz: int) -> list[tuple]:
         query = (
-            f"""SELECT DISTINCT version_id FROM grid_result WHERE plz = %(p)s"""
+            """SELECT DISTINCT version_id FROM grid_result WHERE plz = %(p)s"""
         )
         self.cur.execute(query, {"p": plz})
         result = self.cur.fetchall()
@@ -2479,7 +2479,7 @@ class PgReaderWriter:
 
     def get_grids_of_version(self, plz: int, version_id: str) -> list[tuple]:
         query = (
-            f"""SELECT kcid, bcid, grid
+            """SELECT kcid, bcid, grid
                 FROM grid_result 
                 WHERE plz = %(p)s AND version_id = %(v)s""")
         self.cur.execute(query, {"p": plz, "v": version_id})
@@ -2572,7 +2572,7 @@ class PgReaderWriter:
 
     def delete_version_from_all_tables(self, version_id: str) -> None:
         """Delete all entries of the given version ID from all tables."""
-        query = f"DELETE FROM version WHERE version_id = %(v)s;"
+        query = "DELETE FROM version WHERE version_id = %(v)s;"
         self.cur.execute(query, {"v": version_id})
         self.conn.commit()
         self.logger.info(f"Version {version_id} deleted from all tables")
@@ -2584,7 +2584,7 @@ class PgReaderWriter:
 
         :param classification_id: ID of the classification version to delete
         """
-        query = f"DELETE FROM classification_version WHERE classification_id = %(cid)s;"
+        query = "DELETE FROM classification_version WHERE classification_id = %(cid)s;"
         self.cur.execute(query, {"cid": classification_id})
         self.conn.commit()
         
@@ -2607,7 +2607,7 @@ class PgReaderWriter:
 
     def get_clustering_parameters_for_plz_list(self, plz_tuple: tuple) -> pd.DataFrame:
         """get clustering parameter for multiple plz"""
-        query = f"""
+        query = """
                 WITH plz_table(plz) AS (
                     VALUES (%(p)s)
                 ),
@@ -2629,7 +2629,7 @@ class PgReaderWriter:
 
     def get_municipal_register_for_plz(self, plz: str) -> pd.DataFrame:
         """get entry of table municipal register for given PLZ"""
-        query = f"""SELECT * 
+        query = """SELECT * 
         FROM municipal_register
         WHERE plz = %(p)s;"""
         self.cur.execute(query, {"p": plz})
@@ -2639,7 +2639,7 @@ class PgReaderWriter:
 
     def get_municipal_register(self) -> pd.DataFrame:
         """get municipal register """
-        query = f"""SELECT * 
+        query = """SELECT * 
         FROM municipal_register;"""
         self.cur.execute(query)
         register = self.cur.fetchall()
@@ -2652,7 +2652,7 @@ class PgReaderWriter:
         :return: table with column of ags
         :rtype: DataFrame
          """
-        query = f"""SELECT * 
+        query = """SELECT * 
         FROM ags_log;"""
         df_query = pd.read_sql_query(query, con=self.conn, )
         return df_query
