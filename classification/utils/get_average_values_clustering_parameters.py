@@ -46,10 +46,10 @@ def get_clustering_parameters_for_kmeans_cluster_0() -> pd.DataFrame:
         # Run the query
         query = f"""
             SELECT cp.*
-            FROM {TARGET_SCHEMA}.clustering_parameters cp
+            FROM clustering_parameters cp
             JOIN (
                 SELECT version_id, plz, kcid, bcid
-                FROM {TARGET_SCHEMA}.transformer_classified
+                FROM transformer_classified
                 WHERE kmeans_clusters = 0
                 GROUP BY version_id, plz, kcid, bcid
             ) tc
