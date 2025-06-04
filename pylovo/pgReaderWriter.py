@@ -37,12 +37,14 @@ class PgReaderWriter:
         )
         try:
             self.conn = pg.connect(
-                database=dbname, user=user, password=pw, host=host, port=port
+                database=dbname, user=user, password=pw, host=host, port=port, options=f"-c search_path={TARGET_SCHEMA},public"
             )
             self.cur = self.conn.cursor()
-            self.cur.execute(f"SET search_path TO {TARGET_SCHEMA}, public;")
             self.db_path = f"postgresql+psycopg2://{user}:{pw}@{host}:{port}/{dbname}"
-            self.sqla_engine = create_engine(self.db_path)
+            self.sqla_engine = create_engine(
+                self.db_path,
+                connect_args={"options": f"-c search_path={TARGET_SCHEMA},public"}
+                )
         except pg.OperationalError as err:
             self.logger.warning(
                 f"Connecting to {dbname} was not successful. Make sure, that you have established the SSH "
@@ -1327,6 +1329,7 @@ class PgReaderWriter:
 
         data = self.cur.fetchone()
         if data:
+            print("DEBUG: SCHEMA =", TARGET_SCHEMA, "| query result =", data)
             residential_load = Decimal(data[0])
             residential_count = Decimal(data[1])
             residential_factor = Decimal(data[2])
