@@ -34,10 +34,10 @@ class DatabaseCommunication:
         :return: a table with all grid parameters for all grids for PLZ included in the classification version
         :rtype: pd.DataFrame
         """
-        query = f"""
+        query = """
                 SELECT version_id, plz, kcid, bcid, cp.*
-                FROM {TARGET_SCHEMA}.clustering_parameters cp 
-                JOIN {TARGET_SCHEMA}.grid_result gr ON cp.grid_result_id = gr.grid_result_id
+                FROM clustering_parameters cp 
+                JOIN grid_result gr ON cp.grid_result_id = gr.grid_result_id
                 WHERE gr.version_id = %(v)s AND gr.plz = %(p)s;"""
         params = {"v": VERSION_ID, "p": plz}
         df_query = pd.read_sql_query(query, con=self.conn, params=params, )
@@ -51,16 +51,16 @@ class DatabaseCommunication:
         :return: a table with all grid parameters for all grids for PLZ included in the classification version
         :rtype: pd.DataFrame
         """
-        query = f"""
+        query = """
                 WITH plz_table(plz) AS (
                     SELECT plz
-                    FROM {TARGET_SCHEMA}.sample_set
+                    FROM sample_set
                     WHERE classification_id= %(c)s
                 ),
                 clustering AS (
                     SELECT version_id, plz, kcid, bcid, cp.*
-                    FROM {TARGET_SCHEMA}.clustering_parameters cp 
-                    JOIN {TARGET_SCHEMA}.grid_result gr ON cp.grid_result_id = gr.grid_result_id
+                    FROM clustering_parameters cp 
+                    JOIN grid_result gr ON cp.grid_result_id = gr.grid_result_id
                     WHERE gr.version_id = %(v)s AND cp.filtered = false
                 )
                 SELECT c.* 
@@ -84,17 +84,17 @@ class DatabaseCommunication:
         :return: a table with all grid parameters for all grids for PLZ included in the classification version
         :rtype: pd.DataFrame
         """
-        query = f"""
+        query = """
                 WITH plz_table(plz) AS (
                     SELECT ss.plz, mr.pop, mr.area, mr.lat, mr.lon, ss.ags, mr.name_city, mr.regio7, mr.regio5, mr.pop_den
-                    FROM {TARGET_SCHEMA}.sample_set ss
-                    JOIN {TARGET_SCHEMA}.municipal_register mr ON ss.plz = mr.plz AND ss.ags = mr.ags
+                    FROM sample_set ss
+                    JOIN municipal_register mr ON ss.plz = mr.plz AND ss.ags = mr.ags
                     WHERE ss.classification_id = %(c)s
                 ),
                 clustering AS (
                     SELECT version_id, plz, kcid, bcid, cp.*
-                    FROM {TARGET_SCHEMA}.clustering_parameters cp 
-                    JOIN {TARGET_SCHEMA}.grid_result gr ON cp.grid_result_id = gr.grid_result_id
+                    FROM clustering_parameters cp 
+                    JOIN grid_result gr ON cp.grid_result_id = gr.grid_result_id
                     WHERE gr.version_id = %(v)s AND cp.filtered = false
                 )
                 SELECT c.*, p.pop, p.area, p.lat, p.lon, p.ags, p.name_city, p.regio7, p.regio5, p.pop_den
@@ -116,10 +116,10 @@ class DatabaseCommunication:
         df_parameters_of_grids = self.get_clustering_parameters_for_classification_version()
 
         # load transformer positions from database, preserve geo-datatype of geom column
-        query = f"""
+        query = """
                 SELECT version_id, plz, kcid, bcid, geom
-                FROM {TARGET_SCHEMA}.transformer_positions tp
-                JOIN {TARGET_SCHEMA}.grid_result gr
+                FROM transformer_positions tp
+                JOIN grid_result gr
                   ON tp.grid_result_id = gr.grid_result_id
                 WHERE version_id=%(v)s;"""
         params = {"v": VERSION_ID}
@@ -176,9 +176,9 @@ class DatabaseCommunication:
                                               left_on=['version_id', 'plz', 'kcid', 'bcid'],
                                               right_on=['version_id', 'plz', 'kcid', 'bcid'])
         
-        query = f"""
+        query = """
                 SELECT grid_result_id, version_id, plz, kcid, bcid
-                FROM {TARGET_SCHEMA}.grid_result
+                FROM grid_result
                 WHERE version_id=%(v)s;"""
         params = {"v": VERSION_ID}
         df_grid_result = pd.read_sql_query(query, con=self.sqla_engine, params=params)
@@ -202,7 +202,7 @@ class DatabaseCommunication:
         """apply maximum transformer distance threshold on clustering parameter table
         by indicating if the threshold is surpassed in the filtered column
         """
-        query = f"""UPDATE {TARGET_SCHEMA}.clustering_parameters
+        query = """UPDATE clustering_parameters
                 SET filtered = true
                 WHERE max_trafo_dis > %(t)s;"""
         self.cur.execute(query, {"t": THRESHOLD_MAX_TRAFO_DIS})
@@ -213,13 +213,13 @@ class DatabaseCommunication:
         """apply maximum households per building threshold on clustering parameter table
         by indicating if the threshold is surpassed in the filtered column
         """
-        query = f"""WITH buildings(grid_result_id) AS (
+        query = """WITH buildings(grid_result_id) AS (
                        SELECT DISTINCT grid_result_id
-                       FROM {TARGET_SCHEMA}.buildings_result
+                       FROM buildings_result
                        WHERE houses_per_building > %(h)s
                    )
                    
-                   UPDATE {TARGET_SCHEMA}.clustering_parameters c
+                   UPDATE clustering_parameters c
                    SET filtered = true
                    FROM buildings b
                    WHERE c.grid_result_id = b.grid_result_id;"""
@@ -233,8 +233,8 @@ class DatabaseCommunication:
         If a parameter less than its threshold, set filtered = true.
         """
 
-        query = f"""
-            UPDATE {TARGET_SCHEMA}.clustering_parameters
+        query = """
+            UPDATE clustering_parameters
             SET filtered = true
             WHERE avg_trafo_dis < %(avg_trafo_dis)s
             OR no_house_connections < %(no_house_connections)s
@@ -256,7 +256,7 @@ class DatabaseCommunication:
     def set_remaining_filter_values_false(self) -> None:
         """setting filtered value to false for grids that should not be filtered according to their parameters
         """
-        query = f"""UPDATE {TARGET_SCHEMA}.clustering_parameters 
+        query = """UPDATE clustering_parameters 
             SET filtered = false
             WHERE filtered IS NULL;"""
         self.cur.execute(query)
