@@ -1,6 +1,6 @@
 # Database schema - table structure
 CREATE_QUERIES = {
-    "res": f"""CREATE TABLE IF NOT EXISTS res (
+    "res": """CREATE TABLE IF NOT EXISTS res (
         osm_id varchar PRIMARY KEY,
         area numeric(23, 15),
         use varchar(80),
@@ -17,7 +17,7 @@ CREATE_QUERIES = {
         geom geometry(MultiPolygon,3035)
     )
     """,
-    "oth": f"""CREATE TABLE IF NOT EXISTS oth (
+    "oth": """CREATE TABLE IF NOT EXISTS oth (
         osm_id varchar PRIMARY KEY,
         area numeric(23, 15),
         use varchar(80),
@@ -26,7 +26,7 @@ CREATE_QUERIES = {
         geom geometry(MultiPolygon,3035)
     )
     """,
-    "equipment_data": f"""
+    "equipment_data": """
     CREATE TABLE IF NOT EXISTS equipment_data (
         name varchar(100) PRIMARY KEY,
         s_max_kva integer,
@@ -39,7 +39,7 @@ CREATE_QUERIES = {
         application_area integer
     )
     """,
-    "version": f"""CREATE TABLE IF NOT EXISTS version (
+    "version": """CREATE TABLE IF NOT EXISTS version (
         version_id varchar(10) PRIMARY KEY,
         version_comment varchar, 
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -49,7 +49,7 @@ CREATE_QUERIES = {
         other_parameters varchar
     )
     """,
-    "classification_version": f"""
+    "classification_version": """
     CREATE TABLE IF NOT EXISTS classification_version (
         classification_id integer NOT NULL,
         classification_version_comment varchar, 
@@ -58,7 +58,7 @@ CREATE_QUERIES = {
         CONSTRAINT classification_pkey PRIMARY KEY (classification_id)
     )
     """,
-    "postcode": f"""
+    "postcode": """
     CREATE TABLE IF NOT EXISTS postcode (
         postcode_id integer NOT NULL,
         plz int UNIQUE NOT NULL,
@@ -69,7 +69,7 @@ CREATE_QUERIES = {
         CONSTRAINT "plz-5stellig_pkey" PRIMARY KEY (postcode_id)
     )
     """,
-    "postcode_result": f"""
+    "postcode_result": """
     CREATE TABLE IF NOT EXISTS postcode_result (   
         version_id varchar(10) NOT NULL,
         postcode_result_plz integer NOT NULL,
@@ -80,15 +80,17 @@ CREATE_QUERIES = {
         CONSTRAINT fk_postcode_result_version_id
             FOREIGN KEY (version_id)
             REFERENCES version (version_id)
+            REFERENCES version (version_id)
             ON DELETE CASCADE,
         CONSTRAINT fk_postcode_result_plz
             FOREIGN KEY (postcode_result_plz)
+            REFERENCES postcode (plz)
             REFERENCES postcode (plz)
             ON DELETE CASCADE
     )
     """,
     # old name: building_clusters, got merged with grids
-    "grid_result": f"""
+    "grid_result": """
     CREATE TABLE IF NOT EXISTS grid_result (
         grid_result_id SERIAL PRIMARY KEY,
         version_id varchar(10) NOT NULL,
@@ -104,12 +106,14 @@ CREATE_QUERIES = {
         CONSTRAINT fk_grid_result_version_id_plz
             FOREIGN KEY (version_id, plz)
             REFERENCES postcode_result (version_id, postcode_result_plz)
+            REFERENCES postcode_result (version_id, postcode_result_plz)
             ON DELETE CASCADE
     );
     CREATE INDEX idx_grid_result_version_id_plz_bcid_kcid
     ON grid_result (version_id, plz, bcid, kcid)
+    ON grid_result (version_id, plz, bcid, kcid)
     """,
-    "lines_result": f"""
+    "lines_result": """
     CREATE TABLE IF NOT EXISTS lines_result (
         lines_result_id SERIAL PRIMARY KEY,
         grid_result_id bigint NOT NULL,
@@ -122,10 +126,11 @@ CREATE_QUERIES = {
         CONSTRAINT fk_lines_result_grid_result
             FOREIGN KEY (grid_result_id)
             REFERENCES grid_result (grid_result_id)
+            REFERENCES grid_result (grid_result_id)
             ON DELETE CASCADE
     )
     """,
-    "consumer_categories": f"""
+    "consumer_categories": """
     CREATE TABLE IF NOT EXISTS consumer_categories (
         consumer_category_id integer PRIMARY KEY,
         definition varchar(30) UNIQUE NOT NULL,
@@ -136,7 +141,7 @@ CREATE_QUERIES = {
         sim_factor numeric(10,2) NOT NULL
     )
     """,
-    "buildings_result": f"""
+    "buildings_result": """
     CREATE TABLE IF NOT EXISTS buildings_result (
         version_id varchar(10) NOT NULL,
         osm_id varchar NOT NULL,
@@ -154,16 +159,19 @@ CREATE_QUERIES = {
         CONSTRAINT fk_buildings_result_grid_result
             FOREIGN KEY (version_id, grid_result_id)
             REFERENCES grid_result (version_id, grid_result_id)
+            REFERENCES grid_result (version_id, grid_result_id)
             ON DELETE CASCADE,
         CONSTRAINT fk_buildings_result_type
             FOREIGN KEY (type)
+            REFERENCES consumer_categories (definition)
             REFERENCES consumer_categories (definition)
             ON DELETE CASCADE
     );
     CREATE INDEX idx_buildings_result_grid_result_id
     ON buildings_result (grid_result_id);
+    ON buildings_result (grid_result_id);
     """,
-    "municipal_register": f"""CREATE TABLE IF NOT EXISTS municipal_register (
+    "municipal_register": """CREATE TABLE IF NOT EXISTS municipal_register (
         plz integer,
         pop bigint,
         area double precision,
@@ -178,7 +186,7 @@ CREATE_QUERIES = {
         CONSTRAINT municipal_register_pkey PRIMARY KEY (plz, ags)
     )
     """,
-    "sample_set": f"""CREATE TABLE IF NOT EXISTS sample_set (
+    "sample_set": """CREATE TABLE IF NOT EXISTS sample_set (
         classification_id integer NOT NULL,
         plz integer NOT NULL,
         ags bigint,
@@ -191,14 +199,16 @@ CREATE_QUERIES = {
         CONSTRAINT fk_sample_set_classification_id
             FOREIGN KEY (classification_id)
             REFERENCES classification_version (classification_id)
+            REFERENCES classification_version (classification_id)
             ON DELETE CASCADE,
         CONSTRAINT fk_sample_set_plz
             FOREIGN KEY (plz, ags)
             REFERENCES municipal_register (plz, ags)
+            REFERENCES municipal_register (plz, ags)
             ON DELETE CASCADE
     )
     """,
-    "clustering_parameters": f"""CREATE TABLE IF NOT EXISTS clustering_parameters (
+    "clustering_parameters": """CREATE TABLE IF NOT EXISTS clustering_parameters (
         grid_result_id bigint PRIMARY KEY,
         
         no_connection_buses integer,
@@ -234,10 +244,11 @@ CREATE_QUERIES = {
         CONSTRAINT fk_clustering_parameters_grid_result
             FOREIGN KEY (grid_result_id)
             REFERENCES grid_result (grid_result_id)
+            REFERENCES grid_result (grid_result_id)
             ON DELETE CASCADE
     )
     """,
-    "transformers": f"""CREATE TABLE IF NOT EXISTS transformers (
+    "transformers": """CREATE TABLE IF NOT EXISTS transformers (
         osm_id varchar PRIMARY KEY,
         area double precision,
         power varchar,
@@ -246,7 +257,7 @@ CREATE_QUERIES = {
         geom geometry(MultiPoint, 3035)
     )
     """,
-    "transformer_positions": f"""
+    "transformer_positions": """
     CREATE TABLE IF NOT EXISTS transformer_positions (
         grid_result_id bigint PRIMARY KEY,
         geom geometry(Point,3035),
@@ -255,13 +266,15 @@ CREATE_QUERIES = {
         CONSTRAINT fk_tp_grid_result_id
             FOREIGN KEY (grid_result_id)
             REFERENCES grid_result (grid_result_id)
+            REFERENCES grid_result (grid_result_id)
             ON DELETE CASCADE,
         CONSTRAINT fk_tp_osm_id
             FOREIGN KEY (osm_id)
             REFERENCES transformers (osm_id)
+            REFERENCES transformers (osm_id)
     )
     """,
-    "transformer_classified": f"""
+    "transformer_classified": """
     CREATE TABLE IF NOT EXISTS transformer_classified (
         grid_result_id bigint NOT NULL,
         geom geometry(Point,3035),
@@ -276,19 +289,21 @@ CREATE_QUERIES = {
         CONSTRAINT fk_transformer_classified_classification_id
             FOREIGN KEY (classification_id)
             REFERENCES classification_version (classification_id)
+            REFERENCES classification_version (classification_id)
             ON DELETE CASCADE,
         CONSTRAINT fk_transformer_classified_grid_result
             FOREIGN KEY (grid_result_id)
             REFERENCES grid_result (grid_result_id)
+            REFERENCES grid_result (grid_result_id)
             ON DELETE CASCADE
     )
     """,
-    "ags_log": f"""
+    "ags_log": """
     CREATE TABLE IF NOT EXISTS ags_log (
         ags bigint PRIMARY KEY
     )
     """,
-    "ways": f"""
+    "ways": """
     CREATE TABLE IF NOT EXISTS ways (
         clazz integer,
         source integer,
@@ -299,7 +314,7 @@ CREATE_QUERIES = {
         way_id integer PRIMARY KEY
     )
     """,
-    "ways_result": f"""
+    "ways_result": """
     CREATE TABLE IF NOT EXISTS ways_result (
         version_id varchar(10) NOT NULL,
         clazz integer,
@@ -314,12 +329,13 @@ CREATE_QUERIES = {
         CONSTRAINT fk_ways_result_version_id_plz
             FOREIGN KEY (version_id, plz)
             REFERENCES postcode_result (version_id, postcode_result_plz)
+            REFERENCES postcode_result (version_id, postcode_result_plz)
             ON DELETE CASCADE
     )
     """,
     # old name: grid_parameters
     # saves grid parameters for a whole plz for visualization
-    "plz_parameters": f"""
+    "plz_parameters": """
     CREATE TABLE IF NOT EXISTS plz_parameters (
         version_id varchar(10) NOT NULL,
         plz integer NOT NULL,
@@ -334,24 +350,29 @@ CREATE_QUERIES = {
         CONSTRAINT fk_plz_parameters_version_id_plz
             FOREIGN KEY (version_id, plz)
             REFERENCES postcode_result (version_id, postcode_result_plz)
+            REFERENCES postcode_result (version_id, postcode_result_plz)
             ON DELETE CASCADE
     )
     """,
-    "transformer_positions_with_grid": f"""
+    "transformer_positions_with_grid": """
     CREATE OR REPLACE VIEW transformer_positions_with_grid AS (
         SELECT tp.*, gr.version_id, gr.kcid, gr.bcid, gr.plz
         FROM transformer_positions tp
         JOIN grid_result gr ON tp.grid_result_id = gr.grid_result_id
+        FROM transformer_positions tp
+        JOIN grid_result gr ON tp.grid_result_id = gr.grid_result_id
     )
     """,
-    "transformer_classified_with_grid": f"""
+    "transformer_classified_with_grid": """
     CREATE OR REPLACE VIEW transformer_classified_with_grid AS (
         SELECT tc.*, gr.version_id, gr.kcid, gr.bcid, gr.plz
         FROM transformer_classified tc
         JOIN grid_result gr ON tc.grid_result_id = gr.grid_result_id
+        FROM transformer_classified tc
+        JOIN grid_result gr ON tc.grid_result_id = gr.grid_result_id
     )
     """,
-    "buildings_result_with_grid": f"""
+    "buildings_result_with_grid": """
     CREATE OR REPLACE VIEW buildings_result_with_grid AS (
         SELECT
             (br.version_id || '_' || br.osm_id) AS id,
@@ -359,9 +380,11 @@ CREATE_QUERIES = {
             gr.kcid, gr.bcid, gr.plz
         FROM buildings_result br
         JOIN grid_result gr ON br.grid_result_id = gr.grid_result_id
+        FROM buildings_result br
+        JOIN grid_result gr ON br.grid_result_id = gr.grid_result_id
     )
     """,
-    "lines_result_with_grid": f"""
+    "lines_result_with_grid": """
     CREATE OR REPLACE VIEW lines_result_with_grid AS (
         SELECT
             lr.lines_result_id as id,
@@ -375,12 +398,14 @@ CREATE_QUERIES = {
             gr.version_id, gr.kcid, gr.bcid, gr.plz
         FROM lines_result lr
         JOIN grid_result gr ON lr.grid_result_id = gr.grid_result_id
+        FROM lines_result lr
+        JOIN grid_result gr ON lr.grid_result_id = gr.grid_result_id
     )
     """
 }
 
 TEMP_CREATE_QUERIES = {
-    "buildings_tem": f"""CREATE TABLE IF NOT EXISTS buildings_tem
+    "buildings_tem": """CREATE TABLE IF NOT EXISTS buildings_tem
     (
         osm_id varchar,
         area numeric,
@@ -396,7 +421,7 @@ TEMP_CREATE_QUERIES = {
         floors integer,
         connection_point integer
     )""",
-    "ways_tem": f"""CREATE TABLE IF NOT EXISTS ways_tem
+    "ways_tem": """CREATE TABLE IF NOT EXISTS ways_tem
     (
         clazz integer,
         source integer,

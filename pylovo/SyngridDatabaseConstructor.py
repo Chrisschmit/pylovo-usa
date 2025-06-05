@@ -200,7 +200,6 @@ class SyngridDatabaseConstructor:
                 con=self.pgr.sqla_engine,
                 if_exists="append",
                 index=False,
-                schema=TARGET_SCHEMA,
             )
 
             et = time.time()

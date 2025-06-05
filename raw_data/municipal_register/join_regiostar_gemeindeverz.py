@@ -5,6 +5,7 @@ from sqlalchemy import create_engine
 from raw_data.municipal_register.regiostar.import_regiostar import import_regiostar
 from raw_data.municipal_register.gemeindeverzeichnis.import_functions import import_plz_einwohner, import_zuordnung_plz
 from pylovo.config_loader import *
+from pylovo import pgReaderWriter as pg
 
 
 def import_tables() -> (pd.DataFrame, pd.DataFrame, pd.DataFrame):
@@ -33,21 +34,16 @@ def join_regiostar_plz(plz_pop: pd.DataFrame, plz_ags: pd.DataFrame, regiostar: 
 
 def municipal_register_to_db(regiostar_plz: pd.DataFrame) -> None:
     """writes register to database"""
-    conn = psycopg2.connect(database=DBNAME, user=USER, password=PASSWORD, host=HOST, port=PORT)
-    sqlalchemy_engine = create_engine(
-        f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}")
-    cur = conn.cursor()
+    pgr = pg.PgReaderWriter()
     try:
         regiostar_plz.to_sql(
             'municipal_register', 
-            con=sqlalchemy_engine, 
+            con=pgr.sqla_engine, 
             if_exists='append', 
             index=False,
-            schema=TARGET_SCHEMA
         )
     except Exception as e:
         print(e)
-    conn.commit()
 
 
 def create_municipal_register() -> None:
