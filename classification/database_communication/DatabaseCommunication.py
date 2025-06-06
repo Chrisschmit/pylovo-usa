@@ -5,9 +5,7 @@ from geoalchemy2 import Geometry, WKTElement
 from sqlalchemy import create_engine
 
 from classification.clustering.clustering_algorithms import *
-from classification.config_loader import *
-from pylovo.config_data import *
-from pylovo.config_version import *
+from pylovo.config_loader import *
 
 
 class DatabaseCommunication:

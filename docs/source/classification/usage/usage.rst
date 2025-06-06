@@ -9,7 +9,7 @@ a description and a region, e.g.:
 .. code-block:: python
 
     CLASSIFICATION_VERSION = 1
-    VERSION_COMMENT = "set sample with inspected building quality"
+    CLASSIFICATION_VERSION_COMMENT = "set sample with inspected building quality"
     CLASSIFICATION_REGION = 'Bayern'
 
 A classification version is a unique identifier for your classification and can only be used once. The version comment can be used
