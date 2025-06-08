@@ -318,6 +318,5 @@ class SyngridDatabaseConstructor:
         with open(sc_path, 'r') as sc_file:
             print(f"Executing dump_functions.sql script with schema '{TARGET_SCHEMA}'.")
             sql = sc_file.read()
-            rendered_sql = sql.replace('{schema}', TARGET_SCHEMA)
-            cur.execute(rendered_sql)
+            cur.execute(sql)
             self.pgr.conn.commit()

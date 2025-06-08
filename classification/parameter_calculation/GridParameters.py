@@ -18,7 +18,7 @@ class GridParameters:
     """
 
     def __init__(self, plz, bcid, kcid, pgReaderWriter):
-        self.pg = pgReaderWriter
+        self.pgr = pgReaderWriter
         self.version_id = VERSION_ID
         self.plz = plz
         self.bcid = bcid
@@ -53,7 +53,7 @@ class GridParameters:
         self.osm_trafo = self.has_osm_trafo()
 
         # load network
-        net = self.pg.read_net(self.plz, self.kcid, self.bcid)
+        net = self.pgr.read_net(self.plz, self.kcid, self.bcid)
 
         # calculate parameters
         self.compute_parameters(net)
@@ -151,7 +151,7 @@ class GridParameters:
         # in data list at index 2 the simultaneous
         # peak load is saved grouped by transformer size
         # see also compare_grid_parameters_db.iynb for more details
-        data_list, data_labels, trafo_dict = self.pg.read_per_trafo_dict(self.plz)
+        data_list, data_labels, trafo_dict = self.pgr.read_per_trafo_dict(self.plz)
         transformer_type_str = str(int(self.transformer_mva * 1000))
         max_trafo_distance_list = data_list[3][transformer_type_str]
         if self.max_trafo_dis * 1000 in max_trafo_distance_list:
@@ -273,7 +273,7 @@ class GridParameters:
                   %(ratio)s,
                   %(vsw_per_branch)s,
                   %(max_vsw_of_a_branch)s);"""
-        self.pg.cur.execute(query, {
+        self.pgr.cur.execute(query, {
             "version_id": self.version_id,
             "plz": self.plz,
             "bcid": self.bcid,
@@ -301,8 +301,8 @@ class GridParameters:
             "vsw_per_branch": float(self.vsw_per_branch),
             "max_vsw_of_a_branch": float(self.max_vsw_of_a_branch)
         })
-        print(self.pg.cur.statusmessage)
-        self.pg.conn.commit()
+        print(self.pgr.cur.statusmessage)
+        self.pgr.conn.commit()
 
 
 def get_max_power(pandapower_net) -> float:
