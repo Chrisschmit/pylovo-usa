@@ -5,6 +5,9 @@ HOST: localhost
 PORT: 5432
 PASSWORD: postgres
 
+# Schema selection for database writes/reads
+TARGET_SCHEMA: public
+
 # Toggles whether the grid json files will be saved in a folder or just in the db
 SAVE_GRID_FOLDER: False
 

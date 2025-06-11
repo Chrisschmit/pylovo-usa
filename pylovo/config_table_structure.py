@@ -80,11 +80,9 @@ CREATE_QUERIES = {
         CONSTRAINT fk_postcode_result_version_id
             FOREIGN KEY (version_id)
             REFERENCES version (version_id)
-            REFERENCES version (version_id)
             ON DELETE CASCADE,
         CONSTRAINT fk_postcode_result_plz
             FOREIGN KEY (postcode_result_plz)
-            REFERENCES postcode (plz)
             REFERENCES postcode (plz)
             ON DELETE CASCADE
     )
@@ -106,11 +104,9 @@ CREATE_QUERIES = {
         CONSTRAINT fk_grid_result_version_id_plz
             FOREIGN KEY (version_id, plz)
             REFERENCES postcode_result (version_id, postcode_result_plz)
-            REFERENCES postcode_result (version_id, postcode_result_plz)
             ON DELETE CASCADE
     );
     CREATE INDEX idx_grid_result_version_id_plz_bcid_kcid
-    ON grid_result (version_id, plz, bcid, kcid)
     ON grid_result (version_id, plz, bcid, kcid)
     """,
     "lines_result": """
@@ -125,7 +121,6 @@ CREATE_QUERIES = {
         length_km numeric,
         CONSTRAINT fk_lines_result_grid_result
             FOREIGN KEY (grid_result_id)
-            REFERENCES grid_result (grid_result_id)
             REFERENCES grid_result (grid_result_id)
             ON DELETE CASCADE
     )
@@ -159,16 +154,13 @@ CREATE_QUERIES = {
         CONSTRAINT fk_buildings_result_grid_result
             FOREIGN KEY (version_id, grid_result_id)
             REFERENCES grid_result (version_id, grid_result_id)
-            REFERENCES grid_result (version_id, grid_result_id)
             ON DELETE CASCADE,
         CONSTRAINT fk_buildings_result_type
             FOREIGN KEY (type)
             REFERENCES consumer_categories (definition)
-            REFERENCES consumer_categories (definition)
             ON DELETE CASCADE
     );
     CREATE INDEX idx_buildings_result_grid_result_id
-    ON buildings_result (grid_result_id);
     ON buildings_result (grid_result_id);
     """,
     "municipal_register": """CREATE TABLE IF NOT EXISTS municipal_register (
@@ -199,11 +191,9 @@ CREATE_QUERIES = {
         CONSTRAINT fk_sample_set_classification_id
             FOREIGN KEY (classification_id)
             REFERENCES classification_version (classification_id)
-            REFERENCES classification_version (classification_id)
             ON DELETE CASCADE,
         CONSTRAINT fk_sample_set_plz
             FOREIGN KEY (plz, ags)
-            REFERENCES municipal_register (plz, ags)
             REFERENCES municipal_register (plz, ags)
             ON DELETE CASCADE
     )
@@ -244,7 +234,6 @@ CREATE_QUERIES = {
         CONSTRAINT fk_clustering_parameters_grid_result
             FOREIGN KEY (grid_result_id)
             REFERENCES grid_result (grid_result_id)
-            REFERENCES grid_result (grid_result_id)
             ON DELETE CASCADE
     )
     """,
@@ -266,11 +255,9 @@ CREATE_QUERIES = {
         CONSTRAINT fk_tp_grid_result_id
             FOREIGN KEY (grid_result_id)
             REFERENCES grid_result (grid_result_id)
-            REFERENCES grid_result (grid_result_id)
             ON DELETE CASCADE,
         CONSTRAINT fk_tp_osm_id
             FOREIGN KEY (osm_id)
-            REFERENCES transformers (osm_id)
             REFERENCES transformers (osm_id)
     )
     """,
@@ -289,11 +276,9 @@ CREATE_QUERIES = {
         CONSTRAINT fk_transformer_classified_classification_id
             FOREIGN KEY (classification_id)
             REFERENCES classification_version (classification_id)
-            REFERENCES classification_version (classification_id)
             ON DELETE CASCADE,
         CONSTRAINT fk_transformer_classified_grid_result
             FOREIGN KEY (grid_result_id)
-            REFERENCES grid_result (grid_result_id)
             REFERENCES grid_result (grid_result_id)
             ON DELETE CASCADE
     )
@@ -329,7 +314,6 @@ CREATE_QUERIES = {
         CONSTRAINT fk_ways_result_version_id_plz
             FOREIGN KEY (version_id, plz)
             REFERENCES postcode_result (version_id, postcode_result_plz)
-            REFERENCES postcode_result (version_id, postcode_result_plz)
             ON DELETE CASCADE
     )
     """,
@@ -350,7 +334,6 @@ CREATE_QUERIES = {
         CONSTRAINT fk_plz_parameters_version_id_plz
             FOREIGN KEY (version_id, plz)
             REFERENCES postcode_result (version_id, postcode_result_plz)
-            REFERENCES postcode_result (version_id, postcode_result_plz)
             ON DELETE CASCADE
     )
     """,
@@ -359,15 +342,11 @@ CREATE_QUERIES = {
         SELECT tp.*, gr.version_id, gr.kcid, gr.bcid, gr.plz
         FROM transformer_positions tp
         JOIN grid_result gr ON tp.grid_result_id = gr.grid_result_id
-        FROM transformer_positions tp
-        JOIN grid_result gr ON tp.grid_result_id = gr.grid_result_id
     )
     """,
     "transformer_classified_with_grid": """
     CREATE OR REPLACE VIEW transformer_classified_with_grid AS (
         SELECT tc.*, gr.version_id, gr.kcid, gr.bcid, gr.plz
-        FROM transformer_classified tc
-        JOIN grid_result gr ON tc.grid_result_id = gr.grid_result_id
         FROM transformer_classified tc
         JOIN grid_result gr ON tc.grid_result_id = gr.grid_result_id
     )
@@ -378,8 +357,6 @@ CREATE_QUERIES = {
             (br.version_id || '_' || br.osm_id) AS id,
             br.*,
             gr.kcid, gr.bcid, gr.plz
-        FROM buildings_result br
-        JOIN grid_result gr ON br.grid_result_id = gr.grid_result_id
         FROM buildings_result br
         JOIN grid_result gr ON br.grid_result_id = gr.grid_result_id
     )
@@ -396,8 +373,6 @@ CREATE_QUERIES = {
             lr.to_bus,
             lr.length_km,
             gr.version_id, gr.kcid, gr.bcid, gr.plz
-        FROM lines_result lr
-        JOIN grid_result gr ON lr.grid_result_id = gr.grid_result_id
         FROM lines_result lr
         JOIN grid_result gr ON lr.grid_result_id = gr.grid_result_id
     )

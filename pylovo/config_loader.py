@@ -26,6 +26,7 @@ USER = os.getenv("USER", CONFIG_DATA["USER"])
 HOST = os.getenv("HOST", CONFIG_DATA["HOST"])
 PORT = os.getenv("PORT", CONFIG_DATA["PORT"])
 PASSWORD = os.getenv("PASSWORD", CONFIG_DATA["PASSWORD"])
+TARGET_SCHEMA = os.getenv("TARGET_SCHEMA", CONFIG_DATA["TARGET_SCHEMA"])
 
 # Assign other variables from CONFIG_DATA
 RESULT_DIR = os.path.join(os.getcwd(), "results")
