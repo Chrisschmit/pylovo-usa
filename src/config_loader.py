@@ -16,8 +16,8 @@ def load_yaml_config(filepath: str):
 # Load all configurations with correct paths
 CONFIG_DATA = load_yaml_config("config_data.yaml")
 CONFIG_VERSION = load_yaml_config("config_version.yaml")
-CONFIG_CLASSIFICATION = load_yaml_config("../classification/config_classification.yaml")
-CONFIG_CLUSTERING = load_yaml_config("../classification/clustering/config_clustering.yaml")
+CONFIG_CLASSIFICATION = load_yaml_config("classification/config_classification.yaml")
+CONFIG_CLUSTERING = load_yaml_config("classification/clustering/config_clustering.yaml")
 
 # Load database connection configuration from CONFIG_DATA
 load_dotenv(find_dotenv(), override=True)
