@@ -31,8 +31,8 @@ def replace_plz(plz, regiostar_set):
 
     # create a new sample set from which replacement plz can be taken
     gg = GridGenerator(plz='85375')
-    pg = gg.pgr
-    regiostar_plz = pg.get_municipal_register()
+    dbc_client = gg.dbc
+    regiostar_plz = dbc_client.get_municipal_register()
 
     regiostar_plz = regiostar_plz[regiostar_plz['fed_state'] == 9]
     samples_bayern = perc_of_pop_per_class(regiostar_plz)

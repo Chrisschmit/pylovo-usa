@@ -1,9 +1,9 @@
 import geopandas as gpd
 import pandas as pd
-import psycopg2 as pg
+import psycopg2 as psy
 from geoalchemy2 import Geometry, WKTElement
 from sqlalchemy import create_engine
-from pylovo import pgReaderWriter as pg
+import pylovo.databaseClient as dbc
 
 from classification.clustering.clustering_algorithms import *
 from pylovo.config_loader import *
@@ -16,13 +16,13 @@ class DatabaseCommunication:
     """
 
     def __init__(self, **kwargs):
-        self.pgr = pg.PgReaderWriter()
+        self.dbc = dbc.DatabaseClient()
 
         print("Database connection is constructed. ")
 
     def __del__(self):
-        self.pgr.cur.close()
-        self.pgr.conn.close()
+        self.dbc.cur.close()
+        self.dbc.conn.close()
         print("Database connection closed.")
 
     def get_clustering_parameters_for_plz(self, plz: str) -> pd.DataFrame:
@@ -37,7 +37,7 @@ class DatabaseCommunication:
                 JOIN grid_result gr ON cp.grid_result_id = gr.grid_result_id
                 WHERE gr.version_id = %(v)s AND gr.plz = %(p)s;"""
         params = {"v": VERSION_ID, "p": plz}
-        df_query = pd.read_sql_query(query, con=self.pgr.conn, params=params, )
+        df_query = pd.read_sql_query(query, con=self.dbc.conn, params=params, )
         columns = CLUSTERING_PARAMETERS
         df_parameter = pd.DataFrame(df_query, columns=columns)
         return df_parameter
@@ -65,7 +65,7 @@ class DatabaseCommunication:
                 JOIN plz_table p
                 ON c.plz = p.plz;"""
         params = {"v": VERSION_ID, "c": CLASSIFICATION_VERSION}
-        df_query = pd.read_sql_query(query, con=self.pgr.conn, params=params, )
+        df_query = pd.read_sql_query(query, con=self.dbc.conn, params=params, )
         columns = CLUSTERING_PARAMETERS
         df_parameter = pd.DataFrame(df_query, columns=columns)
         return df_parameter
@@ -99,7 +99,7 @@ class DatabaseCommunication:
                 JOIN plz_table p
                 ON c.plz = p.plz;"""
         params = {"v": VERSION_ID, "c": CLASSIFICATION_VERSION}
-        df_query = pd.read_sql_query(query, con=self.pgr.conn, params=params, )
+        df_query = pd.read_sql_query(query, con=self.dbc.conn, params=params, )
         return df_query
 
     def create_wkt_element(self, geom):
@@ -120,7 +120,7 @@ class DatabaseCommunication:
                   ON tp.grid_result_id = gr.grid_result_id
                 WHERE version_id=%(v)s;"""
         params = {"v": VERSION_ID}
-        df_transformer_positions = gpd.read_postgis(query, con=self.pgr.sqla_engine, params=params, )
+        df_transformer_positions = gpd.read_postgis(query, con=self.dbc.sqla_engine, params=params, )
         df_transformer_positions['geom'] = df_transformer_positions['geom'].apply(self.create_wkt_element)
 
         # calculate the clusters
@@ -178,7 +178,7 @@ class DatabaseCommunication:
                 FROM grid_result
                 WHERE version_id=%(v)s;"""
         params = {"v": VERSION_ID}
-        df_grid_result = pd.read_sql_query(query, con=self.pgr.sqla_engine, params=params)
+        df_grid_result = pd.read_sql_query(query, con=self.dbc.sqla_engine, params=params)
 
         df_transformers_classified  = pd.merge(df_grid_result, df_transformers_classified, how='right',
                                                left_on=['version_id', 'plz', 'kcid', 'bcid'],
@@ -189,11 +189,11 @@ class DatabaseCommunication:
         # add classification id
         df_transformers_classified['classification_id'] = CLASSIFICATION_VERSION
         # write transformer data with cluster info to database
-        df_transformers_classified.to_sql(name='transformer_classified', con=self.pgr.sqla_engine,
+        df_transformers_classified.to_sql(name='transformer_classified', con=self.dbc.sqla_engine,
                                           if_exists='append',
                                           index=False, dtype={'geom': Geometry(geometry_type='POINT', srid=3035)})
-        print(self.pgr.cur.statusmessage)
-        self.pgr.conn.commit()
+        print(self.dbc.cur.statusmessage)
+        self.dbc.conn.commit()
 
     def apply_max_trafo_dis_threshold(self) -> None:
         """apply maximum transformer distance threshold on clustering parameter table
@@ -202,9 +202,9 @@ class DatabaseCommunication:
         query = """UPDATE clustering_parameters
                 SET filtered = true
                 WHERE max_trafo_dis > %(t)s;"""
-        self.pgr.cur.execute(query, {"t": THRESHOLD_MAX_TRAFO_DIS})
-        print(self.pgr.cur.statusmessage)
-        self.pgr.conn.commit()
+        self.dbc.cur.execute(query, {"t": THRESHOLD_MAX_TRAFO_DIS})
+        print(self.dbc.cur.statusmessage)
+        self.dbc.conn.commit()
 
     def apply_households_per_building_threshold(self) -> None:
         """apply maximum households per building threshold on clustering parameter table
@@ -220,9 +220,9 @@ class DatabaseCommunication:
                    SET filtered = true
                    FROM buildings b
                    WHERE c.grid_result_id = b.grid_result_id;"""
-        self.pgr.cur.execute(query, {"h": THRESHOLD_HOUSEHOLDS_PER_BUILDING})
-        print(self.pgr.cur.statusmessage)
-        self.pgr.conn.commit()
+        self.dbc.cur.execute(query, {"h": THRESHOLD_HOUSEHOLDS_PER_BUILDING})
+        print(self.dbc.cur.statusmessage)
+        self.dbc.conn.commit()
     
     def apply_list_of_clustering_parameters_thresholds(self) -> None:
         """
@@ -246,9 +246,9 @@ class DatabaseCommunication:
             "no_households": THRESHOLD_NO_HOUSEHOLDS
         }
 
-        self.pgr.cur.execute(query, params)
-        print(self.pgr.cur.statusmessage)
-        self.pgr.conn.commit()
+        self.dbc.cur.execute(query, params)
+        print(self.dbc.cur.statusmessage)
+        self.dbc.conn.commit()
 
     def set_remaining_filter_values_false(self) -> None:
         """setting filtered value to false for grids that should not be filtered according to their parameters
@@ -256,9 +256,9 @@ class DatabaseCommunication:
         query = """UPDATE clustering_parameters 
             SET filtered = false
             WHERE filtered IS NULL;"""
-        self.pgr.cur.execute(query)
-        print(self.pgr.cur.statusmessage)
-        self.pgr.conn.commit()
+        self.dbc.cur.execute(query)
+        print(self.dbc.cur.statusmessage)
+        self.dbc.conn.commit()
 
     def get_ags_for_plz(df_plz: pd.DataFrame) -> pd.DataFrame:
         """get the AGS for the PLZ in a dataframe

@@ -1,9 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import psycopg2
+import psycopg2 as psy
 from sqlalchemy import create_engine
-from pylovo import pgReaderWriter as pg
+import pylovo.databaseClient as dbc
 
 from pylovo.config_loader import *
 from pylovo.GridGenerator import GridGenerator
@@ -20,7 +20,7 @@ samples_per_class_pop = {
     77: 16,
 }
 
-pgr = pg.PgReaderWriter()
+db_client = dbc.DatabaseClient()
 
 def check_if_classification_version_exists():
     """checks whether classification version already exists.
@@ -28,7 +28,7 @@ def check_if_classification_version_exists():
 
     :raises Exception: if classification version already exists
     """
-    cur = pgr.cur
+    cur = db_client.cur
     count_query = f"""SELECT COUNT(*) 
             FROM classification_version 
             WHERE "classification_id" = {CLASSIFICATION_VERSION}"""
@@ -45,7 +45,7 @@ def check_if_classification_version_exists():
         ({CLASSIFICATION_VERSION}, '{CLASSIFICATION_VERSION_COMMENT}', '{CLASSIFICATION_REGION}')"""
         cur.execute(insert_query)
         print(cur.statusmessage)
-        pgr.conn.commit()
+        db_client.conn.commit()
         print(f"Classification version: {CLASSIFICATION_VERSION} was added")
 
 
@@ -55,7 +55,7 @@ def get_municipal_register_as_dataframe() -> pd.DataFrame:
     :return: municipal register
     :rtype: pd.DataFrame
     """
-    regiostar_plz = pgr.get_municipal_register()
+    regiostar_plz = db_client.get_municipal_register()
     return regiostar_plz
 
 
@@ -131,10 +131,10 @@ def sample_set_to_db(regiostar_samples_result: pd.DataFrame):
     :type regiostar_samples_result: pd.DataFrame
 
     """
-    cur = pgr.cur
-    regiostar_samples_result.to_sql('sample_set', con=pgr.sqla_engine, if_exists='append', index=False)
+    cur = db_client.cur
+    regiostar_samples_result.to_sql('sample_set', con=db_client.sqla_engine, if_exists='append', index=False)
     print(cur.statusmessage)
-    pgr.conn.commit()
+    db_client.conn.commit()
 
 
 def get_federal_state_id() -> int:
@@ -183,7 +183,7 @@ def get_sample_set() -> pd.DataFrame:
     :return: table of a complete sample set
     :rtype: pd.DataFrame
     """
-    cur = pgr.cur
+    cur = db_client.cur
     query = f"""SELECT ss.plz, mr.pop, mr.area, mr.lat, mr.lon, ss.ags, mr.name_city, mr.fed_state, mr.regio7, mr.regio5, mr.pop_den
     FROM sample_set ss
     JOIN municipal_register mr ON ss.plz = mr.plz AND ss.ags = mr.ags

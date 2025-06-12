@@ -1,7 +1,7 @@
 import os
 import sys
 import pandas as pd
-import psycopg2 as pg
+import psycopg2 as psy
 
 # Determine the project's root directory and add to Python's module search path
 PROJECT_ROOT = os.path.abspath(os.path.join(os.getcwd(), "../../.."))
@@ -38,7 +38,7 @@ def get_clustering_parameters_for_kmeans_cluster_0() -> pd.DataFrame:
     :return: A DataFrame with clustering parameters for cluster 0 entries.
     """
     # Connect to the database
-    conn = pg.connect(
+    conn = psy.connect(
         database=DBNAME, user=USER, password=PASSWORD, host=HOST, port=PORT
     )
 

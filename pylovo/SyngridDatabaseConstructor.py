@@ -3,13 +3,13 @@ import time
 import warnings
 from pathlib import Path
 
-import psycopg2 as pg
+import psycopg2 as psy
 import psycopg2.errors
 import sqlparse
 
 from pylovo.config_loader import *
 from pylovo.config_table_structure import *
-from pylovo.pgReaderWriter import PgReaderWriter
+import pylovo.databaseClient as dbc
 from raw_data.preprocessing_scripts.process_trafos import process_trafos, get_trafos_processed_3035_geojson_path, \
     fetch_trafos, RELATION_ID, EPSG, get_trafos_processed_geojson_path
 
@@ -21,20 +21,20 @@ from raw_data.preprocessing_scripts.process_trafos import process_trafos, get_tr
 class SyngridDatabaseConstructor:
     """
     Constructs a ready to use pylovo database. Be careful about overwriting the tables.
-    It uses pgReaderWriter to connect to the database and create tables and import data.
+    It uses databaseClient to connect to the database and create tables and import data.
     """
 
-    def __init__(self, pgr=None):
+    def __init__(self, dbc_obj=None):
         self.extensions_added = False
 
-        if pgr:
-            self.pgr = pgr
+        if dbc_obj:
+            self.dbc = dbc_obj
         else:
-            self.pgr = PgReaderWriter()
+            self.dbc = dbc.DatabaseClient()
 
 
     def get_table_name_list(self):
-        with self.pgr.conn.cursor() as cur:
+        with self.dbc.conn.cursor() as cur:
             cur.execute(
                 """SELECT table_name FROM information_schema.tables
                    WHERE table_schema = %s""", (TARGET_SCHEMA,)
@@ -53,31 +53,31 @@ class SyngridDatabaseConstructor:
     def create_table(self, table_name):
         # create extension if not exists for recognition of geom datatypes
         if not self.extensions_added:
-            with self.pgr.conn.cursor() as cur:
+            with self.dbc.conn.cursor() as cur:
                 # create extension if not exists for recognition of geom datatypes
                 cur.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
                 print("CREATE EXTENSION postgis")
                 cur.execute("CREATE EXTENSION IF NOT EXISTS pgRouting;")
                 print("CREATE EXTENSION pgRouting")
-                self.pgr.conn.commit()
+                self.dbc.conn.commit()
                 self.extensions_added = True
 
         if table_name == "all":
             try:
-                with self.pgr.conn.cursor() as cur:
+                with self.dbc.conn.cursor() as cur:
                     for table_name, query in CREATE_QUERIES.items():
                         cur.execute(query)
                         print(f"CREATE TABLE {table_name}")
-                self.pgr.conn.commit()
-            except (Exception, pg.DatabaseError) as error:
+                self.dbc.conn.commit()
+            except (Exception, psy.DatabaseError) as error:
                 raise error
         elif table_name in CREATE_QUERIES:
             try:
-                with self.pgr.conn.cursor() as cur:
+                with self.dbc.conn.cursor() as cur:
                     cur.execute(CREATE_QUERIES[table_name])
                     print(f"CREATE TABLE {table_name}")
-                self.pgr.conn.commit()
-            except (Exception, pg.DatabaseError) as error:
+                self.dbc.conn.commit()
+            except (Exception, psy.DatabaseError) as error:
                 raise error
         else:
             raise ValueError(
@@ -189,15 +189,15 @@ class SyngridDatabaseConstructor:
             table_name = file_dict.get("table_name", file_name)
 
             if self.table_exists(table_name=table_name):
-                with self.pgr.conn.cursor() as cur:
+                with self.dbc.conn.cursor() as cur:
                     cur.execute(f"DELETE FROM {table_name}")
-                    self.pgr.conn.commit()
+                    self.dbc.conn.commit()
             # read and write
             df = pd.read_csv(file_path, index_col=False)
             df = df.rename(columns={"einwohner": "population", "gid": "postcode_id"})
             df.to_sql(
                 name=table_name,
-                con=self.pgr.sqla_engine,
+                con=self.dbc.sqla_engine,
                 if_exists="append",
                 index=False,
             )
@@ -211,7 +211,7 @@ class SyngridDatabaseConstructor:
         Reads the large SQL file in 10% chunks, executes complete statements on-the-fly,
         and defers incomplete statements until the next chunk.
         """
-        cur = self.pgr.conn.cursor()
+        cur = self.dbc.conn.cursor()
 
         # Path to your SQL file, which includes creation of the table
         sc_path = os.path.join(os.getcwd(), "raw_data", "ways", "ways_public_2po_4pgr.sql")
@@ -250,14 +250,14 @@ class SyngridDatabaseConstructor:
                         stmt = stmt.strip()
                         if stmt:
                             cur.execute(stmt)
-                            self.pgr.conn.commit()
+                            self.dbc.conn.commit()
 
                     # Check if the last statement ends with a semicolon or not
                     last_stmt = statements[-1].strip()
                     if last_stmt.endswith(';'):
                         # It's a complete statement
                         cur.execute(last_stmt)
-                        self.pgr.conn.commit()
+                        self.dbc.conn.commit()
                         leftover = ""
                     else:
                         leftover = last_stmt
@@ -269,7 +269,7 @@ class SyngridDatabaseConstructor:
                         if stmt.endswith(';'):
                             # It's complete, execute it
                             cur.execute(stmt)
-                            self.pgr.conn.commit()
+                            self.dbc.conn.commit()
                             leftover = ""
                         else:
                             # It's incomplete, keep it
@@ -286,7 +286,7 @@ class SyngridDatabaseConstructor:
 
         st = time.time()
 
-        cur = self.pgr.conn.cursor()
+        cur = self.dbc.conn.cursor()
 
         # Transform to ways table
         query = """INSERT INTO ways
@@ -304,7 +304,7 @@ class SyngridDatabaseConstructor:
         query = "DROP TABLE public_2po_4pgr"
         cur.execute(query)
 
-        self.pgr.conn.commit()
+        self.dbc.conn.commit()
 
         et = time.time()
         print(f"Ways are successfully imported to db in {int(et - st)} s")
@@ -313,10 +313,10 @@ class SyngridDatabaseConstructor:
         """
         Creates the SQL functions that are needed for the app to operate
         """
-        cur = self.pgr.conn.cursor()
+        cur = self.dbc.conn.cursor()
         sc_path = os.path.join(os.getcwd(), "pylovo", "dump_functions.sql")
         with open(sc_path, 'r') as sc_file:
             print(f"Executing dump_functions.sql script with schema '{TARGET_SCHEMA}'.")
             sql = sc_file.read()
             cur.execute(sql)
-            self.pgr.conn.commit()
+            self.dbc.conn.commit()

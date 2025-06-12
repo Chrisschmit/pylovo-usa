@@ -30,8 +30,8 @@ gg.generate_grid_for_single_plz(plz=plz, analyze_grids=False)
 
 if plot_results:
     ### plot data from the generated grids
-    pg = gg.pgr
-    cluster_list = gg.pgr.get_list_from_plz(plz)
+    dbc_client = gg.dbc
+    cluster_list = gg.dbc.get_list_from_plz(plz)
     print('The PLZ has', len(cluster_list), 'grids.')
     plot_boxplot_plz(plz)
     plot_pie_of_trafo_cables(plz)

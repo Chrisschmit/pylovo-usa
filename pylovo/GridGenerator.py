@@ -3,7 +3,8 @@ from pathlib import Path
 
 import pandapower as pp
 import numpy as np
-from pylovo import pgReaderWriter as pg, utils
+import pylovo.databaseClient as dbc
+from pylovo import utils
 from pylovo.config_loader import *
 
 
@@ -19,15 +20,15 @@ class GridGenerator:
 
     def __init__(self, plz=999999, **kwargs):
         self.plz = str(plz)
-        self.pgr = pg.PgReaderWriter()
-        self.pgr.insert_version_if_not_exists()
-        self.pgr.insert_parameter_tables(consumer_categories=CONSUMER_CATEGORIES)
+        self.dbc = dbc.DatabaseClient()
+        self.dbc.insert_version_if_not_exists()
+        self.dbc.insert_parameter_tables(consumer_categories=CONSUMER_CATEGORIES)
         self.logger = utils.create_logger(
             name="GridGenerator", log_file=kwargs.get("log_file", "log.txt"), log_level=LOG_LEVEL
         )
 
     def __del__(self):
-        self.pgr.__del__()
+        self.dbc.__del__()
 
     def generate_grid(self):
         self.check_if_results_exist()
@@ -39,7 +40,7 @@ class GridGenerator:
         
 
     def check_if_results_exist(self):
-        postcode_count = self.pgr.count_postcode_result(self.plz)
+        postcode_count = self.dbc.count_postcode_result(self.plz)
         if postcode_count:
             raise ResultExistsError(
                 f"The grids for the postcode area {self.plz} is already generated "
@@ -55,33 +56,33 @@ class GridGenerator:
         :return:
         """
 
-        self.pgr.copy_postcode_result_table(self.plz)
+        self.dbc.copy_postcode_result_table(self.plz)
         self.logger.info(f"Working on plz {self.plz}")
 
-        self.pgr.set_residential_buildings_table(self.plz)
-        self.pgr.set_other_buildings_table(self.plz)
+        self.dbc.set_residential_buildings_table(self.plz)
+        self.dbc.set_other_buildings_table(self.plz)
         self.logger.info("Buildings_tem table prepared")
-        self.pgr.remove_duplicate_buildings()
+        self.dbc.remove_duplicate_buildings()
         self.logger.info("Duplicate buildings removed from buildings_tem")
 
-        self.pgr.set_plz_settlement_type(self.plz)
+        self.dbc.set_plz_settlement_type(self.plz)
         self.logger.info("House_distance and settlement_type in postcode_result")
 
-        unloadcount = self.pgr.set_building_peak_load()
+        unloadcount = self.dbc.set_building_peak_load()
         self.logger.info(
             f"Building peakload calculated in buildings_tem, {unloadcount} unloaded buildings are removed from "
             f"buildings_tem"
         )
-        too_large = self.pgr.zero_too_large_consumers()
+        too_large = self.dbc.zero_too_large_consumers()
         self.logger.info(f"{too_large} too large consumers removed from buildings_tem")
 
-        self.pgr.assign_close_buildings()
+        self.dbc.assign_close_buildings()
         self.logger.info("All close buildings assigned and removed from buildings_tem")
 
-        self.pgr.insert_transformers(self.plz)
+        self.dbc.insert_transformers(self.plz)
         self.logger.info("Transformers inserted in to the buildings_tem table")
-        self.pgr.count_indoor_transformers()
-        self.pgr.drop_indoor_transformers()
+        self.dbc.count_indoor_transformers()
+        self.dbc.drop_indoor_transformers()
         self.logger.info("Indoor transformers dropped from the buildings_tem table")
 
     def preprocess_ways(self):
@@ -91,15 +92,15 @@ class GridGenerator:
         INTO: ways_tem, buildings_tem, ways_tem_vertices_pgr, ways_tem_
         :return:
         """
-        ways_count = self.pgr.set_ways_tem_table(self.plz)
+        ways_count = self.dbc.set_ways_tem_table(self.plz)
         self.logger.info(f"The ways_tem table filled with {ways_count} ways")
-        self.pgr.connect_unconnected_ways()
+        self.dbc.connect_unconnected_ways()
         self.logger.info("Ways connection finished in ways_tem")
-        self.pgr.draw_building_connection()
+        self.dbc.draw_building_connection()
         self.logger.info("Building connection finished in ways_tem")
 
-        self.pgr.update_ways_cost()
-        unconn = self.pgr.set_vertice_id()
+        self.dbc.update_ways_cost()
+        unconn = self.dbc.set_vertice_id()
         self.logger.debug(f"vertice id set, {unconn} buildings with no vertice id")
 
     def apply_kmeans_clustering(self):
@@ -113,7 +114,7 @@ class GridGenerator:
         """
 
         # Get connected components from the street network
-        component, vertices = self.pgr.get_connected_component()
+        component, vertices = self.dbc.get_connected_component()
         component_ids = np.unique(component)
 
         if len(component_ids) > 0:
@@ -131,28 +132,28 @@ class GridGenerator:
             warnings.warn("No connected components found in ways_tem table")
 
         # Verify clustering was successful for all buildings
-        no_kmean_count = self.pgr.count_no_kmean_buildings()
+        no_kmean_count = self.dbc.count_no_kmean_buildings()
         if no_kmean_count not in [0, None]:
             warnings.warn(f"K-means clustering issue: {no_kmean_count} buildings not assigned to clusters")
 
     def _process_component_to_kcid(self, vertices, component_index=None):
         """Helper method to process components to kcid groups"""
-        conn_building_count = self.pgr.count_connected_buildings(vertices)
+        conn_building_count = self.dbc.count_connected_buildings(vertices)
 
         if conn_building_count <= 1 or conn_building_count is None:
             # Remove isolated or empty components
-            self.pgr.delete_ways(vertices)
-            self.pgr.delete_transformers_from_buildings_tem(vertices)
+            self.dbc.delete_ways(vertices)
+            self.dbc.delete_transformers_from_buildings_tem(vertices)
             self.logger.debug("Empty/isolated component removed. Ways and transformers deleted from temporary tables.")
         elif conn_building_count >= LARGE_COMPONENT_LOWER_BOUND:
             # K-means applied to large component to define subgroups with cluster ids
             cluster_count = int(conn_building_count / LARGE_COMPONENT_DIVIDER)
-            self.pgr.update_large_kmeans_cluster(vertices, cluster_count)
+            self.dbc.update_large_kmeans_cluster(vertices, cluster_count)
             log_msg = f"Large component {component_index} clustered into {cluster_count} groups" if component_index is not None else f"Large component clustered into {cluster_count} groups"
             self.logger.debug(log_msg)
         else:
             # Allocate cluster id for connected component smaller than the building threshold
-            self.pgr.update_kmeans_cluster(vertices)
+            self.dbc.update_kmeans_cluster(vertices)
 
     def position_all_transformers(self):
         """
@@ -160,42 +161,42 @@ class GridGenerator:
         FROM: buildings_tem, grid_result
         INTO: buildings_tem, grid_result
         """
-        kcid_length = self.pgr.get_kcid_length()
+        kcid_length = self.dbc.get_kcid_length()
 
         for _ in range(kcid_length):
-            kcid = self.pgr.get_next_unfinished_kcid(self.plz)
+            kcid = self.dbc.get_next_unfinished_kcid(self.plz)
             self.logger.debug(f"working on kcid {kcid}")
             # Building clustering
             # 0. Check for existing transformers from OSM
-            transformers = self.pgr.get_included_transformers(kcid)
+            transformers = self.dbc.get_included_transformers(kcid)
 
             # Case 1: No transformers present
             if not transformers:
                 self.logger.debug(f"kcid{kcid} has no included transformer")
                 # Create greenfield building clusters
-                self.pgr.create_bcid_for_kcid(self.plz, kcid)
+                self.dbc.create_bcid_for_kcid(self.plz, kcid)
                 self.logger.debug(f"kcid{kcid} building clusters finished")
 
             # Case 2: Transformers present
             else:
                 self.logger.debug(f"kcid{kcid} has {len(transformers)} transformers")
                 # Create brownfield building clusters with existing transformers
-                self.pgr.position_brownfield_transformers(self.plz, kcid, transformers)
+                self.dbc.position_brownfield_transformers(self.plz, kcid, transformers)
 
                 # Check buildings and manage clusters
-                if self.pgr.count_kmean_cluster_consumers(kcid) > 1:
-                    self.pgr.create_bcid_for_kcid(self.plz, kcid) #TODO: name should include transformer_size allocation
+                if self.dbc.count_kmean_cluster_consumers(kcid) > 1:
+                    self.dbc.create_bcid_for_kcid(self.plz, kcid) #TODO: name should include transformer_size allocation
                 else:
-                    self.pgr.delete_isolated_building(self.plz, kcid) #TODO: check approach with isolated buildings
+                    self.dbc.delete_isolated_building(self.plz, kcid) #TODO: check approach with isolated buildings
                 self.logger.debug("rest building cluster finished")
 
             # Process unfinished clusters
-            for bcid in self.pgr.get_greenfield_bcids(self.plz, kcid):
+            for bcid in self.dbc.get_greenfield_bcids(self.plz, kcid):
                 # Transformer positioning for greenfield clusters
                 if bcid >= 0:
-                    self.pgr.position_greenfield_transformers(self.plz, kcid, bcid)
+                    self.dbc.position_greenfield_transformers(self.plz, kcid, bcid)
                     self.logger.debug(f"Transformer positioning for kcid{kcid}, bcid{bcid} finished")
-                    self.pgr.update_transformer_rated_power(self.plz, kcid, bcid, 1)
+                    self.dbc.update_transformer_rated_power(self.plz, kcid, bcid, 1)
                     self.logger.debug("transformer_rated_power in grid_result is updated.")
 
     def install_cables(self):
@@ -227,7 +228,7 @@ class GridGenerator:
             None
         """
         # Get all clusters for the postal code area
-        cluster_list = self.pgr.get_list_from_plz(self.plz)
+        cluster_list = self.dbc.get_list_from_plz(self.plz)
         ci_count = 0
         ci_process = 0
         main_street_available_cables = CABLE_COST_DICT.keys()
@@ -238,18 +239,18 @@ class GridGenerator:
 
             # Get data for this cluster
             vertices_dict, ont_vertice, vertices_list, buildings_df, consumer_df, consumer_list, connection_nodes = (
-                self.pgr.prepare_vertices_list(self.plz, kcid, bcid)
+                self.dbc.prepare_vertices_list(self.plz, kcid, bcid)
             )
-            Pd, load_units, load_type = self.pgr.get_consumer_simultaneous_load_dict(consumer_list, buildings_df)
+            Pd, load_units, load_type = self.dbc.get_consumer_simultaneous_load_dict(consumer_list, buildings_df)
             local_length_dict = {c: 0 for c in CABLE_COST_DICT.keys()}
 
             # Create network and add components
             net = pp.create_empty_network()
-            self.pgr.create_cable_std_type(net)
-            self.pgr.create_lvmv_bus(self.plz, kcid, bcid, net)
-            self.pgr.create_transformer(self.plz, kcid, bcid, net)
-            self.pgr.create_connection_bus(connection_nodes, net)
-            self.pgr.create_consumer_bus_and_load(consumer_list, load_units, net, load_type, buildings_df)
+            self.dbc.create_cable_std_type(net)
+            self.dbc.create_lvmv_bus(self.plz, kcid, bcid, net)
+            self.dbc.create_transformer(self.plz, kcid, bcid, net)
+            self.dbc.create_connection_bus(connection_nodes, net)
+            self.dbc.create_consumer_bus_and_load(consumer_list, load_units, net, load_type, buildings_df)
 
             # Install cables branch by branch
             branch_deviation = 0
@@ -262,53 +263,53 @@ class GridGenerator:
                     Imax = sim_load / (VN * V_BAND_LOW * np.sqrt(3))
 
                     # Install consumer cables
-                    local_length_dict = self.pgr.install_consumer_cables(
+                    local_length_dict = self.dbc.install_consumer_cables(
                         self.plz, bcid, kcid, branch_deviation, connection_node_list,
                         ont_vertice, vertices_dict, Pd, net, CONNECTION_AVAILABLE_CABLES, local_length_dict,
                     )
 
                     # Connect to transformer
                     if connection_node_list[0] == ont_vertice:
-                        cable, count = self.pgr.find_minimal_available_cable(Imax, net, main_street_available_cables)
-                        self.pgr.create_line_ont_to_lv_bus(
+                        cable, count = self.dbc.find_minimal_available_cable(Imax, net, main_street_available_cables)
+                        self.dbc.create_line_ont_to_lv_bus(
                             self.plz, bcid, kcid, connection_node_list[0], branch_deviation, net, cable, count
                         )
                     else:
-                        cable, count = self.pgr.find_minimal_available_cable(
+                        cable, count = self.dbc.find_minimal_available_cable(
                             Imax, net, main_street_available_cables, vertices_dict[connection_nodes[0]]
                         )
-                        length = self.pgr.create_line_start_to_lv_bus(
+                        length = self.dbc.create_line_start_to_lv_bus(
                             self.plz, bcid, kcid, connection_node_list[0], branch_deviation,
                             net, vertices_dict, cable, count, ont_vertice
                         )
                         local_length_dict[cable] += length
 
-                    self.pgr.deviate_bus_geodata(connection_node_list, branch_deviation, net)
+                    self.dbc.deviate_bus_geodata(connection_node_list, branch_deviation, net)
                     self.logger.debug("main street cable installation finished")
                     break
 
                 # Process multiple nodes as branches
-                furthest_node_path_list = self.pgr.find_furthest_node_path_list(
+                furthest_node_path_list = self.dbc.find_furthest_node_path_list(
                     connection_node_list, vertices_dict, ont_vertice
                 )
-                branch_node_list, Imax = self.pgr.get_maximum_load_branch(
+                branch_node_list, Imax = self.dbc.get_maximum_load_branch(
                     furthest_node_path_list, buildings_df, consumer_df
                 )
 
                 # Install cables for this branch
-                local_length_dict = self.pgr.install_consumer_cables(
+                local_length_dict = self.dbc.install_consumer_cables(
                     self.plz, bcid, kcid, branch_deviation, branch_node_list,
                     ont_vertice, vertices_dict, Pd, net, CONNECTION_AVAILABLE_CABLES, local_length_dict
                 )
 
                 # Select appropriate cable and connect nodes
                 branch_distance = vertices_dict[branch_node_list[0]]
-                cable, count = self.pgr.find_minimal_available_cable(
+                cable, count = self.dbc.find_minimal_available_cable(
                     Imax, net, main_street_available_cables, branch_distance
                 )
 
                 if len(branch_node_list) >= 2:
-                    local_length_dict = self.pgr.create_line_node_to_node(
+                    local_length_dict = self.dbc.create_line_node_to_node(
                         self.plz, kcid, bcid, branch_node_list, branch_deviation,
                         vertices_dict, local_length_dict, cable, ont_vertice, count, net
                     )
@@ -316,11 +317,11 @@ class GridGenerator:
                 # Connect branch to transformer
                 branch_start_node = branch_node_list[-1]
                 if branch_start_node == ont_vertice:
-                    self.pgr.create_line_ont_to_lv_bus(
+                    self.dbc.create_line_ont_to_lv_bus(
                         self.plz, bcid, kcid, branch_start_node, branch_deviation, net, cable, count
                     )
                 else:
-                    length = self.pgr.create_line_start_to_lv_bus(
+                    length = self.dbc.create_line_start_to_lv_bus(
                         self.plz, bcid, kcid, branch_start_node, branch_deviation,
                         net, vertices_dict, cable, count, ont_vertice
                     )
@@ -330,7 +331,7 @@ class GridGenerator:
                 for vertice in branch_node_list:
                     connection_node_list.remove(vertice)
 
-                self.pgr.deviate_bus_geodata(branch_node_list, branch_deviation, net)
+                self.dbc.deviate_bus_geodata(branch_node_list, branch_deviation, net)
                 branch_deviation += 1
 
             # Track and report progress
@@ -349,17 +350,17 @@ class GridGenerator:
     def analyse_results(self):
         try:
             self.logger.info("Start basic result analysis")
-            self.pgr.analyse_basic_parameters(self.plz)
+            self.dbc.analyse_basic_parameters(self.plz)
             self.logger.info("Start cable counting")
-            self.pgr.analyse_cables(self.plz)
+            self.dbc.analyse_cables(self.plz)
             self.logger.info("Start per trafo analysis")
-            self.pgr.analyse_per_trafo_parameters(self.plz)
+            self.dbc.analyse_per_trafo_parameters(self.plz)
             self.logger.info("Result analysis finished")
-            self.pgr.conn.commit()
+            self.dbc.conn.commit()
         except Exception as e:
             self.logger.error(f"Error during analysis for PLZ {self.plz}: {e}")
             self.logger.info(f"Skipped PLZ {self.plz} due to analysis error.")
-            self.pgr.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION),self.plz)  # delete from sample set
+            self.dbc.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION),self.plz)  # delete from sample set
             
 
 
@@ -376,7 +377,7 @@ class GridGenerator:
 
         json_string = pp.to_json(net, filename=None)
 
-        self.pgr.save_net(self.plz, kcid, bcid, json_string)
+        self.dbc.save_net(self.plz, kcid, bcid, json_string)
 
         self.logger.info(f"Grid with kcid:{kcid} bcid:{bcid} is stored. ")
 
@@ -388,15 +389,15 @@ class GridGenerator:
         :param analyze_grids: option to analyse the results after grid generation, defaults to False
         :type analyze_grids: bool
         """
-        self.pgr.create_temp_tables() # create temp tables for the grid generation
+        self.dbc.create_temp_tables() # create temp tables for the grid generation
         
         for index, row in df_plz.iterrows():
             self.plz = str(row['plz'])
             print('-------------------- start', self.plz, '---------------------------')
             try:
                 self.generate_grid()
-                self.pgr.save_tables(plz=self.plz) # Save data from temporary tables to result tables
-                self.pgr.reset_tables() # Reset temporary tables
+                self.dbc.save_tables(plz=self.plz) # Save data from temporary tables to result tables
+                self.dbc.reset_tables() # Reset temporary tables
                 if analyze_grids:
                     self.analyse_results()
             except ResultExistsError:
@@ -404,14 +405,14 @@ class GridGenerator:
             except Exception as e:
                 self.logger.error(f"Error during grid generation for PLZ {self.plz}: {e}")
                 self.logger.info(f"Skipped PLZ {self.plz} due to generation error.")
-                self.pgr.conn.rollback() # rollback the transaction
-                self.pgr.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION),self.plz)  # delete from sample set
+                self.dbc.conn.rollback() # rollback the transaction
+                self.dbc.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION),self.plz)  # delete from sample set
                 continue
             print('-------------------- end', self.plz, '-----------------------------')
         
         
-        self.pgr.drop_temp_tables() # drop temp tables
-        self.pgr.commit_changes() # commit the changes to the database
+        self.dbc.drop_temp_tables() # drop temp tables
+        self.dbc.commit_changes() # commit the changes to the database
     
     def generate_grid_for_single_plz(self, plz: str, analyze_grids: bool = False) -> None:
         """
@@ -425,11 +426,11 @@ class GridGenerator:
         self.plz = plz
         print('-------------------- start', self.plz, '---------------------------')
         
-        self.pgr.create_temp_tables()  # create temp tables for the grid generation
+        self.dbc.create_temp_tables()  # create temp tables for the grid generation
 
         try:
             self.generate_grid()
-            self.pgr.save_tables(plz=self.plz) # Save data from temporary tables to result tables
+            self.dbc.save_tables(plz=self.plz) # Save data from temporary tables to result tables
             if analyze_grids:
                 self.analyse_results()
         except ResultExistsError:
@@ -437,11 +438,11 @@ class GridGenerator:
         except Exception as e:
             self.logger.error(f"Error during grid generation for PLZ {self.plz}: {e}")
             self.logger.info(f"Skipped PLZ {self.plz} due to generation error.")
-            self.pgr.conn.rollback()  # rollback the transaction
-            self.pgr.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION), self.plz)  # delete from sample set
+            self.dbc.conn.rollback()  # rollback the transaction
+            self.dbc.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION), self.plz)  # delete from sample set
             return
 
-        self.pgr.drop_temp_tables()  # drop temp tables
-        self.pgr.commit_changes()    # commit the changes to the database
+        self.dbc.drop_temp_tables()  # drop temp tables
+        self.dbc.commit_changes()    # commit the changes to the database
 
         print('-------------------- end', self.plz, '-----------------------------')

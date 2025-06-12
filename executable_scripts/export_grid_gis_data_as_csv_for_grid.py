@@ -20,8 +20,8 @@ sys.path.append(bus_datapath)
 
 # read grid from DB
 gg = GridGenerator(plz)
-pg = gg.pgr
-net = pg.read_net(plz, kcid, bcid)
+dbc_client = gg.dbc
+net = dbc_client.read_net(plz, kcid, bcid)
 
 # get geodata
 line_geo, bus_geo = get_bus_line_geo_for_network(pandapower_net=net, plz=plz)

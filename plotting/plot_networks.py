@@ -25,8 +25,8 @@ def get_network_info_for_plotting(df_network_info: pd.DataFrame) -> (str, int, i
 
 def read_net_with_grid_generator(plz: str, kcid: int, bcid: int):
     gg = GridGenerator(plz=plz)
-    pg = gg.pgr
-    net = pg.read_net(plz=str(int(plz)), kcid=kcid, bcid=bcid)
+    dbc_client = gg.dbc
+    net = dbc_client.read_net(plz=str(int(plz)), kcid=kcid, bcid=bcid)
     return net
 
 
@@ -56,13 +56,13 @@ def plot_contextily(plz: str, kcid: int, bcid: int, zoomfactor: int = 19) -> Non
     :type zoomfactor: int
     """
     gg = GridGenerator(plz=plz)
-    net = gg.pgr.read_net(plz=str(int(plz)), kcid=kcid, bcid=bcid)
-    pg = gg.pgr
+    net = gg.dbc.read_net(plz=str(int(plz)), kcid=kcid, bcid=bcid)
+    dbc_client = gg.dbc
     fig, ax = plt.subplots(figsize=(8, 8))
     ax.set_xticks([])
     ax.set_yticks([])
     # Buildings
-    buildings_gdf = pg.get_geo_df_join(
+    buildings_gdf = dbc_client.get_geo_df_join(
         ["gr.version_id", "plz", "kcid", "bcid", "br.*"],
         "buildings_result br", "grid_result gr",
         ("br.grid_result_id", "gr.grid_result_id"),
@@ -76,7 +76,7 @@ def plot_contextily(plz: str, kcid: int, bcid: int, zoomfactor: int = 19) -> Non
     ax = buildings_8_gdf.plot(ax=ax, column="peak_load_in_kw", cmap="YlOrBr",
                               legend=True, legend_kwds={'label': "Peak load in kW"})
     # trafo
-    trafo_gdf = pg.get_geo_df_join(
+    trafo_gdf = dbc_client.get_geo_df_join(
         ["geom"],
         "transformer_positions tp", "grid_result gr",
         ("tp.grid_result_id", "gr.grid_result_id"),

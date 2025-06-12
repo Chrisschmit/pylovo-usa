@@ -38,10 +38,10 @@ def get_bus_line_geo_for_plz(plz):
     """
     # connect to database
     gg = GridGenerator(plz=plz)
-    pg = gg.pgr
+    dbc_client = gg.dbc
 
     # find all networks
-    cluster_list = pg.get_list_from_plz(plz)
+    cluster_list = dbc_client.get_list_from_plz(plz)
 
     # initialise geo dataframes
     gdf_line = gpd.GeoDataFrame()
@@ -52,7 +52,7 @@ def get_bus_line_geo_for_plz(plz):
 
     # loop over all networks and extract line and bus data
     for kcid, bcid in cluster_list:
-        net = pg.read_net(plz, kcid, bcid)
+        net = dbc_client.read_net(plz, kcid, bcid)
         line_geo, bus_geo = get_bus_line_geo_for_network(pandapower_net=net, net_index=net_index, plz=plz)
 
         gdf_line = pd.concat([gdf_line, line_geo])

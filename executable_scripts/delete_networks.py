@@ -6,4 +6,4 @@ version_id = "1.0"
 
 # delete networks
 gg = GridGenerator(plz=plz)
-gg.pgr.delete_plz_from_all_tables(plz, version_id)
+gg.dbc.delete_plz_from_all_tables(plz, version_id)

@@ -14,8 +14,8 @@ def import_buildings_for_single_plz(gg):
     :param gg: Grid generator object for querying relevant PLZ and AGS data
     """
     # Retrieve AGS for the specified PLZ
-    pg = gg.pgr
-    ags_to_add = pg.get_municipal_register_for_plz(plz=gg.plz)
+    dbc_client = gg.dbc
+    ags_to_add = dbc_client.get_municipal_register_for_plz(plz=gg.plz)
 
     # Check if the PLZ exists
     if ags_to_add.empty:
@@ -27,7 +27,7 @@ def import_buildings_for_single_plz(gg):
     gg.logger.info(f"It's AGS is: {ags}")
 
     # Check if AGS is already in the database (avoid duplication)
-    df_log = pg.get_ags_log()
+    df_log = dbc_client.get_ags_log()
     if ags in df_log["ags"].values:
         gg.logger.info("Buildings of this AGS are already in the pylovo database.")
         return
@@ -52,11 +52,11 @@ def import_buildings_for_single_plz(gg):
     ogr_ls_dict = create_list_of_shp_files(files_to_add)
 
     # Add building data to the database
-    sgc = SyngridDatabaseConstructor(pgr=pg)
+    sgc = SyngridDatabaseConstructor(dbc_obj=dbc_client)
     sgc.ogr_to_db(ogr_ls_dict)
 
     # Log the successfully added AGS to the log table in the database
-    pg.write_ags_log(ags)
+    dbc_client.write_ags_log(ags)
 
     gg.logger.info(f"Buildings for AGS {ags} have been successfully added to the database.")
 
@@ -80,8 +80,8 @@ def import_buildings_for_multiple_plz(sample_plz):
 
     # check in ags_log if any ags are already on the database
     gg = GridGenerator(plz='80639')
-    pg = gg.pgr
-    df_log = pg.get_ags_log()
+    dbc_client = gg.dbc
+    df_log = dbc_client.get_ags_log()
     log_ags_list = df_log['ags'].values.tolist()
     ags_to_add = list(set(ags_to_add).difference(log_ags_list))  # dropping already imported ags
     ags_to_add = list(map(str, ags_to_add))
@@ -104,7 +104,7 @@ def import_buildings_for_multiple_plz(sample_plz):
 
         # adding the added ags to the log file
         for ags in ags_to_add:
-            pg.write_ags_log(int(ags))
+            dbc_client.write_ags_log(int(ags))
 
 def create_list_of_shp_files(files_to_add):
     """
