@@ -33,15 +33,6 @@ At the current state of the project the data is prepared for Bavaria, but will b
 Due to the large amount of data, external users need to setup a local PosgreSQL database for the grid generation process.
 A step by step tutorial to understand the product of this tool can be found in the notebook_tutorials directory.
 
-Database Client
----------------
-``databaseClient`` replaces the old ``pgReaderWriter`` module. Import it as::
-
-    import pylovo.databaseClient as dbc
-
-The :class:`dbc.DatabaseClient` class handles all database interactions and
-provides helper methods split across multiple submodules.
-
 License
 ====================
 | The code of this repository is licensed under the **MIT License** (MIT).
