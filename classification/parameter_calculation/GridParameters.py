@@ -9,7 +9,7 @@ import psycopg2 as psy
 from sklearn.metrics.pairwise import haversine_distances
 
 from classification.parameter_calculation.sim_factor import calculate_line_with_sim_factor
-from pylovo.config_loader import *
+from src.config_loader import *
 
 
 class GridParameters:

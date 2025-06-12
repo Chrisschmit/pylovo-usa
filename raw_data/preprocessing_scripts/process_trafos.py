@@ -10,8 +10,8 @@ import subprocess
 import argparse
 import requests
 
-from pylovo import SyngridDatabaseConstructor
-from pylovo.utils import query_overpass_for_geojson
+from src import SyngridDatabaseConstructor
+from src.utils import query_overpass_for_geojson
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 RELATION_ID_BASE = 3600000000  # do not change

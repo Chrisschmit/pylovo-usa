@@ -3,10 +3,10 @@ import pandas as pd
 import psycopg2 as psy
 from geoalchemy2 import Geometry, WKTElement
 from sqlalchemy import create_engine
-import pylovo.databaseClient as dbc
+import src.databaseClient as dbc
 
 from classification.clustering.clustering_algorithms import *
-from pylovo.config_loader import *
+from src.config_loader import *
 
 
 class DatabaseCommunication:

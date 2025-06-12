@@ -3,10 +3,10 @@ import numpy as np
 import pandas as pd
 import psycopg2 as psy
 from sqlalchemy import create_engine
-import pylovo.databaseClient as dbc
+import src.databaseClient as dbc
 
-from pylovo.config_loader import *
-from pylovo.GridGenerator import GridGenerator
+from src.config_loader import *
+from src.GridGenerator import GridGenerator
 
 # According to the population distribution and energy consumption
 # it is defined how many samples are to be choosen per class

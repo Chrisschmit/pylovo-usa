@@ -6,7 +6,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'pylovo'
+project = 'src'
 copyright = '2024, Beneharo Reveron Baecker'
 author = 'Beneharo Reveron Baecker'
 release = '2024'

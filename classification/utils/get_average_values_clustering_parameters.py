@@ -7,7 +7,7 @@ import psycopg2 as psy
 PROJECT_ROOT = os.path.abspath(os.path.join(os.getcwd(), "../../.."))
 sys.path.append(PROJECT_ROOT)
 
-from pylovo.config_loader import *
+from src.config_loader import *
 
 
 def get_clustering_parameters_for_kmeans_cluster_0() -> pd.DataFrame:

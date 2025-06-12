@@ -1,4 +1,4 @@
-from pylovo.GridGenerator import GridGenerator
+from src.GridGenerator import GridGenerator
 
 plz = "91301"  # forchheim
 

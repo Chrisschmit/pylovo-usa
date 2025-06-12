@@ -13,7 +13,7 @@ from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler
 from sklearn_extra.cluster import KMedoids
 
-from pylovo.config_loader import *
+from src.config_loader import *
 from plotting.config_plots import *
 
 

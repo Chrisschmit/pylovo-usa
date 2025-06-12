@@ -2,8 +2,8 @@ import glob
 import os
 import sys
 
-from pylovo.GridGenerator import GridGenerator
-from pylovo.SyngridDatabaseConstructor import SyngridDatabaseConstructor
+from src.GridGenerator import GridGenerator
+from src.SyngridDatabaseConstructor import SyngridDatabaseConstructor
 
 
 def import_buildings_for_single_plz(gg):
@@ -29,7 +29,7 @@ def import_buildings_for_single_plz(gg):
     # Check if AGS is already in the database (avoid duplication)
     df_log = dbc_client.get_ags_log()
     if ags in df_log["ags"].values:
-        gg.logger.info("Buildings of this AGS are already in the pylovo database.")
+        gg.logger.info("Buildings of this AGS are already in the src database.")
         return
     else:
         gg.logger.info("Buildings for this AGS are not in the database and will be added.")

@@ -1,6 +1,6 @@
 from classification.parameter_calculation.GridParameters import GridParameters
-import pylovo.databaseClient as dbc
-from pylovo.config_loader import VERSION_ID
+import src.databaseClient as dbc
+from src.config_loader import VERSION_ID
 
 
 class ParameterCalculator:

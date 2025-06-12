@@ -4,8 +4,8 @@ from sqlalchemy import create_engine
 
 from raw_data.municipal_register.regiostar.import_regiostar import import_regiostar
 from raw_data.municipal_register.gemeindeverzeichnis.import_functions import import_plz_einwohner, import_zuordnung_plz
-from pylovo.config_loader import *
-import pylovo.databaseClient as dbc
+from src.config_loader import *
+import src.databaseClient as dbc
 
 
 def import_tables() -> (pd.DataFrame, pd.DataFrame, pd.DataFrame):

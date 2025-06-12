@@ -2,7 +2,7 @@ import pandas as pd
 
 from sample import get_samples_with_regiostar
 from sample import perc_of_pop_per_class
-from pylovo.GridGenerator import GridGenerator
+from src.GridGenerator import GridGenerator
 
 
 def replace_plz(plz, regiostar_set):

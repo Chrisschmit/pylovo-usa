@@ -1,7 +1,7 @@
 import pandas as pd
 from factor_analyzer import FactorAnalyzer
 
-from pylovo.config_loader import NO_OF_CLUSTERS_ALLOWED
+from src.config_loader import NO_OF_CLUSTERS_ALLOWED
 from classification.database_communication.DatabaseCommunication import DatabaseCommunication
 from plotting.plotting_classification import get_parameters_for_clustering
 from plotting.plotting_classification import plot_ch_index_for_clustering_algos
