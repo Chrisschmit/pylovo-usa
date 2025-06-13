@@ -9,8 +9,7 @@ import json
 import subprocess
 import argparse
 import requests
-
-from src import SyngridDatabaseConstructor
+import src.database_constructor
 from src.utils import query_overpass_for_geojson
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
@@ -69,7 +68,7 @@ def main(relation_id: int) -> None:
             "table_name": "transformers"
         }
     ]
-    sgc = SyngridDatabaseConstructor()
+    sgc = src.database_constructor.SyngridDatabaseConstructor()
     try:
         sgc.ogr_to_db(trafo_dict, skip_failures=True)
     except CalledProcessError as e:
