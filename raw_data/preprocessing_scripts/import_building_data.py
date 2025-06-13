@@ -3,7 +3,7 @@ import os
 import sys
 
 from src.grid_generator import GridGenerator
-from src.database_constructor import SyngridDatabaseConstructor
+from src.database_constructor import DatabaseConstructor
 
 
 def import_buildings_for_single_plz(gg):
@@ -52,7 +52,7 @@ def import_buildings_for_single_plz(gg):
     ogr_ls_dict = create_list_of_shp_files(files_to_add)
 
     # Add building data to the database
-    sgc = SyngridDatabaseConstructor(dbc_obj=dbc_client)
+    sgc = DatabaseConstructor(dbc_obj=dbc_client)
     sgc.ogr_to_db(ogr_ls_dict)
 
     # Log the successfully added AGS to the log table in the database
@@ -99,7 +99,7 @@ def import_buildings_for_multiple_plz(sample_plz):
         ogr_ls_dict = create_list_of_shp_files(files_to_add)
 
         # adding the buildings to the database
-        sgc = SyngridDatabaseConstructor()
+        sgc = DatabaseConstructor()
         sgc.ogr_to_db(ogr_ls_dict)
 
         # adding the added ags to the log file

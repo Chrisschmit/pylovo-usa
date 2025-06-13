@@ -1,11 +1,11 @@
 """
 This script creates a src database and fills with raw data from referenced files.
-Do not use SyngridDatabaseConstructor unless you want to create a new database.
+Do not use DatabaseConstructor class unless you want to create a new database.
 """
 
 from src.config_loader import LOG_LEVEL
 from raw_data.municipal_register.join_regiostar_gemeindeverz import create_municipal_register
-from src.database_constructor import SyngridDatabaseConstructor
+from src.database_constructor import DatabaseConstructor
 from src import utils
 
 
@@ -14,7 +14,7 @@ logger = utils.create_logger(name="main_constructor", log_file="log.txt", log_le
 
 def main():
     ### Create constructor class
-    sgc = SyngridDatabaseConstructor()
+    sgc = DatabaseConstructor()
 
     ### Create database with predefined table structure
     logger.info("### CREATE ALL TABLES ###")

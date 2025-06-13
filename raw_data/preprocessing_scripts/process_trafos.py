@@ -68,7 +68,7 @@ def main(relation_id: int) -> None:
             "table_name": "transformers"
         }
     ]
-    sgc = src.database_constructor.SyngridDatabaseConstructor()
+    sgc = src.database_constructor.DatabaseConstructor()
     try:
         sgc.ogr_to_db(trafo_dict, skip_failures=True)
     except CalledProcessError as e:

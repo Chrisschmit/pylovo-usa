@@ -17,7 +17,7 @@ from raw_data.preprocessing_scripts.process_trafos import process_trafos, get_tr
 # from raw_data.import_building_data import OGR_FILE_LIST
 
 
-class SyngridDatabaseConstructor:
+class DatabaseConstructor:
     """
     Constructs a ready to use src database. Be careful about overwriting the tables.
     It uses databaseClient to connect to the database and create tables and import data.
