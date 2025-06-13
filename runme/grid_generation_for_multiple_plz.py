@@ -7,6 +7,7 @@ import time
 from src.classification.sampling.sample import get_municipal_register_as_dataframe
 from raw_data.preprocessing_scripts.import_building_data import import_buildings_for_multiple_plz
 from src.grid_generator import GridGenerator
+from src.config_loader import ANALYZE_GRIDS
 
 # start timing the script
 start_time = time.time()
@@ -23,7 +24,7 @@ import_buildings_for_multiple_plz(sample_plz=df_plz_ags)
 # initialize GridGenerator
 gg = GridGenerator()
 df_plz = pd.DataFrame(list(map(str,plz_list)), columns=['plz'])
-gg.generate_grid_for_multiple_plz(df_plz=df_plz, analyze_grids=False)
+gg.generate_grid_for_multiple_plz(df_plz=df_plz, analyze_grids=ANALYZE_GRIDS)
 
 # end timing and print results
 elapsed_time = time.time() - start_time

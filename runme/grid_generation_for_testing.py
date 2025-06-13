@@ -6,11 +6,7 @@ import time
 from src.grid_generator import GridGenerator
 
 # enter a plz to generate grid for:
-# plz = "99999"  # test muc
-# plz = "10000"  # test forchheim middle
-# plz = "10001"  # test small
-plz = '10002'  # test large
-# plz = '10003'  # small within test large
+plz = "10000"  # test region created by user
 
 # timing of the script
 start_time = time.time()

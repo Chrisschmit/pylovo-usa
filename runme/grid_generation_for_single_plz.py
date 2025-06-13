@@ -11,6 +11,7 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 from plotting.plot_for_plz import plot_boxplot_plz, plot_pie_of_trafo_cables
 from raw_data.preprocessing_scripts.import_building_data import *
 from src.grid_generator import GridGenerator
+from src.config_loader import ANALYZE_GRIDS
 
 # enter a plz to generate grid for:
 plz = "80803"
@@ -26,7 +27,7 @@ gg = GridGenerator(plz=plz)
 import_buildings_for_single_plz(gg)
 
 # generate a grid for the specified region
-gg.generate_grid_for_single_plz(plz=plz, analyze_grids=False)
+gg.generate_grid_for_single_plz(plz=plz, analyze_grids=ANALYZE_GRIDS)
 
 if plot_results:
     ### plot data from the generated grids
