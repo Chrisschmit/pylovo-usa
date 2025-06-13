@@ -4,12 +4,11 @@ import warnings
 from pathlib import Path
 
 import psycopg2 as psy
-import psycopg2.errors
 import sqlparse
 
 from src.config_loader import *
-from src.config_table_structure import *
-import src.databaseClient as dbc
+from config.config_table_structure import *
+import src.database_client as dbc
 from raw_data.preprocessing_scripts.process_trafos import process_trafos, get_trafos_processed_3035_geojson_path, \
     fetch_trafos, RELATION_ID, EPSG, get_trafos_processed_geojson_path
 
@@ -314,9 +313,9 @@ class SyngridDatabaseConstructor:
         Creates the SQL functions that are needed for the app to operate
         """
         cur = self.dbc.conn.cursor()
-        sc_path = os.path.join(os.getcwd(), "src", "dump_functions.sql")
+        sc_path = os.path.join(os.getcwd(), "src", "postgres_dump_functions.sql")
         with open(sc_path, 'r') as sc_file:
-            print(f"Executing dump_functions.sql script with schema '{TARGET_SCHEMA}'.")
+            print(f"Executing postgres_dump_functions.sql script with schema '{TARGET_SCHEMA}'.")
             sql = sc_file.read()
             cur.execute(sql)
             self.dbc.conn.commit()

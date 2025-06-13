@@ -3,7 +3,7 @@
 
 import time
 
-from src.GridGenerator import GridGenerator
+from src.grid_generator import GridGenerator
 
 # enter a plz to generate grid for:
 # plz = "99999"  # test muc

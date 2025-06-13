@@ -10,7 +10,7 @@ from src.classification.clustering.filter_grids import apply_filter_to_grids
 from src.classification.parameter_calculation.perform_classification_tasks_for_multiple_plz import calculate_parameters_for_multiple_plz
 from raw_data.preprocessing_scripts.import_building_data import import_buildings_for_multiple_plz
 from src.classification.sampling.sample import get_sample_set   , create_sample_set
-from src.GridGenerator import GridGenerator
+from src.grid_generator import GridGenerator
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))

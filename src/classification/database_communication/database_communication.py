@@ -1,7 +1,7 @@
 import geopandas as gpd
 import pandas as pd
 from geoalchemy2 import Geometry, WKTElement
-import src.databaseClient as dbc
+import src.database_client as dbc
 
 from src.config_loader import *
 

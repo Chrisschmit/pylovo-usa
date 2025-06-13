@@ -233,8 +233,8 @@ Use the following steps if you want to add more ways in addition to the default 
 
 (Optional) Adjust SQL functions
 -------------------------------
-Prewritten SQL functions are created by the ``main_constructor`` script, so you can skip this step if you are using that script. The constructor uses the ``dump_functions.sql`` file in the ``pylovo`` folder. If you encounter issues or want to add SQL functions, edit and run the following file:
+Prewritten SQL functions are created by the ``main_constructor`` script, so you can skip this step if you are using that script. The constructor uses the ``postgres_dump_functions.sql`` file in the ``pylovo`` folder. If you encounter issues or want to add SQL functions, edit and run the following file:
 
 ::
 
-    psql -d pylovo_db -a -f "pylovo/dump_functions.sql"
+    psql -d pylovo_db -a -f "pylovo/postgres_dump_functions.sql"

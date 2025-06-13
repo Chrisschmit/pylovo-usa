@@ -1,6 +1,6 @@
 # 7. cluster and write to transformer_classified
 # --> clustered grids and representative grids
-from src.classification.database_communication.DatabaseCommunication import DatabaseCommunication
+from src.classification.database_communication.database_communication import DatabaseCommunication
 
 
 def apply_clustering_for_visualisation() -> None:

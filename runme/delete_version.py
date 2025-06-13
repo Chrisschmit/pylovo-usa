@@ -1,4 +1,4 @@
-from src.GridGenerator import GridGenerator
+from src.grid_generator import GridGenerator
 
 # select version you want to delete entirely
 version_id = "1.0"

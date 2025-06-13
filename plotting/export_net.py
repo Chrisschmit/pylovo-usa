@@ -2,7 +2,7 @@ import geopandas as gpd
 import pandas as pd
 from shapely.geometry import LineString
 
-from src.GridGenerator import GridGenerator
+from src.grid_generator import GridGenerator
 
 
 def get_bus_line_geo_for_network(pandapower_net, plz, net_index=0):

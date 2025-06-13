@@ -1,4 +1,4 @@
-from src.GridGenerator import GridGenerator
+from src.grid_generator import GridGenerator
 
 plz = "91301"  # forchheim
 

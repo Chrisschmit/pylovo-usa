@@ -1,4 +1,4 @@
-from src.classification.database_communication.DatabaseCommunication import DatabaseCommunication
+from src.classification.database_communication.database_communication import DatabaseCommunication
 
 
 def apply_filter_to_grids(additional_filtering: bool = False) -> None:

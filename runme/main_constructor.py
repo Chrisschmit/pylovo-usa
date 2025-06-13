@@ -5,7 +5,7 @@ Do not use SyngridDatabaseConstructor unless you want to create a new database.
 
 from src.config_loader import LOG_LEVEL
 from raw_data.municipal_register.join_regiostar_gemeindeverz import create_municipal_register
-from src.SyngridDatabaseConstructor import SyngridDatabaseConstructor
+from src.database_constructor import SyngridDatabaseConstructor
 from src import utils
 
 

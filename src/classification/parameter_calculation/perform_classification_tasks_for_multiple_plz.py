@@ -1,6 +1,6 @@
 import pandas as pd
 
-from src.classification.parameter_calculation.ParameterCalculator import ParameterCalculator
+from src.classification.parameter_calculation.parameter_calculator import ParameterCalculator
 
 
 def calculate_parameters_for_multiple_plz(df_samples: pd.DataFrame) -> None:

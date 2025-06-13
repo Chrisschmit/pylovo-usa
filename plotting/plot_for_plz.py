@@ -1,5 +1,5 @@
 from plotting.config_plots import ACCESS_TOKEN_PLOTLY
-from src.GridGenerator import GridGenerator
+from src.grid_generator import GridGenerator
 from src.config_loader import *
 
 import os

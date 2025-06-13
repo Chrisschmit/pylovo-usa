@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pandapower as pp
 import numpy as np
-import src.databaseClient as dbc
+import src.database_client as dbc
 from src import utils
 from src.config_loader import *
 

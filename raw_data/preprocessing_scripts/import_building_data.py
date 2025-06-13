@@ -2,8 +2,8 @@ import glob
 import os
 import sys
 
-from src.GridGenerator import GridGenerator
-from src.SyngridDatabaseConstructor import SyngridDatabaseConstructor
+from src.grid_generator import GridGenerator
+from src.database_constructor import SyngridDatabaseConstructor
 
 
 def import_buildings_for_single_plz(gg):

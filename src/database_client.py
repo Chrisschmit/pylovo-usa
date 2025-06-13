@@ -5,24 +5,10 @@ from src.database_modules.databaseGrid import GridMixin
 from src.database_modules.databaseAnalysis import AnalysisMixin
 from src.database_modules.databaseUtils import UtilsMixin
 
-import json
-import math
-import time
-from typing import *
-from decimal import *
-
-import geopandas as gpd
-import pandapower as pp
-import pandapower.topology as top
 import psycopg2 as psy
-import numpy as np
-from scipy.cluster.hierarchy import linkage, fcluster
-from scipy.spatial.distance import squareform
-from shapely.geometry import LineString
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 
 from src import utils
-from src.config_table_structure import *
 from src.config_loader import *
 
 import warnings

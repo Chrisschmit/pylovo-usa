@@ -10,7 +10,7 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 from plotting.plot_for_plz import plot_boxplot_plz, plot_pie_of_trafo_cables
 from raw_data.preprocessing_scripts.import_building_data import *
-from src.GridGenerator import GridGenerator
+from src.grid_generator import GridGenerator
 
 # enter a plz to generate grid for:
 plz = "80803"
