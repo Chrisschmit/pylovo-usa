@@ -17,7 +17,10 @@ pylovo
     :local:
     :backlinks: top
 
-Introduction
+.. image:: docs/source/images.png"
+    :width: 500
+    :alt: Default view
+
 ============
 **pylovo (PYthon tool for LOw-VOltage distribution grid generation)**
 
