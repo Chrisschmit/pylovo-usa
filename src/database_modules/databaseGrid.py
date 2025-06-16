@@ -1,42 +1,15 @@
-import pandapower as pp
+import warnings
+
 import numpy as np
+import pandapower as pp
 from shapely.geometry import LineString
 
 from src import utils
 from src.config_loader import *
 
-import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)
 
 class GridMixin:
-        def get_transformer_data(self, settlement_type: int = None) -> tuple[np.array, dict]:
-            """
-            Args:
-                Settlement type: 1=City, 2=Village, 3=Rural
-            Returns: Typical transformer capacities and costs depending on the settlement type
-            """
-            if settlement_type == 1:
-                application_area_tuple = (1, 2, 3)
-            elif settlement_type == 2:
-                application_area_tuple = (2, 3, 4)
-            elif settlement_type == 3:
-                application_area_tuple = (3, 4, 5)
-            else:
-                self.logger.debug("Incorrect settlement type number specified.")
-                return
-    
-            query = """SELECT equipment_data.s_max_kva , cost_eur
-                FROM equipment_data
-                WHERE typ = 'Transformer' AND application_area IN %(tuple)s
-                ORDER BY s_max_kva;"""
-    
-            self.cur.execute(query, {"tuple": application_area_tuple})
-            data = self.cur.fetchall()
-            capacities = [i[0] for i in data]
-            transformer2cost = {i[0]: i[1] for i in data}
-    
-            self.logger.debug("Transformer data fetched.")
-            return np.array(capacities), transformer2cost
         def create_cable_std_type(self, net: pp.pandapowerNet) -> None:
             """Create standard pandapower cable types from equipment_data table."""
             query = """
@@ -71,6 +44,22 @@ class GridMixin:
     
             self.logger.debug(f"Created {len(cables)} standard cable types from equipment_data table")
             return None
+
+        def prepare_vertices_list(self, plz: int, kcid: int, bcid: int) -> tuple[
+            dict, int, list, pd.DataFrame, pd.DataFrame, list, list]:
+            vertices_dict, ont_vertice = self.get_vertices_from_bcid(plz, kcid, bcid)
+            vertices_list = list(vertices_dict.keys())
+
+            buildings_df = self.get_buildings_from_bc(plz, kcid, bcid)
+            consumer_df = self.get_consumer_categories()
+            consumer_list = buildings_df.vertice_id.to_list()
+            consumer_list = list(dict.fromkeys(consumer_list))  # removing duplicates
+
+            connection_nodes = [i for i in vertices_list if i not in consumer_list]
+
+            return (vertices_dict, ont_vertice, vertices_list, buildings_df, consumer_df, consumer_list,
+                    connection_nodes,)
+
         def create_lvmv_bus(self, plz: int, kcid: int, bcid: int, net: pp.pandapowerNet) -> None:
             geodata = self.get_ont_geom_from_bcid(plz, kcid, bcid)
     
@@ -98,6 +87,7 @@ class GridMixin:
             pp.create_ext_grid(net, bus=mv_bus, vm_pu=1, name="External grid")
     
             return None
+
         def create_transformer(self, plz: int, kcid: int, bcid: int, net: pp.pandapowerNet) -> None:
             transformer_rated_power = self.get_transformer_rated_power_from_bcid(plz, kcid, bcid)
             if transformer_rated_power in (250, 400, 630):
@@ -127,6 +117,7 @@ class GridMixin:
             )
             net.trafo.at[trafo_index, "sn_mva"] = transformer_rated_power * 1e-3
             return None
+
         def create_connection_bus(self, connection_nodes: list, net: pp.pandapowerNet):
             for i in range(len(connection_nodes)):
                 node_geodata = self.get_node_geom(connection_nodes[i])
@@ -139,6 +130,7 @@ class GridMixin:
                     min_vm_pu=V_BAND_LOW,
                     type="n",
                 )
+
         def create_consumer_bus_and_load(
                 self, consumer_list: list, load_units: dict, net: pp.pandapowerNet, load_type: dict, building_df: pd.DataFrame
         ) -> None:
@@ -176,6 +168,7 @@ class GridMixin:
                         name=f"Load {consumer_list[i]} household {j}",
                         max_p_mw=peak_load * 1e-3,
                     )
+
         def install_consumer_cables(
                 self,
                 plz: int,
@@ -275,6 +268,7 @@ class GridMixin:
                                   )
     
             return local_length_dict
+
         def find_minimal_available_cable(self, Imax: float, net: pp.pandapowerNet, cables_list: list, distance: int=0) -> tuple[str, int]:
             count = 1
             cable = None
@@ -312,6 +306,7 @@ class GridMixin:
                     break
     
             return cable, count
+
         def create_line_node_to_node(
                 self,
                 plz: int,
@@ -386,9 +381,9 @@ class GridMixin:
                     length_km=cost_km
                 )
             return local_length_dict
+
         def create_line_ont_to_lv_bus(
-                self, plz:int, bcid:int, kcid:int, branch_start_node: int, branch_deviation:float, net:pp.pandapowerNet, cable: str, count: int
-        ):
+                self, plz:int, bcid:int, kcid:int, branch_start_node: int, branch_deviation:float, net:pp.pandapowerNet, cable: str, count: int):  # TODO: check if this line is required
             end_vid = branch_start_node
             node_geodata = self.get_node_geom(end_vid)
             node_geodata = (
@@ -423,8 +418,8 @@ class GridMixin:
                 std_type=cable,
                 from_bus=pp.get_element_index(net, "bus", "LVbus 1"),
                 to_bus=pp.get_element_index(net, "bus", f"Connection Nodebus {end_vid}"),
-                length_km=cost_km
-            )
+                length_km=cost_km)
+
         def create_line_start_to_lv_bus(
                 self,
                 plz: int,
@@ -484,7 +479,8 @@ class GridMixin:
                               )
     
             return length
-        def get_maximum_load_branch(
+
+        def determine_maximum_load_branch(
                 self, furthest_node_path_list: list, buildings_df: pd.DataFrame, consumer_df: pd.DataFrame
         ) -> tuple[list, float]:
             # TOD O explanation?
@@ -507,6 +503,7 @@ class GridMixin:
             Imax = sim_load / (VN * V_BAND_LOW * np.sqrt(3))
     
             return branch_node_list, Imax
+
         def deviate_bus_geodata(self, branch_node_list: list, branch_deviation: float, net: pp.pandapowerNet):
             for node in branch_node_list:
                 net.bus_geodata.at[
@@ -515,13 +512,7 @@ class GridMixin:
                 net.bus_geodata.at[
                     pp.get_element_index(net, "bus", f"Connection Nodebus {node}"), "y"
                 ] += (5 * 1e-6 * branch_deviation)
-        def get_vertices_from_connection_points(self, connection: list) -> list:
-            query = """SELECT vertice_id FROM buildings_tem
-                        WHERE connection_point IN %(c)s
-                        AND type != 'Transformer';"""
-            self.cur.execute(query, {"c": tuple(connection)})
-            data = self.cur.fetchall()
-            return [t[0] for t in data]
+
         def get_path_to_bus(self, vertice: int, ont: int) -> list:
             """routing problem: find the shortest path from vertice to the ont (ortsnetztrafo)"""
             query = """SELECT node FROM pgr_Dijkstra(
@@ -551,6 +542,7 @@ class GridMixin:
             way_list = [t[0] for t in data]
     
             return way_list
+
         def get_transformer_rated_power_from_bcid(self, plz: int, kcid: int, bcid: int) -> int:
             query = """SELECT transformer_rated_power FROM grid_result
                         WHERE version_id = %(v)s 

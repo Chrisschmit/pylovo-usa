@@ -1,15 +1,15 @@
 import json
-from typing import *
+import warnings
 from decimal import *
+from typing import *
 
 import geopandas as gpd
-import pandapower as pp
 import numpy as np
+import pandapower as pp
 
 from src import utils
 from src.config_loader import *
 
-import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)
 
 class ReadMixin:
@@ -23,6 +23,7 @@ class ReadMixin:
             cc_df.sort_index(inplace=True)
             self.logger.debug("Consumer categories fetched.")
             return cc_df
+
         def get_settlement_type_from_plz(self, plz) -> int:
             """
             Args:
@@ -36,6 +37,7 @@ class ReadMixin:
             settlement_type = self.cur.fetchone()[0]
     
             return settlement_type
+
         def get_buildings_from_kcid(
                 self,
                 kcid : int,
@@ -60,6 +62,7 @@ class ReadMixin:
             )
     
             return buildings_df
+
         def get_buildings_from_bc(self, plz: int, kcid: int, bcid: int) -> pd.DataFrame:
     
             buildings_query = """SELECT * FROM buildings_tem
@@ -78,28 +81,37 @@ class ReadMixin:
             self.logger.debug(f"{len(buildings_df)} building data fetched.")
     
             return buildings_df
-        def prepare_vertices_list(
-                self, plz: int, kcid: int, bcid: int
-            ) -> tuple[dict, int, list, pd.DataFrame, pd.DataFrame, list, list]:
-            vertices_dict, ont_vertice = self.get_vertices_from_bcid(plz, kcid, bcid)
-            vertices_list = list(vertices_dict.keys())
-    
-            buildings_df = self.get_buildings_from_bc(plz, kcid, bcid)
-            consumer_df = self.get_consumer_categories()
-            consumer_list = buildings_df.vertice_id.to_list()
-            consumer_list = list(dict.fromkeys(consumer_list))  # removing duplicates
-    
-            connection_nodes = [i for i in vertices_list if i not in consumer_list]
-    
-            return (
-                vertices_dict,
-                ont_vertice,
-                vertices_list,
-                buildings_df,
-                consumer_df,
-                consumer_list,
-                connection_nodes,
-            )
+
+        def get_transformer_data(self, settlement_type: int = None) -> tuple[np.array, dict]:
+            """
+            Args:
+                Settlement type: 1=City, 2=Village, 3=Rural
+            Returns: Typical transformer capacities and costs depending on the settlement type
+            """
+            if settlement_type == 1:
+                application_area_tuple = (1, 2, 3)
+            elif settlement_type == 2:
+                application_area_tuple = (2, 3, 4)
+            elif settlement_type == 3:
+                application_area_tuple = (3, 4, 5)
+            else:
+                self.logger.debug("Incorrect settlement type number specified.")
+                return
+
+            query = """SELECT equipment_data.s_max_kva, cost_eur
+                       FROM equipment_data
+                       WHERE typ = 'Transformer' \
+                         AND application_area IN %(tuple)s
+                       ORDER BY s_max_kva;"""
+
+            self.cur.execute(query, {"tuple": application_area_tuple})
+            data = self.cur.fetchall()
+            capacities = [i[0] for i in data]
+            transformer2cost = {i[0]: i[1] for i in data}
+
+            self.logger.debug("Transformer data fetched.")
+            return np.array(capacities), transformer2cost
+
         def get_consumer_simultaneous_load_dict(self, consumer_list: list, buildings_df: pd.DataFrame) -> tuple[dict, dict, dict]:
             Pd = {consumer: 0 for consumer in consumer_list}  # dict of all vertices in bc, 0 as default
             load_units = {consumer: 0 for consumer in consumer_list}
@@ -114,6 +126,16 @@ class ReadMixin:
                 Pd[row.vertice_id] = utils.oneSimultaneousLoad(row.peak_load_in_kw * 1e-3, row.houses_per_building, gzf)
     
             return Pd, load_units, load_type
+
+        def get_vertices_from_connection_points(self, connection: list) -> list:
+            query = """SELECT vertice_id
+                       FROM buildings_tem
+                       WHERE connection_point IN %(c)s
+                         AND type != 'Transformer';"""
+            self.cur.execute(query, {"c": tuple(connection)})
+            data = self.cur.fetchall()
+            return [t[0] for t in data]
+
         def find_furthest_node_path_list(self, connection_node_list: list, vertices_dict: dict, ont_vertice: int) -> list:
             connection_node_dict = {n: vertices_dict[n] for n in connection_node_list}
             furthest_node = max(connection_node_dict, key=connection_node_dict.get)
@@ -124,6 +146,7 @@ class ReadMixin:
             ]
     
             return furthest_node_path
+
         def get_vertices_from_bcid(self, plz:int, kcid:int, bcid:int) -> tuple[dict, int]:
             ont = self.get_ont_info_from_bc(plz, kcid, bcid)["ont_vertice_id"]
     
@@ -150,6 +173,7 @@ class ReadMixin:
             }
     
             return vertice_cost_dict, ont
+
         def get_ont_geom_from_bcid(self, plz: int, kcid: int, bcid: int):
             query = """SELECT ST_X(ST_Transform(geom,4326)), ST_Y(ST_Transform(geom,4326))
                        FROM transformer_positions tp
@@ -163,6 +187,7 @@ class ReadMixin:
             geo = self.cur.fetchone()
     
             return geo
+
         def get_node_geom(self, vid: int):
             query = """SELECT ST_X(ST_Transform(the_geom,4326)), ST_Y(ST_Transform(the_geom,4326)) 
                         FROM ways_tem_vertices_pgr
@@ -171,6 +196,7 @@ class ReadMixin:
             geo = self.cur.fetchone()
     
             return geo
+
         def get_list_from_plz(self, plz: int) -> list:
             query = """SELECT DISTINCT kcid, bcid FROM grid_result 
                         WHERE  version_id = %(v)s AND plz = %(p)s 
@@ -179,24 +205,7 @@ class ReadMixin:
             cluster_list = self.cur.fetchall()
     
             return cluster_list
-        def get_distance_matrix_from_kcid(self, kcid: int) -> tuple[dict, np.ndarray, dict]:
-            """
-            Creates a distance matrix from the buildings in the kcid
-            Args:
-                kcid: k-means cluster id
-            Returns: The distance matrix of the buildings as np.array and the mapping between vertice_id and local ID as dict
-            """
-    
-            costmatrix_query = """SELECT * FROM pgr_dijkstraCostMatrix(
-                                'SELECT way_id as id, source, target, cost, reverse_cost FROM ways_tem',
-                                (SELECT array_agg(DISTINCT b.connection_point) FROM (SELECT * FROM buildings_tem 
-                                WHERE kcid = %(k)s
-                                AND bcid ISNULL
-                                ORDER BY connection_point) AS b),
-                                false);"""
-            params = {"k": kcid}
-    
-            return self._calculate_cost_arr_dist_matrix(costmatrix_query, params)
+
         def get_greenfield_bcids(self, plz: int, kcid: int) -> list:
             """
             Args:
@@ -214,6 +223,7 @@ class ReadMixin:
             self.cur.execute(query, params)
             bcid_list = [t[0] for t in data] if (data := self.cur.fetchall()) else []
             return bcid_list
+
         def get_ont_info_from_bc(self, plz: int, kcid: int, bcid: int) -> dict | None:
     
             query = """SELECT ont_vertice_id, transformer_rated_power
@@ -230,6 +240,7 @@ class ReadMixin:
                 return None
     
             return {"ont_vertice_id": info[0][0], "transformer_rated_power": info[0][1]}
+
         def get_next_unfinished_kcid(self, plz: int) -> int:
             """
             :return: one unmodeled k mean cluster ID - plz
@@ -243,11 +254,13 @@ class ReadMixin:
             self.cur.execute(query, {"v": VERSION_ID, "plz": plz})
             kcid = self.cur.fetchone()[0]
             return kcid
+
         def get_kcid_length(self) -> int:
             query = """SELECT COUNT(DISTINCT kcid) FROM buildings_tem WHERE kcid IS NOT NULL; """
             self.cur.execute(query)
             kcid_length = self.cur.fetchone()[0]
             return kcid_length
+
         def calculate_sim_load(self, conn_list: Union[tuple, list]) -> Decimal:
             residential = """WITH residential AS 
             (SELECT b.peak_load_in_kw AS load, b.houses_per_building AS count, c.sim_factor
@@ -342,6 +355,7 @@ class ReadMixin:
             )
     
             return total_sim_load
+
         def count_postcode_result(self, plz: int) -> int:
             """
             :param plz:
@@ -352,6 +366,7 @@ class ReadMixin:
                         AND postcode_result_plz::INT = %(p)s"""
             self.cur.execute(query, {"v": VERSION_ID, "p": plz})
             return int(self.cur.fetchone()[0])
+
         def get_connected_component(self) -> tuple[np.ndarray, np.ndarray]:
             """
             Reads from ways_tem
@@ -365,12 +380,14 @@ class ReadMixin:
             node = np.asarray([i[1] for i in data])
     
             return component, node
+
         def count_buildings_kcid(self, kcid: int) -> int:
             query = """SELECT COUNT(*) FROM buildings_tem WHERE kcid = %(k)s;"""
             self.cur.execute(query, {"k": kcid})
             count = self.cur.fetchone()[0]
     
             return count
+
         def generate_load_vector(self, kcid: int, bcid: int) -> np.ndarray:
             query = """SELECT SUM(peak_load_in_kw)::float FROM buildings_tem 
                     WHERE kcid = %(k)s AND bcid = %(b)s 
@@ -380,6 +397,7 @@ class ReadMixin:
             load = np.asarray([i[0] for i in self.cur.fetchall()])
     
             return load
+
         def count_connected_buildings(self, vertices: Union[list, tuple]) -> int:
             """
             Get count from buildings_tem where type is not transformer
@@ -391,6 +409,7 @@ class ReadMixin:
             count = self.cur.fetchone()[0]
     
             return count
+
         def read_trafo_dict(self, plz: int) -> dict:
             read_query = """SELECT trafo_num FROM plz_parameters 
             WHERE version_id = %(v)s AND plz = %(p)s;"""
@@ -398,6 +417,7 @@ class ReadMixin:
             trafo_num_dict = self.cur.fetchall()[0][0]
     
             return trafo_num_dict
+
         def read_per_trafo_dict(self, plz: int) -> tuple[list[dict], list[str], dict]:
             read_query = """SELECT load_count_per_trafo, bus_count_per_trafo, sim_peak_load_per_trafo,
             max_distance_per_trafo, avg_distance_per_trafo FROM plz_parameters 
@@ -419,6 +439,7 @@ class ReadMixin:
                            'Max. Trafo-Distance [m]', 'Avg. Trafo-Distance [m]']
     
             return data_list, data_labels, trafo_dict
+
         def read_net(self, plz: int, kcid: int, bcid: int) -> pp.pandapowerNet:
             """
             Reads a pandapower network from the database for the specified grid.
@@ -448,6 +469,7 @@ class ReadMixin:
             net = pp.from_json_string(grid_json_string)
     
             return net
+
         def get_geo_df(
                 self,
                 table: str,
@@ -479,6 +501,7 @@ class ReadMixin:
                 gdf = gpd.read_postgis(query, con=connection, params=params)
     
             return gdf
+
         def get_geo_df_join(
                 self,
                 select: list[str],
@@ -527,6 +550,7 @@ class ReadMixin:
                 gdf = gpd.read_postgis(query, con=connection, params=params)
     
             return gdf
+
         def get_municipal_register_for_plz(self, plz: str) -> pd.DataFrame:
             """get entry of table municipal register for given PLZ"""
             query = """SELECT * 
@@ -536,6 +560,7 @@ class ReadMixin:
             register = self.cur.fetchall()
             df_register = pd.DataFrame(register, columns=MUNICIPAL_REGISTER)
             return df_register
+
         def get_municipal_register(self) -> pd.DataFrame:
             """get municipal register """
             query = """SELECT * 
@@ -544,6 +569,7 @@ class ReadMixin:
             register = self.cur.fetchall()
             df_register = pd.DataFrame(register, columns=MUNICIPAL_REGISTER)
             return df_register
+
         def get_ags_log(self) -> pd.DataFrame:
             """get ags log: the amtliche gemeindeschluessel of the municipalities of which the buildings
             have already been imported to the database

@@ -1,8 +1,9 @@
 import warnings
 from pathlib import Path
 
-import pandapower as pp
 import numpy as np
+import pandapower as pp
+
 import src.database_client as dbc
 from src import utils
 from src.config_loader import *
@@ -391,39 +392,7 @@ class GridGenerator:
 
         self.logger.info(f"Grid with kcid:{kcid} bcid:{bcid} is stored. ")
 
-    def generate_grid_for_multiple_plz(self, df_plz: pd.DataFrame, analyze_grids: bool = False) -> None:
-        """generates grid for all plz contained in the column 'plz' of df_samples
 
-        :param df_plz: table that contains PLZ for grid generation
-        :type df_plz: pd.DataFrame
-        :param analyze_grids: option to analyse the results after grid generation, defaults to False
-        :type analyze_grids: bool
-        """
-        self.dbc.create_temp_tables() # create temp tables for the grid generation
-        
-        for index, row in df_plz.iterrows():
-            self.plz = str(row['plz'])
-            print('-------------------- start', self.plz, '---------------------------')
-            try:
-                self.generate_grid()
-                self.dbc.save_tables(plz=self.plz) # Save data from temporary tables to result tables
-                self.dbc.reset_tables() # Reset temporary tables
-                if analyze_grids:
-                    self.analyse_results()
-            except ResultExistsError:
-                print('Grids for this PLZ have already been generated.')
-            except Exception as e:
-                self.logger.error(f"Error during grid generation for PLZ {self.plz}: {e}")
-                self.logger.info(f"Skipped PLZ {self.plz} due to generation error.")
-                self.dbc.conn.rollback() # rollback the transaction
-                self.dbc.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION),self.plz)  # delete from sample set
-                continue
-            print('-------------------- end', self.plz, '-----------------------------')
-        
-        
-        self.dbc.drop_temp_tables() # drop temp tables
-        self.dbc.commit_changes() # commit the changes to the database
-    
     def generate_grid_for_single_plz(self, plz: str, analyze_grids: bool = False) -> None:
         """
         Generates the grid for a single PLZ.
@@ -456,3 +425,36 @@ class GridGenerator:
         self.dbc.commit_changes()    # commit the changes to the database
 
         print('-------------------- end', self.plz, '-----------------------------')
+
+    def generate_grid_for_multiple_plz(self, df_plz: pd.DataFrame, analyze_grids: bool = False) -> None:
+        """generates grid for all plz contained in the column 'plz' of df_samples
+
+        :param df_plz: table that contains PLZ for grid generation
+        :type df_plz: pd.DataFrame
+        :param analyze_grids: option to analyse the results after grid generation, defaults to False
+        :type analyze_grids: bool
+        """
+        self.dbc.create_temp_tables()  # create temp tables for the grid generation
+
+        for index, row in df_plz.iterrows():
+            self.plz = str(row['plz'])
+            print('-------------------- start', self.plz, '---------------------------')
+            try:
+                self.generate_grid()
+                self.dbc.save_tables(plz=self.plz)  # Save data from temporary tables to result tables
+                self.dbc.reset_tables()  # Reset temporary tables
+                if analyze_grids:
+                    self.analyse_results()
+            except ResultExistsError:
+                print('Grids for this PLZ have already been generated.')
+            except Exception as e:
+                self.logger.error(f"Error during grid generation for PLZ {self.plz}: {e}")
+                self.logger.info(f"Skipped PLZ {self.plz} due to generation error.")
+                self.dbc.conn.rollback()  # rollback the transaction
+                self.dbc.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION),
+                                                          self.plz)  # delete from sample set
+                continue
+            print('-------------------- end', self.plz, '-----------------------------')
+
+        self.dbc.drop_temp_tables()  # drop temp tables
+        self.dbc.commit_changes()  # commit the changes to the database
