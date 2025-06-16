@@ -32,8 +32,10 @@ class GridGenerator:
 
     def generate_grid(self):
         self.check_if_results_exist()
-        self.cache_and_preprocess_static_objects()
-        self.preprocess_ways()
+        self.prepare_postcodes()
+        self.prepare_buildings()
+        self.prepare_transformers()
+        self.prepare_ways()
         self.apply_kmeans_clustering()
         self.position_all_transformers()
         self.install_cables()
@@ -47,18 +49,21 @@ class GridGenerator:
                 f"for the version {VERSION_ID}."
             )
 
-    def cache_and_preprocess_static_objects(self):
+    def prepare_postcodes(self):
         """
-        Caches static objects (postcode, buildings, transformers) from raw data tables and
-        stores in temporary tables.
-        FROM: postcode, res, oth, transformers
-        INTO: postcode_result, buildings_tem
-        :return:
+        Caches postcode from raw data tables and stores in temporary tables.
+        FROM: postcode
+        INTO: postcode_result
         """
-
         self.dbc.copy_postcode_result_table(self.plz)
         self.logger.info(f"Working on plz {self.plz}")
 
+    def prepare_buildings(self):
+        """
+        Caches buildings from raw data tables and stores in temporary tables.
+        FROM: res, oth
+        INTO: buildings_tem
+        """
         self.dbc.set_residential_buildings_table(self.plz)
         self.dbc.set_other_buildings_table(self.plz)
         self.logger.info("Buildings_tem table prepared")
@@ -73,24 +78,29 @@ class GridGenerator:
             f"Building peakload calculated in buildings_tem, {unloadcount} unloaded buildings are removed from "
             f"buildings_tem"
         )
-        too_large = self.dbc.zero_too_large_consumers()
-        self.logger.info(f"{too_large} too large consumers removed from buildings_tem")
+        too_large_consumers = self.dbc.update_too_large_consumers_to_zero()
+        self.logger.info(f"{too_large_consumers} too large consumers removed from buildings_tem")
 
         self.dbc.assign_close_buildings()
         self.logger.info("All close buildings assigned and removed from buildings_tem")
 
+    def prepare_transformers(self):
+        """
+        Cache transformers from raw data tables and stores in temporary tables.
+        FROM: transformers
+        INTO: buildings_tem
+        """
         self.dbc.insert_transformers(self.plz)
         self.logger.info("Transformers inserted in to the buildings_tem table")
         self.dbc.count_indoor_transformers()
         self.dbc.drop_indoor_transformers()
         self.logger.info("Indoor transformers dropped from the buildings_tem table")
 
-    def preprocess_ways(self):
+    def prepare_ways(self):
         """
         Cache ways, create network, connect buildings to the ways network
         FROM: ways, buildings_tem
         INTO: ways_tem, buildings_tem, ways_tem_vertices_pgr, ways_tem_
-        :return:
         """
         ways_count = self.dbc.set_ways_tem_table(self.plz)
         self.logger.info(f"The ways_tem table filled with {ways_count} ways")
