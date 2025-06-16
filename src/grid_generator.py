@@ -302,7 +302,7 @@ class GridGenerator:
                 furthest_node_path_list = self.dbc.find_furthest_node_path_list(
                     connection_node_list, vertices_dict, ont_vertice
                 )
-                branch_node_list, Imax = self.dbc.get_maximum_load_branch(
+                branch_node_list, Imax = self.dbc.determine_maximum_load_branch(
                     furthest_node_path_list, buildings_df, consumer_df
                 )
 
@@ -387,7 +387,7 @@ class GridGenerator:
 
         json_string = pp.to_json(net, filename=None)
 
-        self.dbc.save_net(self.plz, kcid, bcid, json_string)
+        self.dbc.save_pp_net_with_json(self.plz, kcid, bcid, json_string)
 
         self.logger.info(f"Grid with kcid:{kcid} bcid:{bcid} is stored. ")
 
