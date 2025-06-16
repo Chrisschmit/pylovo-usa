@@ -4,6 +4,7 @@ from geoalchemy2 import Geometry, WKTElement
 import src.database_client as dbc
 
 from src.config_loader import *
+from src.classification.clustering.clustering_algorithms import gmm_tied_clustering, kmeans_clustering, kmedoids_clustering
 
 
 class DatabaseCommunication:

@@ -7,8 +7,10 @@ from src.classification.get_parameters_for_clustering import get_parameters_for_
 from src.classification.prepare_data_for_clustering import prepare_data_for_clustering
 
 # Define paths to YAML config files
-CONFIG_CLASSIFICATION_PATH = os.path.join(os.path.dirname(__file__), "config_classification.yaml")
-CONFIG_CLUSTERING_PATH = os.path.join(os.path.dirname(__file__), "clustering/config_clustering.yaml")
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+CONFIG_CLASSIFICATION_PATH = os.path.join(BASE_DIR, "config", "config_classification.yaml")
+CONFIG_CLUSTERING_PATH = os.path.join(BASE_DIR, "config", "config_clustering.yaml")
 
 def load_yaml(filepath):
     """Load a YAML file."""
