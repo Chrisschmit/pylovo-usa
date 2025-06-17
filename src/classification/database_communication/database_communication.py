@@ -23,23 +23,6 @@ class DatabaseCommunication:
         self.dbc.conn.close()
         print("Database connection closed.")
 
-    def get_clustering_parameters_for_plz(self, plz: str) -> pd.DataFrame:
-        """get clustering parameter for a specific classification version indicated in config classification
-
-        :return: a table with all grid parameters for all grids for PLZ included in the classification version
-        :rtype: pd.DataFrame
-        """
-        query = """
-                SELECT version_id, plz, kcid, bcid, cp.*
-                FROM clustering_parameters cp 
-                JOIN grid_result gr ON cp.grid_result_id = gr.grid_result_id
-                WHERE gr.version_id = %(v)s AND gr.plz = %(p)s;"""
-        params = {"v": VERSION_ID, "p": plz}
-        df_query = pd.read_sql_query(query, con=self.dbc.conn, params=params, )
-        columns = CLUSTERING_PARAMETERS
-        df_parameter = pd.DataFrame(df_query, columns=columns)
-        return df_parameter
-
     def get_clustering_parameters_for_classification_version(self) -> pd.DataFrame:
         """get clustering parameter for a specific classification version indicated in config classification
 

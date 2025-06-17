@@ -1,6 +1,7 @@
 import json
 import warnings
 
+import geopandas as gpd
 import pandapower.topology as top
 
 from src import utils
@@ -10,64 +11,26 @@ warnings.simplefilter(action="ignore", category=UserWarning)
 
 
 class AnalysisMixin:
-    def analyse_basic_parameters(self, plz: int):
-        cluster_list = self.get_list_from_plz(plz)
-        count = len(cluster_list)
-        time = 0
-        percent = 0
 
-        load_count_dict = {}
-        bus_count_dict = {}
-        cable_length_dict = {}
-        trafo_dict = {}
-        self.logger.debug("start basic parameter counting")
-        for kcid, bcid in cluster_list:
-            load_count = 0
-            bus_list = []
-            try:
-                net = self.read_net(plz, kcid, bcid)
-            except Exception as e:
-                self.logger.warning(f" local network {kcid},{bcid} is problematic")
-                raise e
-            else:
-                for row in net.load[["name", "bus"]].itertuples():
-                    load_count += 1
-                    bus_list.append(row.bus)
-                bus_list = list(set(bus_list))
-                bus_count = len(bus_list)
-                cable_length = net.line["length_km"].sum()
+    def insert_plz_parameters(self, plz: int, trafo_string: str, load_count_string: str, bus_count_string: str):
+        update_query = """INSERT INTO plz_parameters (version_id, plz, trafo_num, load_count_per_trafo, bus_count_per_trafo)
+                          VALUES (%s, %s, %s, %s,
+                                  %s);"""  # TODO: check - should values be updated for same plz and version if analysis is started? And Add a column
+        self.cur.execute(update_query, vars=(VERSION_ID, plz, trafo_string, load_count_string, bus_count_string), )
 
-                for row in net.trafo[["sn_mva", "lv_bus"]].itertuples():
-                    capacity = round(row.sn_mva * 1e3)
+        self.logger.debug("basic parameter count finished")
 
-                    if capacity in trafo_dict:
-                        trafo_dict[capacity] += 1
-
-                        load_count_dict[capacity].append(load_count)
-                        bus_count_dict[capacity].append(bus_count)
-                        cable_length_dict[capacity].append(cable_length)
-
-                    else:
-                        trafo_dict[capacity] = 1
-
-                        load_count_dict[capacity] = [load_count]
-                        bus_count_dict[capacity] = [bus_count]
-                        cable_length_dict[capacity] = [cable_length]
-
-            time += 1
-            if time / count >= 0.1:
-                percent += 10
-                self.logger.info(f"{percent} percent finished")
-                time = 0
-        self.logger.info("analyse_basic_parameters finished.")
-        trafo_string = json.dumps(trafo_dict)
-        load_count_string = json.dumps(load_count_dict)
-        bus_count_string = json.dumps(bus_count_dict)
-
-        self.insert_plz_parameters(plz, trafo_string, load_count_string, bus_count_string)
+    def save_pp_net_with_json(self, plz: int, kcid: int, bcid: int, json_string: str) -> None:
+        insert_query = ("""UPDATE grid_result
+                           SET grid = %s
+                           WHERE version_id = %s
+                             AND plz = %s
+                             AND kcid = %s
+                             AND bcid = %s;""")
+        self.cur.execute(insert_query, vars=(json_string, VERSION_ID, plz, kcid, bcid))
 
     def analyse_cables(self, plz: int):
-        cluster_list = self.get_list_from_plz(plz)
+        cluster_list = self.dbc.get_list_from_plz(plz)
         count = len(cluster_list)
         time = 0
         percent = 0
@@ -110,7 +73,7 @@ class AnalysisMixin:
         self.logger.debug("cable count finished")
 
     def analyse_per_trafo_parameters(self, plz: int):
-        cluster_list = self.get_list_from_plz(plz)
+        cluster_list = self.dbc.get_list_from_plz(plz)
         count = len(cluster_list)
         time = 0
         percent = 0
@@ -194,3 +157,175 @@ class AnalysisMixin:
                           "a": trafo_avg_distance_string, }, )
 
         self.logger.debug("per trafo analysis finished")
+
+    def count_clustering_parameters(self, plz: int) -> int:
+        """
+        :param plz:
+        :return:
+        """
+        query = """SELECT COUNT(cp.grid_result_id)
+                   FROM clustering_parameters cp
+                            JOIN grid_result gr ON gr.grid_result_id = cp.grid_result_id
+                   WHERE version_id = %(v)s
+                     AND plz = %(p)s"""
+        self.cur.execute(query, {"v": VERSION_ID, "p": plz})
+        return int(self.cur.fetchone()[0])
+
+    def read_per_trafo_dict(self, plz: int) -> tuple[list[dict], list[str], dict]:
+        read_query = """SELECT load_count_per_trafo,
+                               bus_count_per_trafo,
+                               sim_peak_load_per_trafo,
+                               max_distance_per_trafo,
+                               avg_distance_per_trafo
+                        FROM plz_parameters
+                        WHERE version_id = %(v)s
+                          AND plz = %(p)s;"""
+        self.cur.execute(read_query, {"v": VERSION_ID, "p": plz})
+        result = self.cur.fetchall()
+
+        # Sort all parameters according to transformer size
+        load_dict = dict(sorted(result[0][0].items(), key=lambda x: int(x[0])))
+        bus_dict = dict(sorted(result[0][1].items(), key=lambda x: int(x[0])))
+        peak_dict = dict(sorted(result[0][2].items(), key=lambda x: int(x[0])))
+        max_dict = dict(sorted(result[0][3].items(), key=lambda x: int(x[0])))
+        avg_dict = dict(sorted(result[0][4].items(), key=lambda x: int(x[0])))
+
+        trafo_dict = dict(sorted(self.read_trafo_dict(plz).items(), key=lambda x: int(x[0]), reverse=True))
+        # Create list with all parameter dicts
+        data_list = [load_dict, bus_dict, peak_dict, max_dict, avg_dict]
+        data_labels = ['Load Number [-]', 'Bus Number [-]', 'Simultaneous peak load [kW]', 'Max. Trafo-Distance [m]',
+                       'Avg. Trafo-Distance [m]']
+
+        return data_list, data_labels, trafo_dict
+
+    def read_net(self, plz: int, kcid: int, bcid: int) -> pp.pandapowerNet:
+        """
+        Reads a pandapower network from the database for the specified grid.
+
+        Args:
+            plz: Postal code ID
+            kcid: Kmeans cluster ID
+            bcid: Building cluster ID
+
+        Returns:
+            A pandapower network object
+
+        Raises:
+            ValueError: If the requested grid does not exist in the database
+        """
+        read_query = "SELECT grid FROM grid_result WHERE version_id = %s AND plz = %s AND kcid = %s AND bcid = %s LIMIT 1"
+        self.cur.execute(read_query, vars=(VERSION_ID, plz, kcid, bcid))
+
+        result = self.cur.fetchall()
+        if not result:
+            self.logger.error(f"Grid not found for plz={plz}, kcid={kcid}, bcid={bcid}, version_id={VERSION_ID}")
+            raise ValueError(f"Grid not found for plz={plz}, kcid={kcid}, bcid={bcid}")
+
+        grid_tuple = result[0]
+        grid_dict = grid_tuple[0]
+        grid_json_string = json.dumps(grid_dict)
+        net = pp.from_json_string(grid_json_string)
+
+        return net
+
+    def get_geo_df(self, table: str, **kwargs, ) -> gpd.GeoDataFrame:
+        """
+        Args:
+            **kwargs: equality filters matching with the table column names
+        Returns: A geodataframe with all building information
+        :param table: table name
+        """
+        if kwargs:
+            filters = " AND " + " AND ".join(
+                [f"{key} = {value}" for key, value in kwargs.items() if key != 'version_id'])
+        else:
+            filters = ""
+        query = (f"""SELECT * FROM {table}
+                        WHERE version_id = %(v)s """ + filters)
+        version = VERSION_ID
+        if 'version_id' in kwargs:
+            version = kwargs.get('version_id')
+
+        params = {"v": version}
+        with self.sqla_engine.begin() as connection:
+            gdf = gpd.read_postgis(query, con=connection, params=params)
+
+        return gdf
+
+    def get_geo_df_join(self, select: list[str], from_table: str, join_table: str, on: tuple[str, str],
+            **kwargs, ) -> gpd.GeoDataFrame:
+        """
+        Args:
+            **kwargs: equality filters matching with the table column names
+        Returns: A geodataframe with all building information
+        :param select: list of column names
+        :param from_table: table name
+        :param join_table: table name
+        :param on: join on on[0] = on[1]
+        """
+        if kwargs:
+            filters = " AND " + " AND ".join(
+                [f"{key} = {value}" for key, value in kwargs.items() if key != 'version_id'])
+        else:
+            filters = ""
+
+        column_names = ", ".join(select)
+
+        jt_prefix = join_table
+        parts = join_table.split(" ")
+        if len(parts) == 2:
+            jt_prefix = parts[1]
+
+        query = (f"""SELECT {column_names}
+                        FROM {from_table}
+                        JOIN {join_table}
+                          ON {on[0]} = {on[1]}
+                        WHERE {jt_prefix}.version_id = %(v)s """ + filters)
+        version = VERSION_ID
+        if 'version_id' in kwargs:
+            version = kwargs.get('version_id')
+
+        params = {"v": version}
+        with self.sqla_engine.begin() as connection:
+            gdf = gpd.read_postgis(query, con=connection, params=params)
+
+        return gdf
+
+    def get_municipal_register_for_plz(self, plz: str) -> pd.DataFrame:
+        """get entry of table municipal register for given PLZ"""
+        query = """SELECT *
+                   FROM municipal_register
+                   WHERE plz = %(p)s;"""
+        self.cur.execute(query, {"p": plz})
+        register = self.cur.fetchall()
+        df_register = pd.DataFrame(register, columns=MUNICIPAL_REGISTER)
+        return df_register
+
+    def get_municipal_register(self) -> pd.DataFrame:
+        """get municipal register """
+        query = """SELECT *
+                   FROM municipal_register;"""
+        self.cur.execute(query)
+        register = self.cur.fetchall()
+        df_register = pd.DataFrame(register, columns=MUNICIPAL_REGISTER)
+        return df_register
+
+    def read_trafo_dict(self, plz: int) -> dict:
+        read_query = """SELECT trafo_num
+                        FROM plz_parameters
+                        WHERE version_id = %(v)s
+                          AND plz = %(p)s;"""
+        self.cur.execute(read_query, {"v": VERSION_ID, "p": plz})
+        trafo_num_dict = self.cur.fetchall()[0][0]
+
+        return trafo_num_dict
+
+    def read_cable_dict(self, plz: int) -> dict:
+        read_query = """SELECT cable_length
+                        FROM plz_parameters
+                        WHERE version_id = %(v)s
+                          AND plz = %(p)s;"""
+        self.cur.execute(read_query, {"v": VERSION_ID, "p": plz})
+        cable_length = self.cur.fetchall()[0][0]
+
+        return cable_length
