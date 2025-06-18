@@ -767,7 +767,7 @@ class PgReaderWriter:
                    FROM transformer_positions tp
                    JOIN grid_result gr
                    ON tp.grid_result_id = gr.grid_result_id
-                   WHERE version_id = %(v)s 
+                   WHERE gr.version_id = %(v)s 
                    AND plz = %(p)s 
                    AND kcid = %(k)s
                    AND bcid = %(b)s;"""
