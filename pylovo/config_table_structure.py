@@ -250,8 +250,14 @@ CREATE_QUERIES = {
     CREATE TABLE IF NOT EXISTS transformer_positions (
         grid_result_id bigint PRIMARY KEY,
         geom geometry(Point,3035),
-        osm_id varchar UNIQUE,
+        osm_id varchar,
+        version_id varchar,
         "comment" varchar,
+        CONSTRAINT uq_tp_osm_v UNIQUE (osm_id, version_id),
+        CONSTRAINT fk_tp_version_id
+            FOREIGN KEY (version_id)
+            REFERENCES grid_result (version_id)
+            ON DELETE CASCADE,
         CONSTRAINT fk_tp_grid_result_id
             FOREIGN KEY (grid_result_id)
             REFERENCES grid_result (grid_result_id)
