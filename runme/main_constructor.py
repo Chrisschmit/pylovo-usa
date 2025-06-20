@@ -5,7 +5,7 @@ Do not use DatabaseConstructor class unless you want to create a new database.
 
 from src.config_loader import LOG_LEVEL
 from raw_data.municipal_register.join_regiostar_gemeindeverz import create_municipal_register
-from src.database_constructor import DatabaseConstructor
+from src.database.database_constructor import DatabaseConstructor
 from src import utils
 
 
