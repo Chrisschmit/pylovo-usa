@@ -12,7 +12,7 @@ ANALYZE_GRIDS: True
 SAVE_GRID_FOLDER: False
 
 # Logging configuration for PgReaderWriter & GridGenerator
-LOG_LEVEL: INFO
+LOG_LEVEL: DEBUG
 
 CLUSTERING_PARAMETERS:
   - version_id
