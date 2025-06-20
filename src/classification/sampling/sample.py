@@ -1,12 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import psycopg2 as psy
-from sqlalchemy import create_engine
-import src.database_client as dbc
+import src.database.database_client as dbc
 
 from src.config_loader import *
-from src.grid_generator import GridGenerator
 
 # According to the population distribution and energy consumption
 # it is defined how many samples are to be choosen per class

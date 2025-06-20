@@ -1,11 +1,7 @@
-import pandas as pd
-import psycopg2 as psy
-from sqlalchemy import create_engine
-
 from raw_data.municipal_register.regiostar.import_regiostar import import_regiostar
 from raw_data.municipal_register.gemeindeverzeichnis.import_functions import import_plz_einwohner, import_zuordnung_plz
 from src.config_loader import *
-import src.database_client as dbc
+import src.database.database_client as dbc
 
 
 def import_tables() -> (pd.DataFrame, pd.DataFrame, pd.DataFrame):

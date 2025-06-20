@@ -1,5 +1,5 @@
 from src.classification.parameter_calculation.grid_parameters import GridParameters
-import src.database_client as dbc
+import src.database.database_client as dbc
 from src.config_loader import VERSION_ID
 
 

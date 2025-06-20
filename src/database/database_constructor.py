@@ -8,8 +8,8 @@ import sqlparse
 
 from src.config_loader import *
 from config.config_table_structure import *
-import src.database_client as dbc
-from raw_data.preprocessing_scripts.process_trafos import process_trafos, get_trafos_processed_3035_geojson_path, \
+import src.database.database_client as dbc
+from raw_data.preprocessing_scripts.import_transformers import process_trafos, get_trafos_processed_3035_geojson_path, \
     fetch_trafos, RELATION_ID, EPSG, get_trafos_processed_geojson_path
 
 

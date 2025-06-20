@@ -9,7 +9,7 @@ import json
 import subprocess
 import argparse
 import requests
-import src.database_constructor
+import src.database.database_constructor
 from src.utils import query_overpass_for_geojson
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
@@ -24,8 +24,8 @@ MIN_DISTANCE_BETWEEN_TRAFOS = 8
 VOLTAGE_THRESHOLD = 110000
 EPSG = 32633
 
-SUBSTATIONS_QUERY_PATH = os.path.join(".", "raw_data", "transformer_data", "overpass_queries", "substations_query.txt")
-SHOPPING_MALL_QUERY_PATH = os.path.join(".", "raw_data", "transformer_data", "overpass_queries", "shopping_mall_query.txt")
+SUBSTATIONS_QUERY_PATH = os.path.join("", "raw_data", "transformer_data", "overpass_queries", "substations_query.txt")
+SHOPPING_MALL_QUERY_PATH = os.path.join("", "raw_data", "transformer_data", "overpass_queries", "shopping_mall_query.txt")
 
 
 def main(relation_id: int) -> None:
@@ -68,7 +68,7 @@ def main(relation_id: int) -> None:
             "table_name": "transformers"
         }
     ]
-    sgc = src.database_constructor.DatabaseConstructor()
+    sgc = src.database.database_constructor.DatabaseConstructor()
     try:
         sgc.ogr_to_db(trafo_dict, skip_failures=True)
     except CalledProcessError as e:
@@ -81,19 +81,19 @@ def main(relation_id: int) -> None:
 
 
 def get_substations_geojson_path(relation_id: int) -> str:
-    return os.path.join(".", "raw_data", "transformer_data", "fetched_trafos", f"{relation_id}_substations.geojson")
+    return os.path.join("", "raw_data", "transformer_data", "fetched_trafos", f"{relation_id}_substations.geojson")
 
 
 def get_shopping_mall_geojson_path(relation_id: int) -> str:
-    return os.path.join(".", "raw_data", "transformer_data", "fetched_trafos", f"{relation_id}_shopping_mall.geojson")
+    return os.path.join("", "raw_data", "transformer_data", "fetched_trafos", f"{relation_id}_shopping_mall.geojson")
 
 
 def get_trafos_processed_geojson_path(relation_id: int) -> str:
-    return os.path.join(".", "raw_data", "transformer_data", "processed_trafos", f"{relation_id}_trafos_processed.geojson")
+    return os.path.join("", "raw_data", "transformer_data", "processed_trafos", f"{relation_id}_trafos_processed.geojson")
 
 
 def get_trafos_processed_3035_geojson_path(relation_id: int) -> str:
-    return os.path.join(".", "raw_data", "transformer_data", "processed_trafos", f"{relation_id}_trafos_processed_3035.geojson")
+    return os.path.join("", "raw_data", "transformer_data", "processed_trafos", f"{relation_id}_trafos_processed_3035.geojson")
 
 
 def fetch_trafos(relation_id: int) -> None:

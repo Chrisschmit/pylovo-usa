@@ -13,6 +13,9 @@ def load_yaml_config(filepath: str):
     with open(abs_path, "r", encoding="utf-8") as file:
         return yaml.safe_load(file)
 
+# Load Project Root
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
 # Load all configurations with correct paths
 CONFIG_DATA = load_yaml_config("../config/config_data.yaml")
 CONFIG_VERSION = load_yaml_config("../config/config_version.yaml")

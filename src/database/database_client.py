@@ -4,11 +4,11 @@ from sqlalchemy import create_engine
 
 from src import utils
 from src.config_loader import *
-from src.database_modules.databaseAnalysis import AnalysisMixin
-from src.database_modules.databaseGrid import GridMixin
-from src.database_modules.databaseClustering import ClusteringMixin
-from src.database_modules.databasePreprocessing import PreprocessingMixin
-from src.database_modules.databaseUtils import UtilsMixin
+from src.database.databaseAnalysis import AnalysisMixin
+from src.database.databaseGrid import GridMixin
+from src.database.databaseClustering import ClusteringMixin
+from src.database.databasePreprocessing import PreprocessingMixin
+from src.database.databaseUtils import UtilsMixin
 
 warnings.simplefilter(action='ignore', category=UserWarning)
 
@@ -18,7 +18,7 @@ class DatabaseClient(PreprocessingMixin, ClusteringMixin, GridMixin, AnalysisMix
 
     def __init__(self, dbname=DBNAME, user=USER, pw=PASSWORD, host=HOST, port=PORT, **kwargs):
         self.logger = utils.create_logger(
-            "DatabaseClient", log_file=kwargs.get("log_file", "log.txt"), log_level=LOG_LEVEL
+            "DatabaseClient", log_file=kwargs.get("log_file", "../log.txt"), log_level=LOG_LEVEL
         )
         try:
             self.conn = psy.connect(

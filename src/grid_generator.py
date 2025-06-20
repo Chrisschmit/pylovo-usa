@@ -7,7 +7,7 @@ import pandapower as pp
 from scipy.cluster.hierarchy import linkage
 from scipy.spatial.distance import squareform
 
-import src.database_client as dbc
+import src.database.database_client as dbc
 from src import utils
 from src.config_loader import *
 
