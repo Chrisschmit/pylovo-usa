@@ -4,10 +4,10 @@ from sqlalchemy import create_engine
 
 from src import utils
 from src.config_loader import *
-from src.database.databaseAnalysis import AnalysisMixin
-from src.database.databaseGrid import GridMixin
-from src.database.databaseClustering import ClusteringMixin
 from src.database.databasePreprocessing import PreprocessingMixin
+from src.database.databaseClustering import ClusteringMixin
+from src.database.databaseGrid import GridMixin
+from src.database.databaseAnalysis import AnalysisMixin
 from src.database.databaseUtils import UtilsMixin
 
 warnings.simplefilter(action='ignore', category=UserWarning)

@@ -2,10 +2,12 @@ import json
 import warnings
 
 import geopandas as gpd
+import pandapower as pp
 import pandapower.topology as top
 
 from src import utils
 from src.config_loader import *
+from src.database.databaseUtils import UtilsMixin
 
 warnings.simplefilter(action="ignore", category=UserWarning)
 
@@ -30,7 +32,7 @@ class AnalysisMixin:
         self.cur.execute(insert_query, vars=(json_string, VERSION_ID, plz, kcid, bcid))
 
     def analyse_cables(self, plz: int):
-        cluster_list = self.dbc.get_list_from_plz(plz)
+        cluster_list = UtilsMixin.get_list_from_plz(plz)
         count = len(cluster_list)
         time = 0
         percent = 0
@@ -73,7 +75,7 @@ class AnalysisMixin:
         self.logger.debug("cable count finished")
 
     def analyse_per_trafo_parameters(self, plz: int):
-        cluster_list = self.dbc.get_list_from_plz(plz)
+        cluster_list = UtilsMixin.get_list_from_plz(plz)
         count = len(cluster_list)
         time = 0
         percent = 0

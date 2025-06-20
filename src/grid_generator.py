@@ -377,7 +377,7 @@ class GridGenerator:
         self.logger.debug(f"{len(transformer_list)} transformers found")
 
         # Get cost dataframe between consumers and transformers
-        cost_df = self.get_consumer_to_transformer_df(kcid, transformer_list)
+        cost_df = self.dbc.get_consumer_to_transformer_df(kcid, transformer_list)
 
         # Filter out connections with distance >= 300
         cost_df = cost_df[cost_df["agg_cost"] < 300].sort_values(by=["agg_cost"])
@@ -455,11 +455,11 @@ class GridGenerator:
             bcid: Building cluster ID
         """
         # Get all connection points in the building cluster
-        connection_points = self.get_building_connection_points_from_bc(kcid, bcid)
+        connection_points = self.dbc.get_building_connection_points_from_bc(kcid, bcid)
 
         # If there's only one connection point, use it
         if len(connection_points) == 1:
-            self.upsert_transformer_selection(plz, kcid, bcid, connection_points[0])
+            self.dbc.upsert_transformer_selection(plz, kcid, bcid, connection_points[0])
             return
 
         # Get distance matrix between all connection points
@@ -476,7 +476,7 @@ class GridGenerator:
         ont_connection_id = int(localid2vid[min_localid])
 
         # Update the database with the selected transformer position
-        self.upsert_transformer_selection(plz, kcid, bcid, ont_connection_id)
+        self.dbc.upsert_transformer_selection(plz, kcid, bcid, ont_connection_id)
 
     def install_cables(self):
         """
@@ -518,9 +518,9 @@ class GridGenerator:
 
             # Get data for this cluster
             vertices_dict, ont_vertice, vertices_list, buildings_df, consumer_df, consumer_list, connection_nodes = (
-                self.dbc.prepare_vertices_list(self.plz, kcid, bcid)
+                self.prepare_vertices_list(self.plz, kcid, bcid)
             )
-            Pd, load_units, load_type = self.dbc.get_consumer_simultaneous_load_dict(consumer_list, buildings_df)
+            Pd, load_units, load_type = self.get_consumer_simultaneous_load_dict(consumer_list, buildings_df)
             local_length_dict = {c: 0 for c in CABLE_COST_DICT.keys()}
 
             # Create network and add components
@@ -947,7 +947,7 @@ class GridGenerator:
     def analyse_results(self):
         try:
             self.logger.info("Start basic result analysis")
-            self.dbc.analyse_basic_parameters(self.plz)
+            self.analyse_basic_parameters(self.plz)
             self.logger.info("Start cable counting")
             self.dbc.analyse_cables(self.plz)
             self.logger.info("Start per trafo analysis")
@@ -979,7 +979,7 @@ class GridGenerator:
         self.logger.info(f"Grid with kcid:{kcid} bcid:{bcid} is stored. ")
 
     def analyse_basic_parameters(self, plz: int):
-        cluster_list = self.get_list_from_plz(plz)
+        cluster_list = self.dbc.get_list_from_plz(plz)
         count = len(cluster_list)
         time = 0
         percent = 0
@@ -993,7 +993,7 @@ class GridGenerator:
             load_count = 0
             bus_list = []
             try:
-                net = self.read_net(plz, kcid, bcid)
+                net = self.dbc.read_net(plz, kcid, bcid)
             except Exception as e:
                 self.logger.warning(f" local network {kcid},{bcid} is problematic")
                 raise e

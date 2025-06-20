@@ -1,5 +1,6 @@
 import math
 import warnings
+import time
 from decimal import *
 from typing import *
 
@@ -8,6 +9,7 @@ from scipy.cluster.hierarchy import fcluster
 
 from src import utils
 from src.config_loader import *
+from src.database import databaseUtils
 
 warnings.simplefilter(action='ignore', category=UserWarning)
 
@@ -132,8 +134,39 @@ class ClusteringMixin:
                                              ORDER BY connection_point) AS b), \
                                       false);"""
         params = {"k": kcid}
+        localid2vid, dist_mat, _ = self.calculate_cost_arr_dist_matrix(costmatrix_query, params)
 
-        return self.dbc.calculate_cost_arr_dist_matrix(costmatrix_query, params)
+        return localid2vid, dist_mat, _
+
+    def calculate_cost_arr_dist_matrix(self, costmatrix_query: str, params: dict) -> tuple[dict, np.ndarray, dict]:
+        """
+        Helper function for calculating cost array and distance matrix from given parameters
+        """
+        st = time.time()
+        cost_df = pd.read_sql_query(costmatrix_query, con=self.conn, params=params,
+                                    dtype={"start_vid": np.int32, "end_vid": np.int32, "agg_cost": np.int32}, )
+        cost_arr = cost_df.to_numpy()
+        et = time.time()
+        self.logger.debug(f"Elapsed time for SQL to cost_arr: {et - st}")
+        # Speichere die echte vertices_ids mit neuen Indexen
+        # 0 5346
+        # 1 3263
+        # 2 3653
+        # ...
+        localid2vid = dict(enumerate(cost_df["start_vid"].unique()))
+        vid2localid = {y: x for x, y in localid2vid.items()}
+
+        # Square distance matrix
+        dist_matrix = np.zeros([len(localid2vid), len(localid2vid)])
+        st = time.time()
+        for i in range(len(cost_df)):
+            start_id = vid2localid[cost_arr[i, 0]]
+            end_id = vid2localid[cost_arr[i, 1]]
+            dist_matrix[start_id][end_id] = cost_arr[i, 2]
+        et = time.time()
+        self.logger.debug(f"Elapsed time for dist_matrix creation: {et - st}")
+        return localid2vid, dist_matrix, vid2localid
+
 
     def generate_load_vector(self, kcid: int, bcid: int) -> np.ndarray:
         query = """SELECT SUM(peak_load_in_kw)::float
@@ -361,8 +394,8 @@ class ClusteringMixin:
         :param note:
         :return:
         """
-        sdl = self.dbc.get_settlement_type_from_plz(plz)
-        transformer_capacities, _ = self.dbc.get_transformer_data(sdl)
+        sdl = self.get_settlement_type_from_plz(plz)
+        transformer_capacities, _ = self.get_transformer_data(sdl)
 
         if note == 0:
             old_query = """SELECT transformer_rated_power
@@ -643,5 +676,21 @@ class ClusteringMixin:
                                              ORDER BY connection_point) AS b),
                                       false);"""
         params = {"b": bcid, "k": kcid}
+        localid2vid, dist_mat, _ = self.calculate_cost_arr_dist_matrix(costmatrix_query, params)
 
-        return self.dbc.calculate_cost_arr_dist_matrix(costmatrix_query, params)
+        return localid2vid, dist_mat, _
+
+    def get_settlement_type_from_plz(self, plz) -> int:
+        """
+        Args:
+            plz:
+        Returns: Settlement type: 1=City, 2=Village, 3=Rural
+        """
+        settlement_query = """SELECT settlement_type
+                              FROM postcode_result
+                              WHERE postcode_result_plz = %(p)s
+                              LIMIT 1; """
+        self.cur.execute(settlement_query, {"p": plz})
+        settlement_type = self.cur.fetchone()[0]
+
+        return settlement_type
