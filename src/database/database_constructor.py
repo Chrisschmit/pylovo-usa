@@ -9,7 +9,7 @@ import sqlparse
 from src.config_loader import *
 from config.config_table_structure import *
 import src.database.database_client as dbc
-from raw_data.preprocessing_scripts.import_transformers import process_trafos, get_trafos_processed_3035_geojson_path, \
+from src.data_import.import_transformers import process_trafos, get_trafos_processed_3035_geojson_path, \
     fetch_trafos, RELATION_ID, EPSG, get_trafos_processed_geojson_path
 
 
@@ -83,7 +83,7 @@ class DatabaseConstructor:
                 f"Table name {table_name} is not a valid parameter value for the function create_table. See config.py"
             )
 
-    def ogr_to_db(self, ogr_file_list, skip_failures: bool = None):
+    def ogr_to_db(self, ogr_file_list, skip_failures: bool = False):
         """
             OGR/GDAL is a translator library for raster and vector geospatial data formats
             inserts building data specified into database

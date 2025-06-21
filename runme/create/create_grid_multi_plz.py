@@ -5,7 +5,7 @@ import pandas as pd
 import time
 
 from src.classification.sampling.sample import get_municipal_register_as_dataframe
-from raw_data.preprocessing_scripts.import_buildings import import_buildings_for_multiple_plz
+from src.data_import.import_buildings import import_buildings_for_multiple_plz
 from src.grid_generator import GridGenerator
 from src.config_loader import ANALYZE_GRIDS
 
