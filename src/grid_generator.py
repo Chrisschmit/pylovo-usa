@@ -1,4 +1,5 @@
 import json
+import traceback
 import warnings
 from pathlib import Path
 
@@ -45,20 +46,21 @@ class GridGenerator:
         self.plz = plz
         print('-------------------- start', self.plz, '---------------------------')
 
-        self.dbc.create_temp_tables()  # create temp tables for the grid generation
+        # self.dbc.create_temp_tables()  # create temp tables for the grid generation
 
         try:
-            self.generate_grid()
-            self.dbc.save_tables(plz=self.plz)  # Save data from temporary tables to result tables
+            # self.generate_grid()
+            # self.dbc.save_tables(plz=self.plz)  # Save data from temporary tables to result tables
             if analyze_grids:
                 self.analyse_results()
-        except ResultExistsError:
-            print('Grids for this PLZ have already been generated.')
+        # except ResultExistsError:
+        #     print('Grids for this PLZ have already been generated.')
         except Exception as e:
             self.logger.error(f"Error during grid generation for PLZ {self.plz}: {e}")
             self.logger.info(f"Skipped PLZ {self.plz} due to generation error.")
             self.dbc.conn.rollback()  # rollback the transaction
             self.dbc.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION), self.plz)  # delete from sample set
+            traceback.print_exc()
             return
 
         self.dbc.drop_temp_tables()  # drop temp tables
@@ -949,7 +951,7 @@ class GridGenerator:
             self.logger.info("Start basic result analysis")
             self.analyse_basic_parameters(self.plz)
             self.logger.info("Start cable counting")
-            self.dbc.analyse_cables(self.plz)
+            self.analyse_cables(self.plz)
             self.logger.info("Start per trafo analysis")
             self.dbc.analyse_per_trafo_parameters(self.plz)
             self.logger.info("Result analysis finished")
@@ -1033,3 +1035,39 @@ class GridGenerator:
         bus_count_string = json.dumps(bus_count_dict)
 
         self.dbc.insert_plz_parameters(plz, trafo_string, load_count_string, bus_count_string)
+
+    def analyse_cables(self, plz: int):
+        cluster_list = self.dbc.get_list_from_plz(plz)
+        count = len(cluster_list)
+        time = 0
+        percent = 0
+
+        # distributed according to cross_section
+        cable_length_dict = {}
+        for kcid, bcid in cluster_list:
+            try:
+                net = self.dbc.read_net(plz, kcid, bcid)
+            except Exception as e:
+                self.logger.debug(f" local network {kcid},{bcid} is problematic")
+                raise e
+            else:
+                cable_df = net.line[net.line["in_service"] == True]
+
+                cable_type = pd.unique(cable_df["std_type"]).tolist()
+                for type in cable_type:
+
+                    if type in cable_length_dict:
+                        cable_length_dict[type] += (cable_df[cable_df["std_type"] == type]["parallel"] *
+                                                    cable_df[cable_df["std_type"] == type]["length_km"]).sum()
+
+                    else:
+                        cable_length_dict[type] = (cable_df[cable_df["std_type"] == type]["parallel"] *
+                                                   cable_df[cable_df["std_type"] == type]["length_km"]).sum()
+            time += 1
+            if time / count >= 0.1:
+                percent += 10
+                self.logger.info(f"{percent} % processed")
+                time = 0
+        self.logger.info("analyse_cables finished.")
+        cable_length_string = json.dumps(cable_length_dict)
+        self.dbc.insert_cable_length(plz, cable_length_string)

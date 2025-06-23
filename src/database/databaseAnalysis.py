@@ -19,8 +19,16 @@ class AnalysisMixin:
                           VALUES (%s, %s, %s, %s,
                                   %s);"""  # TODO: check - should values be updated for same plz and version if analysis is started? And Add a column
         self.cur.execute(update_query, vars=(VERSION_ID, plz, trafo_string, load_count_string, bus_count_string), )
-
         self.logger.debug("basic parameter count finished")
+
+    def insert_cable_length(self, plz: int, cable_length_string: str):
+        update_query = """UPDATE plz_parameters
+                          SET cable_length = %(c)s
+                          WHERE version_id = %(v)s
+                            AND plz = %(p)s;"""
+        self.cur.execute(update_query, {"v": VERSION_ID, "c": cable_length_string,
+                                        "p": plz})  # TODO: change to cable_length_per_type, add cable_length_per_trafo
+        self.logger.debug("cable count finished")
 
     def save_pp_net_with_json(self, plz: int, kcid: int, bcid: int, json_string: str) -> None:
         insert_query = ("""UPDATE grid_result
@@ -30,49 +38,6 @@ class AnalysisMixin:
                              AND kcid = %s
                              AND bcid = %s;""")
         self.cur.execute(insert_query, vars=(json_string, VERSION_ID, plz, kcid, bcid))
-
-    def analyse_cables(self, plz: int):
-        cluster_list = UtilsMixin.get_list_from_plz(plz)
-        count = len(cluster_list)
-        time = 0
-        percent = 0
-
-        # distributed according to cross_section
-        cable_length_dict = {}
-        for kcid, bcid in cluster_list:
-            try:
-                net = self.read_net(plz, kcid, bcid)
-            except Exception as e:
-                self.logger.debug(f" local network {kcid},{bcid} is problematic")
-                raise e
-            else:
-                cable_df = net.line[net.line["in_service"] == True]
-
-                cable_type = pd.unique(cable_df["std_type"]).tolist()
-                for type in cable_type:
-
-                    if type in cable_length_dict:
-                        cable_length_dict[type] += (cable_df[cable_df["std_type"] == type]["parallel"] *
-                                                    cable_df[cable_df["std_type"] == type]["length_km"]).sum()
-
-                    else:
-                        cable_length_dict[type] = (cable_df[cable_df["std_type"] == type]["parallel"] *
-                                                   cable_df[cable_df["std_type"] == type]["length_km"]).sum()
-            time += 1
-            if time / count >= 0.1:
-                percent += 10
-                self.logger.info(f"{percent} % processed")
-                time = 0
-        self.logger.info("analyse_cables finished.")
-        cable_length_string = json.dumps(cable_length_dict)
-
-        update_query = """UPDATE plz_parameters
-            SET cable_length = %(c)s 
-            WHERE version_id = %(v)s AND plz = %(p)s;"""
-        self.cur.execute(update_query, {"v": VERSION_ID, "c": cable_length_string,
-                                        "p": plz})  # TODO: change to cable_length_per_type, add cable_length_per_trafo
-
-        self.logger.debug("cable count finished")
 
     def analyse_per_trafo_parameters(self, plz: int):
         cluster_list = UtilsMixin.get_list_from_plz(plz)

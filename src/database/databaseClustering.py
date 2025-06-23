@@ -9,7 +9,6 @@ from scipy.cluster.hierarchy import fcluster
 
 from src import utils
 from src.config_loader import *
-from src.database import databaseUtils
 
 warnings.simplefilter(action='ignore', category=UserWarning)
 
