@@ -3,11 +3,8 @@ import warnings
 
 import geopandas as gpd
 import pandapower as pp
-import pandapower.topology as top
 
-from src import utils
 from src.config_loader import *
-from src.database.databaseUtils import UtilsMixin
 
 warnings.simplefilter(action="ignore", category=UserWarning)
 
@@ -29,6 +26,20 @@ class AnalysisMixin:
         self.cur.execute(update_query, {"v": VERSION_ID, "c": cable_length_string,
                                         "p": plz})  # TODO: change to cable_length_per_type, add cable_length_per_trafo
         self.logger.debug("cable count finished")
+
+    def insert_trafo_parameters(self, plz: int, trafo_load_string: str, trafo_max_distance_string: str,
+            trafo_avg_distance_string: str):
+        update_query = """UPDATE plz_parameters
+                          SET sim_peak_load_per_trafo = %(l)s,
+                              max_distance_per_trafo  = %(m)s,
+                              avg_distance_per_trafo  = %(a)s
+                          WHERE version_id = %(v)s
+                            AND plz = %(p)s; \
+                       """
+        self.cur.execute(update_query,
+                         {"v": VERSION_ID, "p": plz, "l": trafo_load_string, "m": trafo_max_distance_string,
+                          "a": trafo_avg_distance_string, }, )
+        self.logger.debug("per trafo analysis finished")
 
     def save_pp_net_with_json(self, plz: int, kcid: int, bcid: int, json_string: str) -> None:
         insert_query = ("""UPDATE grid_result
