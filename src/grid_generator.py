@@ -46,15 +46,15 @@ class GridGenerator:
         self.plz = plz
         print('-------------------- start', self.plz, '---------------------------')
 
-        # self.dbc.create_temp_tables()  # create temp tables for the grid generation
+        self.dbc.create_temp_tables()  # create temp tables for the grid generation
 
         try:
-            # self.generate_grid()
-            # self.dbc.save_tables(plz=self.plz)  # Save data from temporary tables to result tables
+            self.generate_grid()
+            self.dbc.save_tables(plz=self.plz)  # Save data from temporary tables to result tables
             if analyze_grids:
                 self.analyse_results()
-        # except ResultExistsError:
-        #     print('Grids for this PLZ have already been generated.')
+        except ResultExistsError:
+            print('Grids for this PLZ have already been generated.')
         except Exception as e:
             self.logger.error(f"Error during grid generation for PLZ {self.plz}: {e}")
             self.logger.info(f"Skipped PLZ {self.plz} due to generation error.")
