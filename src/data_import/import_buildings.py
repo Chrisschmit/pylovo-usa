@@ -1,8 +1,8 @@
 import glob
-import os
 
 from src.grid_generator import GridGenerator
 from src.database.database_constructor import DatabaseConstructor
+from src.config_loader import *
 
 
 def import_buildings_for_single_plz(gg):
@@ -34,7 +34,7 @@ def import_buildings_for_single_plz(gg):
         gg.logger.info("Buildings for this AGS are not in the database and will be added.")
 
     # Define the path for building shapefiles
-    data_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "buildings"))
+    data_path = os.path.abspath(os.path.join(PROJECT_ROOT, "raw_data", "buildings"))
     shapefiles_pattern = os.path.join(data_path, "*.shp")  # Pattern for shapefiles
 
     # Retrieve all matching shapefiles
@@ -66,7 +66,7 @@ def import_buildings_for_multiple_plz(sample_plz):
     imports building data to db for multiple plz
     """
     # Define the path for building shapefiles
-    data_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "buildings"))
+    data_path = os.path.abspath(os.path.join(PROJECT_ROOT, "raw_data", "buildings"))
     shapefiles_pattern = os.path.join(data_path, "*.shp")  # Pattern for shapefiles
 
     # retrieving all shape files
