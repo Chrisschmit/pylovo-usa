@@ -954,7 +954,7 @@ class GridGenerator:
             self.logger.info("Start cable counting")
             self.analyse_cables(self.plz)
             self.logger.info("Start per trafo analysis")
-            self.dbc.analyse_per_trafo_parameters(self.plz)
+            self.analyse_per_trafo_parameters(self.plz)
             self.logger.info("Result analysis finished")
             self.dbc.conn.commit()
         except Exception as e:
