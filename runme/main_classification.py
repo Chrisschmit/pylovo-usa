@@ -1,13 +1,13 @@
 import yaml
 import os
 
-from src.classification import apply_clustering_for_visualisation
-from src.classification.clustering import get_no_clusters_for_clustering, prepare_data_for_clustering
+from src.classification.clustering.apply_clustering_for_visualisation import apply_clustering_for_visualisation
+from src.classification.clustering.get_no_clusters_for_clustering import get_no_clusters_for_clustering
+from src.classification.clustering.prepare_data_for_clustering import prepare_data_for_clustering
 from src.classification.clustering.get_parameters_for_clustering import get_parameters_for_clustering
 
 # Define paths to YAML config files
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-
 CONFIG_CLASSIFICATION_PATH = os.path.join(BASE_DIR, "config", "config_classification.yaml")
 CONFIG_CLUSTERING_PATH = os.path.join(BASE_DIR, "config", "config_clustering.yaml")
 
