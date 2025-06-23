@@ -10,7 +10,7 @@ def calc_deviation_of_clustering_method(df_parameters_of_grids: pd.DataFrame, re
     """
     Calculate the overall deviation of a cluster-analysis. E.g. use to compare different clustering approaches 
     Calculate the deviation of all values from the medioid.
-    see also examples_clustering/kmedoids_calc_deviation
+    see also clustering/kmedoids_calc_deviation
 
     Parameters
     ----------
