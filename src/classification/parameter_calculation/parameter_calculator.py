@@ -1,3 +1,5 @@
+import pandas as pd
+
 from src.classification.parameter_calculation.grid_parameters import GridParameters
 import src.database.database_client as dbc
 from src.config_loader import VERSION_ID
@@ -8,7 +10,7 @@ class ParameterCalculator:
         self.plz = plz
         # connect to database
         self.dbc = dbc.DatabaseClient()
-        
+        self.pc = ParameterCalculator(str(self.plz))
 
     def calc_parameters_for_grids(self) -> None:
         """

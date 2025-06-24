@@ -113,37 +113,14 @@ class GridParameters:
         self.vsw_per_branch = self.resistance / self.no_branches
 
     def get_parameters_as_dataframe(self) -> pd.DataFrame:
-        """get grid parameters
+        """get grid parameters. Order of parameters is defined in CLUSTERING_PARAMETERS should equal database
+        table clustering_parameters
 
         :return: table of grid parameters
         :rtype: pd.Dataframe
         """
-        df_parameters = pd.DataFrame(columns=CLUSTERING_PARAMETERS, data=[[self.version_id,
-                                                                           self.plz,
-                                                                           self.bcid,
-                                                                           self.kcid,
-                                                                           self.no_connection_buses,
-                                                                           self.no_branches,
-                                                                           self.no_house_connections,
-                                                                           self.no_house_connections_per_branch,
-                                                                           self.no_households,
-                                                                           self.no_household_equ,
-                                                                           self.no_households_per_branch,
-                                                                           self.max_no_of_households_of_a_branch,
-                                                                           self.house_distance_km,
-                                                                           self.transformer_mva,
-                                                                           self.osm_trafo,
-                                                                           self.max_trafo_dis,
-                                                                           self.avg_trafo_dis,
-                                                                           self.cable_length_km,
-                                                                           self.cable_len_per_house,
-                                                                           self.max_power_mw,
-                                                                           self.simultaneous_peak_load_mw,
-                                                                           self.resistance,
-                                                                           self.reactance,
-                                                                           self.ratio,
-                                                                           self.vsw_per_branch,
-                                                                           self.max_vsw_of_a_branch]])
+        params = [value for key, value in vars(self).items() if key != 'dbc']
+        df_parameters = pd.DataFrame([params], columns=CLUSTERING_PARAMETERS)
         return df_parameters
 
     def get_simultaneous_peak_load(self) -> float:
@@ -166,60 +143,12 @@ class GridParameters:
         return self.bcid < 0
 
     def print_grid_parameters_types(self) -> None:
-        print(type(self.version_id),
-              type(self.plz),
-              type(self.bcid),
-              type(self.kcid),
-              type(self.no_connection_buses),
-              type(self.no_branches),
-              type(self.no_house_connections),
-              type(self.no_house_connections_per_branch),
-              type(self.no_households),
-              type(self.no_household_equ),
-              type(self.no_households_per_branch),
-              type(self.max_no_of_households_of_a_branch),
-              type(self.house_distance_km),
-              type(self.transformer_mva),
-              type(self.osm_trafo),
-              type(self.max_trafo_dis),
-              type(self.avg_trafo_dis),
-              type(self.cable_length_km),
-              type(self.cable_len_per_house),
-              type(self.max_power_mw),
-              type(self.simultaneous_peak_load_mw),
-              type(self.resistance),
-              type(self.reactance),
-              type(self.ratio),
-              type(self.vsw_per_branch),
-              type(self.max_vsw_of_a_branch))
+        param_types = [type(value) for key, value in vars(self).items() if key != 'dbc']
+        print(*param_types)
 
     def print_grid_parameters(self) -> None:
-        print(self.version_id,
-              self.plz,
-              self.bcid,
-              self.kcid,
-              self.no_connection_buses,
-              self.no_branches,
-              self.no_house_connections,
-              self.no_house_connections_per_branch,
-              self.no_households,
-              self.no_household_equ,
-              self.no_households_per_branch,
-              self.max_no_of_households_of_a_branch,
-              self.house_distance_km,
-              self.transformer_mva,
-              self.osm_trafo,
-              self.max_trafo_dis,
-              self.avg_trafo_dis,
-              self.cable_length_km,
-              self.cable_len_per_house,
-              self.max_power_mw,
-              self.simultaneous_peak_load_mw,
-              self.resistance,
-              self.reactance,
-              self.ratio,
-              self.vsw_per_branch,
-              self.max_vsw_of_a_branch)
+        params = [value for key, value in vars(self).items() if key != 'dbc']
+        print(*params)
 
     def write_parameters_to_db(self):
         """writes parameters to database"""
@@ -272,6 +201,7 @@ class GridParameters:
                   %(ratio)s,
                   %(vsw_per_branch)s,
                   %(max_vsw_of_a_branch)s);"""
+
         self.dbc.cur.execute(query, {
             "version_id": self.version_id,
             "plz": self.plz,

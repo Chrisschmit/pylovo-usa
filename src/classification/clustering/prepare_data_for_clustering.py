@@ -7,7 +7,7 @@ import sys
 import time
 
 from src.classification.clustering.filter_grids import apply_filter_to_grids
-from src.classification.parameter_calculation.perform_classification_tasks_for_multiple_plz import calculate_parameters_for_multiple_plz
+from src.classification.parameter_calculation.parameter_calculator import ParameterCalculator
 from src.data_import.import_buildings import import_buildings_for_multiple_plz
 from src.classification.sampling.sample import get_sample_set   , create_sample_set
 from src.grid_generator import GridGenerator
@@ -45,8 +45,11 @@ def prepare_data_for_clustering(additional_filtering: bool = False) -> None:
     # timing of the script
     start_time = time.time()
 
+    pc = ParameterCalculator()
     # calculate network parameter for all plz
-    calculate_parameters_for_multiple_plz(df_samples=samples)
+    for plz_index in samples['plz']:
+        # compute parameters for plz
+        pc.calc_parameters_for_grids(plz=plz_index)
 
     # end timing
     print("--- %s seconds parameter calculation---" % (time.time() - start_time))
