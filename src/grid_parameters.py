@@ -1,11 +1,14 @@
 import math
 import statistics
 from math import radians
-
+import pandas as pd
 import geopandas as gpd
 import networkx as nx
 import pandapower as pp
 from sklearn.metrics.pairwise import haversine_distances
+
+from src.config_loader import SIM_FACTOR
+from src.utils import oneSimultaneousLoad
 
 from src.classification.parameter_calculation.sim_factor import calculate_line_with_sim_factor
 from src.config_loader import *
@@ -301,140 +304,208 @@ def calc_avg_house_distance(pandapower_net) -> float:
     return median_dis
 
 
-def get_root(pandapower_net):
-    # the trafo is the root of the graph
-    root = pandapower_net.bus
-    root['LV_bus'] = root['name'].str.contains("LVbus")
-    root = root[root['LV_bus']]
-    root = root.index
-    root = list(root)
-    root = root[0]
-    return root
+    def get_root(pandapower_net):
+        # the trafo is the root of the graph
+        root = pandapower_net.bus
+        root['LV_bus'] = root['name'].str.contains("LVbus")
+        root = root[root['LV_bus']]
+        root = root.index
+        root = list(root)
+        root = root[0]
+        return root
 
 
-def get_no_branches(networkx_graph, pandapower_net) -> int:
-    # number of branches
-    root = get_root(pandapower_net)
-    # number of branches
-    no_branches = networkx_graph.degree(root) - 1
-    return no_branches
+    def get_no_branches(networkx_graph, pandapower_net) -> int:
+        # number of branches
+        root = get_root(pandapower_net)
+        # number of branches
+        no_branches = networkx_graph.degree(root) - 1
+        return no_branches
 
 
-def get_distances_in_graph(pandapower_net, networkx_graph) -> tuple[float, float]:
-    """
-    distances in the graph:
-    - average trafo distance: distance from each house connection to the trafo
-      divided by the number of house connections
-    - max trafo distance: distance to the furthest house connection from the trafo
-    """
+    def get_distances_in_graph(pandapower_net, networkx_graph) -> tuple[float, float]:
+        """
+        distances in the graph:
+        - average trafo distance: distance from each house connection to the trafo
+          divided by the number of house connections
+        - max trafo distance: distance to the furthest house connection from the trafo
+        """
 
-    root = get_root(pandapower_net)
-    # the consumers are leaves in the graph
-    leaves = pandapower_net.bus
-    leaves['consumer_bus'] = leaves['name'].str.contains("Consumer Nodebus")
-    leaves = leaves[leaves['consumer_bus']]
-    leaves = leaves.index
-    leaves = list(leaves)
-    no_leaves = len(leaves)
+        root = get_root(pandapower_net)
+        # the consumers are leaves in the graph
+        leaves = pandapower_net.bus
+        leaves['consumer_bus'] = leaves['name'].str.contains("Consumer Nodebus")
+        leaves = leaves[leaves['consumer_bus']]
+        leaves = leaves.index
+        leaves = list(leaves)
+        no_leaves = len(leaves)
 
-    # determine path lengths in graph:
-    path_length_to_leaves = []
-    for leaf in leaves:
-        weighted_length = nx.dijkstra_path_length(networkx_graph, root,
-                                                  leaf)  # calculates weigthed path from start to end note
-        # in this case the weight of an edge is the actual length in km
-        path_length_to_leaves.append(weighted_length)
+        # determine path lengths in graph:
+        path_length_to_leaves = []
+        for leaf in leaves:
+            weighted_length = nx.dijkstra_path_length(networkx_graph, root,
+                                                      leaf)  # calculates weigthed path from start to end note
+            # in this case the weight of an edge is the actual length in km
+            path_length_to_leaves.append(weighted_length)
 
-    max_path_length = max(path_length_to_leaves)
-    avg_path_length = sum(path_length_to_leaves) / no_leaves
+        max_path_length = max(path_length_to_leaves)
+        avg_path_length = sum(path_length_to_leaves) / no_leaves
 
-    return avg_path_length, max_path_length
-
-
-def get_trafo_power(pandapower_net) -> float:
-    # transformer
-    df_trafo = pandapower_net.trafo.sn_mva
-    return df_trafo.iloc[0]
+        return avg_path_length, max_path_length
 
 
-def calc_resistance(pandapower_net, networkx_graph) -> tuple[float, float, float, float, float]:
-    """
-    this function calculates the resistance and reactance in ohm of the network
-    (Verbrauchersummenwiderstand accoding to Kerber 2010 p. 44)
-    output:  resistance  and reactance and ratio of resistances
-    """
-    # get dataframe of load (consumer households) of the network
-    df_load = pandapower_net.load
+    def get_trafo_power(pandapower_net) -> float:
+        # transformer
+        df_trafo = pandapower_net.trafo.sn_mva
+        return df_trafo.iloc[0]
 
-    # for the Verbrauchersummenwiderstand vsw the number of household equivalents (loads with 0.03 MW)
-    # of each house connection are computed
-    df_vsw = df_load.groupby('bus')['max_p_mw'].sum() * 1000.0 / PEAK_LOAD_HOUSEHOLD
-    df_vsw = df_vsw.to_frame()
-    df_vsw = df_vsw.reset_index()
-    df_vsw = df_vsw.rename(columns={"bus": "house_connection"})
-    df_vsw = df_vsw.rename(columns={"max_p_mw": "household_equivalents"})
 
-    # get dataframe of lines (cables) with their length and resistances
-    # get line with sim factor
-    df_line = calculate_line_with_sim_factor(pandapower_net, networkx_graph)
+    def calc_resistance(pandapower_net, networkx_graph) -> tuple[float, float, float, float, float]:
+        """
+        this function calculates the resistance and reactance in ohm of the network
+        (Verbrauchersummenwiderstand accoding to Kerber 2010 p. 44)
+        output:  resistance  and reactance and ratio of resistances
+        """
+        # get dataframe of load (consumer households) of the network
+        df_load = pandapower_net.load
 
-    root = get_root(pandapower_net=pandapower_net)
+        # for the Verbrauchersummenwiderstand vsw the number of household equivalents (loads with 0.03 MW)
+        # of each house connection are computed
+        df_vsw = df_load.groupby('bus')['max_p_mw'].sum() * 1000.0 / PEAK_LOAD_HOUSEHOLD
+        df_vsw = df_vsw.to_frame()
+        df_vsw = df_vsw.reset_index()
+        df_vsw = df_vsw.rename(columns={"bus": "house_connection"})
+        df_vsw = df_vsw.rename(columns={"max_p_mw": "household_equivalents"})
 
-    # compute path from root to each house connection
-    df_vsw['path'] = ''
-    for index, row in df_vsw.iterrows():
-        df_vsw.at[index, 'path'] = nx.shortest_path(networkx_graph, source=root,
-                                                    target=df_vsw.at[index, 'house_connection'])
+        # get dataframe of lines (cables) with their length and resistances
+        # get line with sim factor
+        df_line = calculate_line_with_sim_factor(pandapower_net, networkx_graph)
 
-    # assign each path to a branch
-    df_vsw['branch'] = ''
-    for branch in networkx_graph.edges(root):
+        root = get_root(pandapower_net=pandapower_net)
+
+        # compute path from root to each house connection
+        df_vsw['path'] = ''
         for index, row in df_vsw.iterrows():
-            if branch[1] in row['path']:
-                df_vsw.at[index, 'branch'] = branch
+            df_vsw.at[index, 'path'] = nx.shortest_path(networkx_graph, source=root,
+                                                        target=df_vsw.at[index, 'house_connection'])
 
-    # maximum number of household (equivalents) of a single branch
-    max_no_of_households_of_a_branch = df_vsw.groupby('branch')['household_equivalents'].sum().max()
+        # assign each path to a branch
+        df_vsw['branch'] = ''
+        for branch in networkx_graph.edges(root):
+            for index, row in df_vsw.iterrows():
+                if branch[1] in row['path']:
+                    df_vsw.at[index, 'branch'] = branch
 
-    # compute the  part of the resistance and reactance for each edge of the graph (cable section)
-    # the resistance depends on the cable type, length of the cable and the amount of households that are connected
-    df_vsw['resistance'] = ''
-    df_vsw['resistance_sections'] = ''
-    df_vsw['reactance'] = ''
-    df_vsw['reactance_sections'] = ''
-    for index, row in df_vsw.iterrows():
-        path_list = df_vsw.at[index, 'path']
-        length = len(path_list)
-        no_load = df_vsw.at[index, 'household_equivalents']
-        resistance_list = []
-        reactance_list = []
-        for i in range(length - 1):
-            start_node = path_list[i]
-            end_node = path_list[i + 1]
-            line = df_line[df_line['from_bus'] == start_node]  # here the correct cable is filtered that starts at start
-            line = line[line['to_bus'] == end_node]  # node and ends at end node
-            line = line.head(1)
-            length_km = line['length_km']
-            r_ohm_per_km = line['r_ohm_per_km']
-            x_ohm_per_km = line['x_ohm_per_km']
-            sim_factor = line['sim_factor_cumulated']
-            resistance_of_cable_section = no_load * length_km * r_ohm_per_km * sim_factor
-            resistance_of_cable_section = resistance_of_cable_section
-            resistance_list.append(resistance_of_cable_section)
-            reactance_of_cable_section = no_load * length_km * x_ohm_per_km
-            reactance_of_cable_section = reactance_of_cable_section
-            reactance_list.append(reactance_of_cable_section)
-        df_vsw.at[index, 'resistance'] = math.fsum(resistance_list)
-        df_vsw.at[index, 'resistance_sections'] = resistance_list
-        df_vsw.at[index, 'reactance'] = math.fsum(reactance_list)
-        df_vsw.at[index, 'reactance_sections'] = reactance_list
+        # maximum number of household (equivalents) of a single branch
+        max_no_of_households_of_a_branch = df_vsw.groupby('branch')['household_equivalents'].sum().max()
 
-    # sum the capacitive and inductive resistance of each house_connection to obtain the total resistance of the network
-    resistance = df_vsw['resistance'].sum()
-    reactance = df_vsw['reactance'].sum()
-    ratio = resistance / reactance
+        # compute the  part of the resistance and reactance for each edge of the graph (cable section)
+        # the resistance depends on the cable type, length of the cable and the amount of households that are connected
+        df_vsw['resistance'] = ''
+        df_vsw['resistance_sections'] = ''
+        df_vsw['reactance'] = ''
+        df_vsw['reactance_sections'] = ''
+        for index, row in df_vsw.iterrows():
+            path_list = df_vsw.at[index, 'path']
+            length = len(path_list)
+            no_load = df_vsw.at[index, 'household_equivalents']
+            resistance_list = []
+            reactance_list = []
+            for i in range(length - 1):
+                start_node = path_list[i]
+                end_node = path_list[i + 1]
+                line = df_line[df_line['from_bus'] == start_node]  # here the correct cable is filtered that starts at start
+                line = line[line['to_bus'] == end_node]  # node and ends at end node
+                line = line.head(1)
+                length_km = line['length_km']
+                r_ohm_per_km = line['r_ohm_per_km']
+                x_ohm_per_km = line['x_ohm_per_km']
+                sim_factor = line['sim_factor_cumulated']
+                resistance_of_cable_section = no_load * length_km * r_ohm_per_km * sim_factor
+                resistance_of_cable_section = resistance_of_cable_section
+                resistance_list.append(resistance_of_cable_section)
+                reactance_of_cable_section = no_load * length_km * x_ohm_per_km
+                reactance_of_cable_section = reactance_of_cable_section
+                reactance_list.append(reactance_of_cable_section)
+            df_vsw.at[index, 'resistance'] = math.fsum(resistance_list)
+            df_vsw.at[index, 'resistance_sections'] = resistance_list
+            df_vsw.at[index, 'reactance'] = math.fsum(reactance_list)
+            df_vsw.at[index, 'reactance_sections'] = reactance_list
 
-    # maximum vsw of a single branch in the network
-    max_vsw_of_a_branch = df_vsw.groupby('branch')['resistance'].sum().max()
+        # sum the capacitive and inductive resistance of each house_connection to obtain the total resistance of the network
+        resistance = df_vsw['resistance'].sum()
+        reactance = df_vsw['reactance'].sum()
+        ratio = resistance / reactance
 
-    return max_no_of_households_of_a_branch, resistance, reactance, ratio, max_vsw_of_a_branch
+        # maximum vsw of a single branch in the network
+        max_vsw_of_a_branch = df_vsw.groupby('branch')['resistance'].sum().max()
+
+        return max_no_of_households_of_a_branch, resistance, reactance, ratio, max_vsw_of_a_branch
+
+    def calculate_line_with_sim_factor(pandapower_net, networkx_graph) -> pd.DataFrame:
+        """Calculate the simultaneity factor for each line segment."""
+
+        # Prepare SIM_FACTOR definitions
+        df_sim_def = pd.DataFrame.from_dict(SIM_FACTOR, orient='index', columns=['sim_factor']).reset_index()
+        df_sim_def.rename(columns={'index': 'description'}, inplace=True)
+
+        # Initialize new attributes in pandapower_net.line
+        net_line = pandapower_net.line.drop(['c_nf_per_km', 'g_us_per_km', 'max_i_ka', 'df', 'type', 'in_service'],
+            axis=1).drop_duplicates()
+        new_columns = ['sim_factor_cumulated', 'sim_load', 'no_commercial', 'load_commercial_mw', 'no_public',
+            'load_public_mw', 'no_residential', 'load_residential_mw']
+        net_line[new_columns] = ''
+
+        # Calculate simultaneity factor for consumer buses
+        level1 = pd.merge(pandapower_net.load, pandapower_net.bus, left_on='bus', right_index=True).replace(
+            ['MFH', 'SFH', 'AB', 'TH'], 'Residential')
+
+        load_data = level1.groupby(['bus', 'zone'])['max_p_mw'].sum().reset_index()
+        load_count = level1.groupby(['bus', 'zone'])['name_x'].count().reset_index().rename(columns={'name_x': 'count'})
+        load_count = pd.merge(load_count, load_data, on='bus').merge(df_sim_def, left_on='zone_x', right_on='description')
+
+        load_count['sim_factor_level1'] = load_count.apply(lambda x: oneSimultaneousLoad(1, x['count'], x['sim_factor']),
+            axis=1)
+        load_count['sim_load_level1'] = load_count['max_p_mw'] * load_count['sim_factor_level1']
+
+        # Update net_line with calculated values
+        for _, row in load_count.iterrows():
+            bus, desc = row['bus'], row['description']
+            idx = net_line.index[net_line['to_bus'] == bus].tolist()
+            if not idx:
+                continue
+            idx = idx[0]
+
+            net_line.at[idx, 'sim_factor_cumulated'] = row['sim_factor_level1']
+            net_line.at[idx, 'sim_load'] = row['sim_load_level1']
+            net_line.at[idx, f'no_{desc.lower()}'] = row['count']
+            net_line.at[idx, f'load_{desc.lower()}_mw'] = row['max_p_mw']
+
+        # Process connection node buses
+        connection_buses = pandapower_net.bus[pandapower_net.bus['name'].str.contains("Connection Nodebus")].index.tolist()
+        df_conn_bus = pd.DataFrame({'bus': connection_buses, 'source': 0})
+        df_conn_bus['len_to_trafo'] = df_conn_bus['bus'].apply(
+            lambda x: nx.shortest_path_length(networkx_graph, source=0, target=x))
+        df_conn_bus.sort_values('len_to_trafo', ascending=False, inplace=True)
+
+        # Aggregate data for upstream buses
+        def aggregate_upstream(connected_downstream, upstream_idx):
+            for col in new_columns[2:]:
+                net_line.at[upstream_idx, col] = connected_downstream[col].sum()
+
+            sim_load = sum([
+                oneSimultaneousLoad(net_line.at[upstream_idx, f'load_{t}_mw'], net_line.at[upstream_idx, f'no_{t}'],
+                                    SIM_FACTOR[t]) for t in ['commercial', 'public', 'residential']])
+            peak_load = sum(net_line.at[upstream_idx, f'load_{t}_mw'] for t in ['commercial', 'public', 'residential'])
+
+            net_line.at[upstream_idx, 'sim_load'] = sim_load
+            net_line.at[upstream_idx, 'sim_factor_cumulated'] = sim_load / peak_load if peak_load else 0
+
+        for _, row in df_conn_bus.iterrows():
+            furthest_bus = row['bus']
+            downstream = net_line[net_line['from_bus'] == furthest_bus]
+            upstream_idx = net_line[net_line['to_bus'] == furthest_bus].index.tolist()
+            if upstream_idx:
+                aggregate_upstream(downstream, upstream_idx[0])
+
+        return net_line

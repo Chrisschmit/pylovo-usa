@@ -1,6 +1,4 @@
-import pandas as pd
-
-from src.classification.parameter_calculation.grid_parameters import GridParameters
+from src.grid_parameters import GridParameters
 import src.database.database_client as dbc
 from src.config_loader import VERSION_ID
 
