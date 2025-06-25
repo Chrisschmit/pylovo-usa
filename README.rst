@@ -17,7 +17,7 @@ pylovo
     :local:
     :backlinks: top
 
-.. image:: docs/source/images.png"
+.. image:: docs/source/images/logo.png"
     :width: 500
     :alt: Default view
 
