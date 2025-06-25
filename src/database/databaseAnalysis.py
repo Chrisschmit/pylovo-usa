@@ -120,6 +120,62 @@ class AnalysisMixin:
 
         return net
 
+    def insert_clustering_parameters(self, params: dict) -> None:
+        """Insert calculated grid parameters into clustering_parameters table."""
+
+        insert_query = """INSERT INTO clustering_parameters (
+                   grid_result_id,
+                   no_connection_buses,
+                   no_branches,
+                   no_house_connections,
+                   no_house_connections_per_branch,
+                   no_households,
+                   no_household_equ,
+                   no_households_per_branch,
+                   max_no_of_households_of_a_branch,
+                   house_distance_km,
+                   transformer_mva,
+                   osm_trafo,
+                   max_trafo_dis,
+                   avg_trafo_dis,
+                   cable_length_km,
+                   cable_len_per_house,
+                   max_power_mw,
+                   simultaneous_peak_load_mw,
+                   resistance,
+                   reactance,
+                   ratio,
+                   vsw_per_branch,
+                   max_vsw_of_a_branch
+                  )
+                  VALUES (
+                  (SELECT grid_result_id FROM grid_result WHERE version_id = %(version_id)s AND plz = %(plz)s AND bcid = %(bcid)s AND kcid = %(kcid)s),
+                  %(no_connection_buses)s,
+                  %(no_branches)s,
+                  %(no_house_connections)s,
+                  %(no_house_connections_per_branch)s,
+                  %(no_households)s,
+                  %(no_household_equ)s,
+                  %(no_households_per_branch)s,
+                  %(max_no_of_households_of_a_branch)s,
+                  %(house_distance_km)s,
+                  %(transformer_mva)s,
+                  %(osm_trafo)s,
+                  %(max_trafo_dis)s,
+                  %(avg_trafo_dis)s,
+                  %(cable_length_km)s,
+                  %(cable_len_per_house)s,
+                  %(max_power_mw)s,
+                  %(simultaneous_peak_load_mw)s,
+                  %(resistance)s,
+                  %(reactance)s,
+                  %(ratio)s,
+                  %(vsw_per_branch)s,
+                  %(max_vsw_of_a_branch)s);"""
+
+        self.cur.execute(insert_query, params)
+        self.conn.commit()
+
     def get_geo_df(self, table: str, **kwargs, ) -> gpd.GeoDataFrame:
         """
         Args:

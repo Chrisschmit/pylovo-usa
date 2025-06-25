@@ -49,7 +49,7 @@ def prepare_data_for_clustering(additional_filtering: bool = False) -> None:
     # calculate network parameter for all plz
     for plz_index in samples['plz']:
         # compute parameters for plz
-        pc.calc_parameters_for_grids(plz=plz_index)
+        pc.calc_parameters_per_grid(plz=plz_index)
 
     # end timing
     print("--- %s seconds parameter calculation---" % (time.time() - start_time))
