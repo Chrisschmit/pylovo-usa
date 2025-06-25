@@ -1,0 +1,56 @@
+# Database connection configuration
+DBNAME: pylovo_db_local
+USER: postgres
+HOST: localhost
+PORT: 5432
+PASSWORD: postgres
+TARGET_SCHEMA: public
+
+# Toggles whether the results per plz are analyzed after grid generation (basic parameters, trafo analysis, cable counting)
+ANALYZE_GRIDS: True
+# Toggles whether the grid json files will be saved in a folder or just in the db
+SAVE_GRID_FOLDER: False
+
+# Logging configuration for PgReaderWriter & GridGenerator
+LOG_LEVEL: DEBUG
+
+CLUSTERING_PARAMETERS:
+  - version_id
+  - plz
+  - bcid
+  - kcid
+  - no_connection_buses
+  - no_branches
+  - no_house_connections
+  - no_house_connections_per_branch
+  - no_households
+  - no_household_equ
+  - no_households_per_branch
+  - max_no_of_households_of_a_branch
+  - house_distance_km
+  - transformer_mva
+  - osm_trafo
+  - max_trafo_dis
+  - avg_trafo_dis
+  - cable_length_km
+  - cable_len_per_house
+  - max_power_mw
+  - simultaneous_peak_load_mw
+  - resistance
+  - reactance
+  - ratio
+  - vsw_per_branch
+  - max_vsw_of_a_branch
+
+MUNICIPAL_REGISTER:
+  - plz
+  - pop
+  - area
+  - lat
+  - lon
+  - ags
+  - name_city
+  - fed_state
+  - regio7
+  - regio5
+  - pop_den

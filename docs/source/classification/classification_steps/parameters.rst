@@ -1,7 +1,7 @@
 Calculate Parameters for Grids
 ===============================
 
-.. autoclass:: classification.parameter_calculation.GridParameters.GridParameters
+.. autoclass:: classification.parameter_calculation.ParameterCalculator.ParameterCalculator
 
 has the attributes
 
@@ -36,7 +36,7 @@ has the attributes
 
 that are calculated in the function:
 
-.. autofunction:: classification.parameter_calculation.GridParameters.GridParameters.calc_plz_parameters
+.. autofunction:: classification.parameter_calculation.ParameterCalculator.ParameterCalculator.calc_grid_parameters
 
 To calculate the parameters for all grids in the classification version use:
 

@@ -136,11 +136,11 @@ If you want more control over your input data follow instructions below:
 ------------------------------------------------
 By default the database is populated with preloaded data of transformers in Bavaria.
 
-If you want to fetch up-to-date data upon running ``executable_scripts/main_constructor.py`` data from OSM, delete the
+If you want to fetch up-to-date data upon running ``runme/main_constructor.py`` data from OSM, delete the
 ``raw_data/transformer_data/processed_trafos/*_trafos_processed.geojson`` file before running the script.
 
-If you want to fetch up-to-date data upon running ``executable_scripts/main_constructor.py`` from a different area
-then change the ``RELATION_ID`` in ``raw_data/preprocessing_scripts/process_trafos.py`` to the relation ID
+If you want to fetch up-to-date data upon running ``runme/main_constructor.py`` from a different area
+then change the ``RELATION_ID`` in ``src/data_import/import_transformers.py`` to the relation ID
 of the desired area.
 
 Note: Processing transformer data can take around 50 minutes for entire German states.
@@ -161,23 +161,23 @@ How to find desired relation ID
 
 How to add more transformer data after database has already been constructed
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-To add more transformers from different areas after ``executable_scripts/main_constructor.py`` has been run, i.e. the database
-has been constructed, simply run the ``raw_data/preprocessing_scripts/process_trafos.py`` script as shown in the example.
+To add more transformers from different areas after ``runme/main_constructor.py`` has been run, i.e. the database
+has been constructed, simply run the ``runme/import/import_transformers_via_relation_id.py`` script as shown in the example.
 
 Example:
 
 ::
 
-    $ python -m raw_data.preprocessing_scripts.process_trafos --relation-id 62611
+    $ python -m runme.import.import_transformers_via_relation_id --relation-id 62611
     Selected relation ID: 62611
     Corresponding area: Baden-Württemberg
     Do you want to continue? [Y/n]
 
 How to configure transformer processing
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Open the ``raw_data/preprocessing_scripts/process_trafos.py`` script. At the top, there are constants you can change: ``AREA_THRESHOLD``, ``MIN_DISTANCE_BETWEEN_TRAFOS``, ``VOLTAGE_THRESHOLD``, and ``EPSG``.
+Open the ``src/data_import/import_transformers.py`` file. At the top, there are constants you can change: ``AREA_THRESHOLD``, ``MIN_DISTANCE_BETWEEN_TRAFOS``, ``VOLTAGE_THRESHOLD``, and ``EPSG``.
 
-  - The script fetches GeoJSON files form the Overpass API. (saved in ``raw_data/transformer_data/fetched_trafos``)
+  - The script ``runme/import/import_transformers_via_relation_id.py`` is for running from the terminal directly and fetches GeoJSON files form the Overpass API. (saved in ``raw_data/transformer_data/fetched_trafos``)
 
   - Then it imports the files, transforming the geodata according to the EPSG projection to calculate distances and areas. Transformers can be points or polygons.
 
@@ -233,8 +233,8 @@ Use the following steps if you want to add more ways in addition to the default 
 
 (Optional) Adjust SQL functions
 -------------------------------
-Prewritten SQL functions are created by the ``main_constructor`` script, so you can skip this step if you are using that script. The constructor uses the ``dump_functions.sql`` file in the ``pylovo`` folder. If you encounter issues or want to add SQL functions, edit and run the following file:
+Prewritten SQL functions are created by the ``main_constructor`` script, so you can skip this step if you are using that script. The constructor uses the ``postgres_dump_functions.sql`` file in the ``pylovo`` folder. If you encounter issues or want to add SQL functions, edit and run the following file:
 
 ::
 
-    psql -d pylovo_db -a -f "pylovo/dump_functions.sql"
+    psql -d pylovo_db -a -f "pylovo/postgres_dump_functions.sql"
