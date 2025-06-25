@@ -99,7 +99,7 @@ class DatabaseCommunication:
                 FROM transformer_positions tp
                 JOIN grid_result gr
                   ON tp.grid_result_id = gr.grid_result_id
-                WHERE version_id=%(v)s;"""
+                WHERE gr.version_id=%(v)s;"""
         params = {"v": VERSION_ID}
         df_transformer_positions = gpd.read_postgis(query, con=self.dbc.sqla_engine, params=params, )
         df_transformer_positions['geom'] = df_transformer_positions['geom'].apply(self.create_wkt_element)

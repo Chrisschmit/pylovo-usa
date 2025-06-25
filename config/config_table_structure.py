@@ -246,12 +246,18 @@ CREATE_QUERIES = {
         geom geometry(MultiPoint, 3035)
     )
     """,
-    "transformer_positions": """
+        "transformer_positions": """
     CREATE TABLE IF NOT EXISTS transformer_positions (
         grid_result_id bigint PRIMARY KEY,
         geom geometry(Point,3035),
-        osm_id varchar UNIQUE,
+        osm_id varchar,
+        version_id varchar(10),
         "comment" varchar,
+        CONSTRAINT uq_tp_osm_v UNIQUE (osm_id, version_id),
+        CONSTRAINT fk_tp_version_id
+            FOREIGN KEY (version_id)
+            REFERENCES version (version_id)
+            ON DELETE CASCADE,
         CONSTRAINT fk_tp_grid_result_id
             FOREIGN KEY (grid_result_id)
             REFERENCES grid_result (grid_result_id)
@@ -339,7 +345,7 @@ CREATE_QUERIES = {
     """,
     "transformer_positions_with_grid": """
     CREATE OR REPLACE VIEW transformer_positions_with_grid AS (
-        SELECT tp.*, gr.version_id, gr.kcid, gr.bcid, gr.plz
+        SELECT tp.*, gr.kcid, gr.bcid, gr.plz
         FROM transformer_positions tp
         JOIN grid_result gr ON tp.grid_result_id = gr.grid_result_id
     )
