@@ -767,7 +767,7 @@ class PgReaderWriter:
                    FROM transformer_positions tp
                    JOIN grid_result gr
                    ON tp.grid_result_id = gr.grid_result_id
-                   WHERE version_id = %(v)s 
+                   WHERE gr.version_id = %(v)s 
                    AND plz = %(p)s 
                    AND kcid = %(k)s
                    AND bcid = %(b)s;"""
@@ -950,8 +950,9 @@ class PgReaderWriter:
                    UPDATE grid_result SET model_status = 1 
                    WHERE version_id = %(v)s AND plz = %(p)s AND kcid = %(k)s AND bcid = %(b)s;
                    
-                   INSERT INTO transformer_positions (grid_result_id, geom, comment)
+                   INSERT INTO transformer_positions (version_id, grid_result_id, geom, comment)
                    VALUES (
+                     %(v)s,
                      (SELECT grid_result_id FROM grid_result WHERE version_id = %(v)s AND plz = %(p)s AND kcid = %(k)s AND bcid = %(b)s),
                      (SELECT the_geom FROM ways_tem_vertices_pgr WHERE id = %(c)s),
                      'on_way'
@@ -1288,8 +1289,9 @@ class PgReaderWriter:
             INSERT INTO grid_result (version_id, plz, kcid, bcid, ont_vertice_id, transformer_rated_power)
             VALUES (%(v)s, %(pc)s, %(k)s, %(count)s, %(t)s, %(l)s);
 
-            INSERT INTO transformer_positions (grid_result_id, geom, osm_id, comment)
+            INSERT INTO transformer_positions (version_id, grid_result_id, geom, osm_id, comment)
             VALUES (
+                %(v)s,
                 (SELECT grid_result_id FROM grid_result WHERE version_id = %(v)s AND plz = %(pc)s AND kcid = %(k)s AND bcid = %(count)s),
                 (SELECT center FROM buildings_tem WHERE vertice_id = %(t)s),
                 (SELECT osm_id FROM buildings_tem WHERE vertice_id = %(t)s),
