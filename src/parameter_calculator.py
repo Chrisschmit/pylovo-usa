@@ -239,7 +239,6 @@ class ParameterCalculator:
         df_trafo = pandapower_net.trafo.sn_mva
         return df_trafo.iloc[0]
 
-
     def calc_resistance(self, pandapower_net: pp.pandapowerNet, networkx_graph: nx.Graph) -> tuple[
         float, float, float, float, float]:
         df_load = pandapower_net.load
@@ -278,10 +277,10 @@ class ParameterCalculator:
                 end_node = path_list[i + 1]
                 line = df_line[df_line["from_bus"] == start_node]
                 line = line[line["to_bus"] == end_node].head(1)
-                length_km = line["length_km"]
-                r_ohm_per_km = line["r_ohm_per_km"]
-                x_ohm_per_km = line["x_ohm_per_km"]
-                sim_factor = line["sim_factor_cumulated"]
+                length_km = line["length_km"].iloc[0]
+                r_ohm_per_km = line["r_ohm_per_km"].iloc[0]
+                x_ohm_per_km = line["x_ohm_per_km"].iloc[0]
+                sim_factor = line["sim_factor_cumulated"].iloc[0]
                 resistance_of_cable_section = no_load * length_km * r_ohm_per_km * sim_factor
                 resistance_list.append(resistance_of_cable_section)
                 reactance_of_cable_section = no_load * length_km * x_ohm_per_km
