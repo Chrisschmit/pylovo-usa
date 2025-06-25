@@ -14,7 +14,7 @@ start_time = time.time()
 # generate grid
 gg = GridGenerator(plz=plz)
 gg.generate_grid()
-gg.analyse_results()
+gg.calc_parameters_per_plz()
 
 # end timing
 print("--- %s seconds ---" % (time.time() - start_time))
