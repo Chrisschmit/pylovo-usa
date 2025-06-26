@@ -5,11 +5,11 @@ from typing import override
 
 from src import utils
 from src.config_loader import *
-from src.database.databasePreprocessing import PreprocessingMixin
-from src.database.databaseClustering import ClusteringMixin
-from src.database.databaseGrid import GridMixin
-from src.database.databaseAnalysis import AnalysisMixin
-from src.database.databaseUtils import UtilsMixin
+from src.database.preprocessing_mixin import PreprocessingMixin
+from src.database.clustering_mixin import ClusteringMixin
+from src.database.grid_mixin import GridMixin
+from src.database.analysis_mixin import AnalysisMixin
+from src.database.utils_mixin import UtilsMixin
 
 warnings.simplefilter(action='ignore', category=UserWarning)
 

@@ -3,12 +3,12 @@ from abc import ABC
 
 from config.config_table_structure import *
 from src.config_loader import *
-from src.database.baseDatabaseMixin import BaseDatabaseMixin
+from src.database.base_mixin import BaseMixin
 
 warnings.simplefilter(action='ignore', category=UserWarning)
 
 
-class UtilsMixin(BaseDatabaseMixin, ABC):
+class UtilsMixin(BaseMixin, ABC):
     def __init__(self):
         super().__init__()
 

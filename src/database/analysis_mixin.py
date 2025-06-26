@@ -6,12 +6,12 @@ import pandapower as pp
 from abc import ABC
 
 from src.config_loader import *
-from src.database.baseDatabaseMixin import BaseDatabaseMixin
+from src.database.base_mixin import BaseMixin
 
 warnings.simplefilter(action="ignore", category=UserWarning)
 
 
-class AnalysisMixin(BaseDatabaseMixin, ABC):
+class AnalysisMixin(BaseMixin, ABC):
     def __init__(self):
         super().__init__()
 

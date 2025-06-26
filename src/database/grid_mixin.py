@@ -5,12 +5,12 @@ import pandapower as pp
 from shapely.geometry import LineString
 
 from src.config_loader import *
-from src.database.baseDatabaseMixin import BaseDatabaseMixin
+from src.database.base_mixin import BaseMixin
 
 warnings.simplefilter(action='ignore', category=UserWarning)
 
 
-class GridMixin(BaseDatabaseMixin, ABC):
+class GridMixin(BaseMixin, ABC):
     def __init__(self):
         super().__init__()
 

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-class BaseDatabaseMixin(ABC):
+class BaseMixin(ABC):
     def __init__(self):
         super().__init__()
         self.conn = self.get_connection()
