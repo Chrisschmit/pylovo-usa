@@ -51,11 +51,11 @@ class ParameterCalculator:
     def calc_parameters_per_plz(self, plz):
         grid_generated = self.dbc.is_grid_generated(plz)
         if not grid_generated:
-            self.dbc.logger.info("Grid for the postcode area {self.plz} is not generated, yet. Generate it first.")
+            self.dbc.logger.info(f"Grid for the postcode area {self.plz} is not generated, yet. Generate it first.")
             return
         grid_analysed = self.dbc.is_grid_analyzed(plz)
         if grid_analysed:
-            self.dbc.logger.info("Grid for the postcode area {self.plz} has already been analyzed.")
+            self.dbc.logger.info(f"Grid for the postcode area {self.plz} has already been analyzed.")
             return
 
         try:
