@@ -49,6 +49,15 @@ class ParameterCalculator:
 
 
     def calc_parameters_per_plz(self, plz):
+        grid_generated = self.dbc.is_grid_generated(plz)
+        if not grid_generated:
+            print("Grid for this PLZ is not generated, yet. Generate it first.")
+            return
+        grid_analysed = self.dbc.is_grid_analyzed(plz)
+        if grid_analysed:
+            print("Grid has already been analyzed.")
+            return
+
         try:
             self.dbc.logger.info("Start basic result analysis")
             self.analyse_basic_parameters_per_plz(plz)

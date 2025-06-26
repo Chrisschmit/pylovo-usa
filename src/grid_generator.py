@@ -104,7 +104,11 @@ class GridGenerator:
         self.dbc.commit_changes()  # commit the changes to the database
 
     def generate_grid(self):
-        self.check_if_results_exist()
+        if self.dbc.is_grid_generated(self.plz):
+            raise ResultExistsError(
+                f"The grids for the postcode area {self.plz} is already generated "
+                f"for the version {VERSION_ID}."
+            )
         self.prepare_postcodes()
         self.prepare_buildings()
         self.prepare_transformers()
@@ -112,14 +116,6 @@ class GridGenerator:
         self.apply_kmeans_clustering()
         self.position_all_transformers()
         self.install_cables()
-
-    def check_if_results_exist(self):
-        postcode_count = self.dbc.count_postcode_result(self.plz)
-        if postcode_count:
-            raise ResultExistsError(
-                f"The grids for the postcode area {self.plz} is already generated "
-                f"for the version {VERSION_ID}."
-            )
 
     def prepare_postcodes(self):
         """

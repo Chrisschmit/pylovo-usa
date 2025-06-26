@@ -1,14 +1,19 @@
 import warnings
+from abc import ABC
 
 import pandapower as pp
 from shapely.geometry import LineString
 
 from src.config_loader import *
+from src.database.baseDatabaseMixin import BaseDatabaseMixin
 
 warnings.simplefilter(action='ignore', category=UserWarning)
 
 
-class GridMixin:
+class GridMixin(BaseDatabaseMixin, ABC):
+    def __init__(self):
+        super().__init__()
+
     def create_cable_std_type(self, net: pp.pandapowerNet) -> None:
         """Create standard pandapower cable types from equipment_data table."""
         query = """
@@ -187,3 +192,24 @@ class GridMixin:
                          {"v": VERSION_ID, "geom": LineString(geom).wkb_hex, "plz": int(plz), "bcid": int(bcid),
                              "kcid": int(kcid), "line_name": line_name, "std_type": std_type, "from_bus": int(from_bus),
                              "to_bus": int(to_bus), "length_km": length_km})
+
+    def is_grid_generated(self, plz: int):
+        """
+        Check if grid exists.
+
+        Args:
+            plz: Postal code to be checked
+
+        Returns:
+            bool: True if record exists, False otherwise
+        """
+        query = f"""
+            SELECT 1
+            FROM postcode_result
+            WHERE version_id = %(version_id)s AND postcode_result_plz = %(plz)s
+            LIMIT 1;
+        """
+
+        self.cur.execute(query, {"version_id": VERSION_ID, "plz": plz})
+        result = self.cur.fetchone()
+        return result is not None
