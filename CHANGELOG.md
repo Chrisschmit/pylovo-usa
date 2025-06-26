@@ -11,6 +11,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 - Add new changes here before merging into the next official version.
 
+## [0.4.0] - 2025-06-26
+### Changed
+- Restructure database communication: split pgReaderWriter into multiple database modules for better organization
+- Restructure src and notebook directories
+- Restructure executable functions in runme categories
+- Adjust directory naming according to best practices
+- Convert configs into yaml files
+- Move parameter calculation class from classification into src to be used for validation
+
+### Fixed
+- Fix unique constraint issue when generating the same grid for different versions
+
+### Added
+- Add modules for analyzing grid independent from grid generation
+- Add schema selection to config for more flexible database handling
+- Add warnings when analyzing grids
+
 ## [0.3.0] - 2025-05-23
 ### Changed
 - Refine codebase for better readability and maintainability
