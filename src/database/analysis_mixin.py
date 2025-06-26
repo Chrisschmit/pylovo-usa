@@ -3,13 +3,17 @@ import warnings
 
 import geopandas as gpd
 import pandapower as pp
+from abc import ABC
 
 from src.config_loader import *
+from src.database.base_mixin import BaseMixin
 
 warnings.simplefilter(action="ignore", category=UserWarning)
 
 
-class AnalysisMixin:
+class AnalysisMixin(BaseMixin, ABC):
+    def __init__(self):
+        super().__init__()
 
     def insert_plz_parameters(self, plz: int, trafo_string: str, load_count_string: str, bus_count_string: str):
         update_query = """INSERT INTO plz_parameters (version_id, plz, trafo_num, load_count_per_trafo, bus_count_per_trafo)
@@ -277,3 +281,24 @@ class AnalysisMixin:
         cable_length = self.cur.fetchall()[0][0]
 
         return cable_length
+
+    def is_grid_analyzed(self, plz: int):
+        """
+        Check if grid has been analyzed.
+
+        Args:
+            plz: Postal code to be checked
+
+        Returns:
+            bool: True if record exists, False otherwise
+        """
+        query = f"""
+            SELECT 1
+            FROM plz_parameters
+            WHERE version_id = %(version_id)s AND plz = %(plz)s
+            LIMIT 1;
+        """
+
+        self.cur.execute(query, {"version_id": VERSION_ID, "plz": plz})
+        result = self.cur.fetchone()
+        return result is not None

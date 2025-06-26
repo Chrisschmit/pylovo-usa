@@ -1,14 +1,15 @@
 import warnings
 import psycopg2 as psy
 from sqlalchemy import create_engine
+from typing import override
 
 from src import utils
 from src.config_loader import *
-from src.database.databasePreprocessing import PreprocessingMixin
-from src.database.databaseClustering import ClusteringMixin
-from src.database.databaseGrid import GridMixin
-from src.database.databaseAnalysis import AnalysisMixin
-from src.database.databaseUtils import UtilsMixin
+from src.database.preprocessing_mixin import PreprocessingMixin
+from src.database.clustering_mixin import ClusteringMixin
+from src.database.grid_mixin import GridMixin
+from src.database.analysis_mixin import AnalysisMixin
+from src.database.utils_mixin import UtilsMixin
 
 warnings.simplefilter(action='ignore', category=UserWarning)
 
@@ -41,11 +42,26 @@ class DatabaseClient(PreprocessingMixin, ClusteringMixin, GridMixin, AnalysisMix
             )
             raise err
 
+        # init supers after everything is set up
+        super().__init__()
+
         self.logger.debug(f"DatabaseClient is constructed and connected to {self.db_path}.")
 
     def __del__(self):
         self.cur.close()
         self.conn.close()
+
+    @override
+    def get_connection(self):
+        return self.conn
+
+    @override
+    def get_logger(self):
+        return self.logger
+
+    @override
+    def get_sqla_engine(self):
+        return self.sqla_engine
 
     def save_tables(self, plz: int):
 
@@ -144,8 +160,7 @@ class DatabaseClient(PreprocessingMixin, ClusteringMixin, GridMixin, AnalysisMix
 
     def delete_transformers(self) -> None:
         """all transformers are deleted from table transformers in database"""
-        delete_query = """DELETE
-                          FROM transformers;"""
+        delete_query = "TRUNCATE TABLE transformers;"
         self.cur.execute(delete_query)
         self.conn.commit()
         self.logger.info('Transformers deleted.')

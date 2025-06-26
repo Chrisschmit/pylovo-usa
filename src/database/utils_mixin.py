@@ -1,12 +1,17 @@
 import warnings
+from abc import ABC
 
 from config.config_table_structure import *
 from src.config_loader import *
+from src.database.base_mixin import BaseMixin
 
 warnings.simplefilter(action='ignore', category=UserWarning)
 
 
-class UtilsMixin:
+class UtilsMixin(BaseMixin, ABC):
+    def __init__(self):
+        super().__init__()
+
     def __del__(self):
         self.cur.close()
         self.conn.close()

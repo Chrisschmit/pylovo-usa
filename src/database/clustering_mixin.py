@@ -1,6 +1,7 @@
 import math
 import warnings
 import time
+from abc import ABC
 from decimal import *
 from typing import *
 
@@ -9,11 +10,14 @@ from scipy.cluster.hierarchy import fcluster
 
 from src import utils
 from src.config_loader import *
+from src.database.base_mixin import BaseMixin
 
 warnings.simplefilter(action='ignore', category=UserWarning)
 
 
-class ClusteringMixin:
+class ClusteringMixin(BaseMixin, ABC):
+    def __init__(self):
+        super().__init__()
 
     def get_connected_component(self) -> tuple[np.ndarray, np.ndarray]:
         """

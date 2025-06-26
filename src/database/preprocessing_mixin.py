@@ -1,12 +1,17 @@
 import json
 import warnings
+from abc import ABC
 
 from src.config_loader import *
+from src.database.base_mixin import BaseMixin
 
 warnings.simplefilter(action='ignore', category=UserWarning)
 
 
-class PreprocessingMixin:
+class PreprocessingMixin(BaseMixin, ABC):
+    def __init__(self):
+        super().__init__()
+
     def insert_parameter_tables(self, consumer_categories: pd.DataFrame):
         self.cur.execute("SELECT count(*) FROM consumer_categories")
         categories_exist = self.cur.fetchone()[0]
@@ -35,18 +40,6 @@ class PreprocessingMixin:
                 ('{VERSION_ID}', '{VERSION_COMMENT}', '{consumer_categories_str}', '{cable_cost_dict_str}', '{connection_available_cables_str}', '{other_paramters_str}')"""
             self.cur.execute(insert_query)
             self.logger.info(f"Version: {VERSION_ID} (created for the first time)")
-
-    def count_postcode_result(self, plz: int) -> int:
-        """
-        :param plz:
-        :return:
-        """
-        query = """SELECT COUNT(*)
-                   FROM postcode_result
-                   WHERE version_id = %(v)s
-                     AND postcode_result_plz::INT = %(p)s"""
-        self.cur.execute(query, {"v": VERSION_ID, "p": plz})
-        return int(self.cur.fetchone()[0])
 
     def copy_postcode_result_table(self, plz: int) -> None:
         """
