@@ -74,7 +74,10 @@ class ParameterCalculator:
 
     def calc_parameters_per_grid(self, plz: int) -> None:
         """Calculate parameters for all grids of a PLZ."""
-
+        grid_analysed = self.dbc.is_grid_analyzed(plz)
+        if not grid_analysed:
+            self.dbc.logger.info(f"PLZ parameters for the postcode area {plz} missing. Please run calc_parameters_per_plz() first.")
+            return
         plz = str(plz)
         parameter_count = self.dbc.count_clustering_parameters(plz=plz)
         if parameter_count > 0:
