@@ -90,7 +90,7 @@ class GridGenerator:
                     pc = ParameterCalculator()
                     pc.calc_parameters_per_plz(plz=self.plz)
             except ResultExistsError:
-                self.dbc.logger.info(f"Grid for the postcode area {plz} has already been generated.")
+                self.dbc.logger.info(f"Grid for the postcode area {self.plz} has already been generated.")
             except Exception as e:
                 self.logger.error(f"Error during grid generation for PLZ {self.plz}: {e}")
                 self.logger.info(f"Skipped PLZ {self.plz} due to generation error.")
