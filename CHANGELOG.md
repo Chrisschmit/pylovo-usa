@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fix unique constraint issue when generating the same grid for different versions
 
 ### Added
+- Add improved QGIS templates for local and remote visualization with QWC
 - Add modules for analyzing grid independent from grid generation
 - Add schema selection to config for more flexible database handling
 - Add warnings when analyzing grids
