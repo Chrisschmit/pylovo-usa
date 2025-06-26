@@ -1,6 +1,6 @@
-==========
-pylovo
-==========
+.. image:: docs/source/images/logo.png
+    :width: 700
+    :alt: Default view
 
 **A repo to generate synthetic low-voltage distribution grids based on open data.**
 
@@ -12,14 +12,8 @@ pylovo
    * - Documentation
      - |badge_documentation|
 
-.. contents::
-    :depth: 2
-    :local:
-    :backlinks: top
-
-Introduction
-============
 **pylovo (PYthon tool for LOw-VOltage distribution grid generation)**
+============
 
 This tool provides a comprehensive public-data-based module to generate synthetic low-voltage distribution grids for a
 freely-selected research area. The main data input is the buildings, roads and transformers geographic data that are obtained

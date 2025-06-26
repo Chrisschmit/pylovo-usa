@@ -1,7 +1,6 @@
 from plotting.config_plots import ACCESS_TOKEN_PLOTLY
-from pylovo.GridGenerator import GridGenerator
-from pylovo.config_data import *
-from pylovo.config_version import *
+from src.grid_generator import GridGenerator
+from src.config_loader import *
 
 import os
 import sys
@@ -24,15 +23,15 @@ def plot_pie_of_trafo_cables(plz):
     Plots a pie chart of the trafos and cable types for a plz
     """
     gg = GridGenerator(plz=plz)
-    pg = gg.pgr
-    data_list, data_labels, trafo_dict = pg.read_per_trafo_dict(plz=plz)
+    dbc_client = gg.dbc
+    data_list, data_labels, trafo_dict = dbc_client.read_per_trafo_dict(plz=plz)
     fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(16, 4))
     # Plot Transformer size distribution
     axs[0].pie(trafo_dict.values(), labels=trafo_dict.keys(), autopct='%1.1f%%',
                pctdistance=1.15, labeldistance=.6)
     axs[0].set_title('Transformer Size Distribution', fontsize=14)
     # Plot cable length distribution
-    cable_dict = pg.read_cable_dict(plz)
+    cable_dict = dbc_client.read_cable_dict(plz)
     axs[1].pie(cable_dict.values(), labels=cable_dict.keys(), autopct="%.1f%%")
     axs[1].set_title("Installed Cable Length", fontsize=14)
     plt.show()
@@ -43,8 +42,8 @@ def plot_hist_trafos(plz):
     plots histogram of trafo sizes in plz
     """
     gg = GridGenerator(plz=plz)
-    pg = gg.pgr
-    data_list, data_labels, trafo_dict = pg.read_per_trafo_dict(plz=plz)
+    dbc_client = gg.dbc
+    data_list, data_labels, trafo_dict = dbc_client.read_per_trafo_dict(plz=plz)
     plt.bar(trafo_dict.keys(), height=trafo_dict.values(), width=0.3)
     plt.title('Transformer Size Distribution', fontsize=14)
     plt.xlabel("Trafo size")
@@ -57,8 +56,8 @@ def plot_boxplot_plz(plz):
     Boxplot of load number, bus number, simultaneaous load peak, max trafo distance, avg trafo distance
     """
     gg = GridGenerator(plz=plz)
-    pg = gg.pgr
-    data_list, data_labels, trafo_dict = pg.read_per_trafo_dict(plz=plz)
+    dbc_client = gg.dbc
+    data_list, data_labels, trafo_dict = dbc_client.read_per_trafo_dict(plz=plz)
     trafo_sizes = list(data_list[0].keys())
     values = [list(d.values()) for d in data_list]
 
@@ -80,13 +79,13 @@ def plot_cable_length_of_types(plz):
     Plots distribution of cable length by length
     """
     gg = GridGenerator(plz=plz)
-    pg = gg.pgr
+    dbc_client = gg.dbc
     # distributed according to cross_section
-    cluster_list = pg.get_list_from_plz(plz)
+    cluster_list = dbc_client.get_list_from_plz(plz)
     cable_length_dict = {}
     for kcid, bcid in cluster_list:
         try:
-            net = pg.read_net(plz, kcid, bcid)
+            net = dbc_client.read_net(plz, kcid, bcid)
         except Exception as e:
             print(f" local network {kcid},{bcid} is problematic")
             raise e
@@ -119,8 +118,8 @@ def get_trafo_dicts(plz):
     Retrieve load count, bus count and cable lenth per type for a plz
     """
     gg = GridGenerator(plz=plz)
-    pg = gg.pgr
-    cluster_list = pg.get_list_from_plz(plz)
+    dbc_client = gg.dbc
+    cluster_list = dbc_client.get_list_from_plz(plz)
     load_count_dict = {}
     bus_count_dict = {}
     cable_length_dict = {}
@@ -129,7 +128,7 @@ def get_trafo_dicts(plz):
     for kcid, bcid in cluster_list:
         load_count = 0
         bus_list = []
-        net = pg.read_net(plz, kcid, bcid)
+        net = dbc_client.read_net(plz, kcid, bcid)
         for row in net.load[["name", "bus"]].itertuples():
             load_count += 1
             bus_list.append(row.bus)
@@ -162,12 +161,12 @@ def plot_trafo_on_map(plz, save_plots: bool = False) -> None:
 
     net_plot = pp.create_empty_network()
     gg = GridGenerator(plz=plz)
-    pg = gg.pgr
-    cluster_list = pg.get_list_from_plz(plz)
+    dbc_client = gg.dbc
+    cluster_list = dbc_client.get_list_from_plz(plz)
     grid_index = 1
     set_mapbox_token("pk.eyJ1IjoiYmVuZWhhcm8iLCJhIjoiY205OGdwejJ1MDJsbzJsczl1ajdyYmlzaSJ9.HWA8ZLQm1Sp0Whs5PADxrw") # public token
     for kcid, bcid in cluster_list:
-        net = pg.read_net(plz, kcid, bcid)
+        net = dbc_client.read_net(plz, kcid, bcid)
         for row in net.trafo[["sn_mva", "lv_bus"]].itertuples():
             trafo_size = round(row.sn_mva * 1e3)
             trafo_geom = np.array(net.bus_geodata.loc[row.lv_bus, ["x", "y"]])

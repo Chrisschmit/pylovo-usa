@@ -2,7 +2,7 @@
 /raw_data/buildings/*
 /raw_data/ways/ways_public_2po_4pgr.sql
 /raw_data/postcode.csv
-classification/results
+src/classification/results
 tutorials/.ipynb_checkpoints/
 log.txt
 
