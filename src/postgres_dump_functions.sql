@@ -2,7 +2,7 @@
 -- Name: draw_home_connections(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION draw_home_connections() RETURNS void
+CREATE OR REPLACE FUNCTION draw_home_connections() RETURNS void
     LANGUAGE plpgsql
 AS
 $$
@@ -114,7 +114,7 @@ $$;
 -- Name: draw_way_connections(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION draw_way_connections() RETURNS void
+CREATE OR REPLACE FUNCTION draw_way_connections() RETURNS void
     LANGUAGE PLPGSQL
 AS
 $$

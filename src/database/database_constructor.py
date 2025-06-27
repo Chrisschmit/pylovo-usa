@@ -52,6 +52,10 @@ class DatabaseConstructor:
         # create extension if not exists for recognition of geom datatypes
         if not self.extensions_added:
             with self.dbc.conn.cursor() as cur:
+                # create schema if not exists
+                cur.execute(f"CREATE SCHEMA IF NOT EXISTS {TARGET_SCHEMA};")
+                print(f"CREATE SCHEMA {TARGET_SCHEMA}")
+                self.dbc.conn.commit()
                 # create extension if not exists for recognition of geom
                 # datatypes
                 cur.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
@@ -343,3 +347,17 @@ class DatabaseConstructor:
             sql = sc_file.read()
             cur.execute(sql)
             self.dbc.conn.commit()
+
+    def drop_all_tables(self):
+        """
+        Drops all tables in the database
+        """
+        cur = self.dbc.conn.cursor()
+
+        cur.execute("DROP EXTENSION IF EXISTS pgRouting CASCADE;")
+        print("Dropped pgRouting extension.")
+        cur.execute("DROP EXTENSION IF EXISTS postgis CASCADE;")
+        print("Dropped postgis extension.")
+
+        cur.execute(f"DROP SCHEMA {TARGET_SCHEMA} CASCADE")
+        self.dbc.conn.commit()

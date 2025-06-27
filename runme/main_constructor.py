@@ -19,6 +19,10 @@ def main():
     # Create constructor class
     sgc = DatabaseConstructor()
 
+    # Drop all tables
+    logger.info("### DEV: DROP ALL TABLES ###")
+    sgc.drop_all_tables()
+
     # Create database with predefined table structure
     logger.info("### CREATE ALL TABLES ###")
     sgc.create_table(table_name="all")
