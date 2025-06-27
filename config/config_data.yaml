@@ -14,6 +14,14 @@ SAVE_GRID_FOLDER: False
 # Logging configuration for PgReaderWriter & GridGenerator
 LOG_LEVEL: DEBUG
 
+# Suffix for the database name
+DB_SUFFIX: usa
+
+# EPSG code for spatial data.
+# 3035 is for Europe (ETRS89-extended / LAEA Europe)
+# 5070 is for USA (NAD83 / Conus Albers)
+EPSG: 5070
+
 CLUSTERING_PARAMETERS:
   - version_id
   - plz

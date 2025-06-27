@@ -69,7 +69,7 @@ class DatabaseConstructor:
             try:
                 with self.dbc.conn.cursor() as cur:
                     for table_name, query in CREATE_QUERIES.items():
-                        cur.execute(query)
+                        cur.execute(query, {"epsg": EPSG})
                         print(f"CREATE TABLE {table_name}")
                 self.dbc.conn.commit()
             except (Exception, psy.DatabaseError) as error:
@@ -77,7 +77,7 @@ class DatabaseConstructor:
         elif table_name in CREATE_QUERIES:
             try:
                 with self.dbc.conn.cursor() as cur:
-                    cur.execute(CREATE_QUERIES[table_name])
+                    cur.execute(CREATE_QUERIES[table_name], {"epsg": EPSG})
                     print(f"CREATE TABLE {table_name}")
                 self.dbc.conn.commit()
             except (Exception, psy.DatabaseError) as error:
@@ -118,7 +118,7 @@ class DatabaseConstructor:
                 # "MULTIPOLYGON",
                 "PROMOTE_TO_MULTI",
                 "-t_srs",
-                "EPSG:3035",
+                f"EPSG:{EPSG}",
                 "-lco",
                 "geometry_name=geom",
                 # ensures creation happens in correct schema
@@ -174,13 +174,13 @@ class DatabaseConstructor:
         out_file = trafos_processed_3035_geojson_path
 
         if update_trafos or not os.path.isfile(out_file):
-            # Convert the GeoJSON file to EPSG:3035 and write to a new file
+            # Convert the GeoJSON file to EPSG and write to a new file
             subprocess.run(
                 [
                     "ogr2ogr",
                     "-f", "GeoJSON",
                     "-s_srs", f"EPSG:{str(EPSG)}",
-                    "-t_srs", "EPSG:3035",
+                    "-t_srs", f"EPSG:{str(EPSG)}",
                     out_file,  # output
                     in_file  # input
                 ],
@@ -212,8 +212,8 @@ class DatabaseConstructor:
             df = pd.read_csv(file_path, index_col=False)
             df = df.rename(
                 columns={
-                    "einwohner": "population",
-                    "gid": "postcode_id"})
+                    "subdivision_name": "note",
+                    "fipscode": "plz"})
             df.to_sql(
                 name=table_name,
                 con=self.dbc.sqla_engine,
@@ -318,10 +318,10 @@ class DatabaseConstructor:
                     target,
                     cost,
                     reverse_cost,
-                    ST_Transform(geom_way, 3035) as geom,
+                    ST_Transform(geom_way, %(epsg)s) as geom,
                     id AS way_id
             FROM public_2po_4pgr"""
-        cur.execute(query)
+        cur.execute(query, {"epsg": EPSG})
 
         # Drop public_2po_4pgr table, as it is not needed anymore
         query = "DROP TABLE public_2po_4pgr"

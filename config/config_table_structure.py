@@ -14,7 +14,7 @@ CREATE_QUERIES = {
         refurb_roo numeric(23, 15),
         refurb_bas numeric(23, 15),
         refurb_win numeric(23, 15),
-        geom geometry(MultiPolygon,3035)
+        geom geometry(MultiPolygon,%(epsg)s)
     )
     """,
     "oth": """CREATE TABLE IF NOT EXISTS oth (
@@ -23,7 +23,7 @@ CREATE_QUERIES = {
         use varchar(80),
         comment varchar(80),
         free_walls integer,
-        geom geometry(MultiPolygon,3035)
+        geom geometry(MultiPolygon,%(epsg)s)
     )
     """,
     "equipment_data": """
@@ -52,7 +52,7 @@ CREATE_QUERIES = {
     "classification_version": """
     CREATE TABLE IF NOT EXISTS classification_version (
         classification_id integer NOT NULL,
-        classification_version_comment varchar, 
+        version_comment varchar, 
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         classification_region varchar,
         CONSTRAINT classification_pkey PRIMARY KEY (classification_id)
@@ -60,21 +60,26 @@ CREATE_QUERIES = {
     """,
     "postcode": """
     CREATE TABLE IF NOT EXISTS postcode (
-        postcode_id integer NOT NULL,
-        plz int UNIQUE NOT NULL,
+        id SERIAL PRIMARY KEY,
+        state_abbr varchar,
+        state_fips varchar,
+        county_fips varchar,
+        county_name varchar,
+        subdivision_fips varchar,
+        funcstat varchar,
+        plz bigint UNIQUE NOT NULL,
         note varchar,
         qkm double precision,
         population integer,
-        geom geometry(MultiPolygon,3035),
-        CONSTRAINT "plz-5stellig_pkey" PRIMARY KEY (postcode_id)
+        geom geometry(MultiPolygon,%(epsg)s)
     )
     """,
     "postcode_result": """
     CREATE TABLE IF NOT EXISTS postcode_result (   
         version_id varchar(10) NOT NULL,
-        postcode_result_plz integer NOT NULL,
+        postcode_result_plz bigint NOT NULL,
         settlement_type integer,
-        geom geometry(MultiPolygon,3035),
+        geom geometry(MultiPolygon,%(epsg)s),
         house_distance numeric,
         CONSTRAINT "postcode_result_pkey" PRIMARY KEY (version_id, postcode_result_plz),
         CONSTRAINT fk_postcode_result_version_id
@@ -94,7 +99,7 @@ CREATE_QUERIES = {
         version_id varchar(10) NOT NULL,
         kcid integer NOT NULL,
         bcid integer NOT NULL,
-        plz integer NOT NULL,
+        plz bigint NOT NULL,
         transformer_rated_power bigint,
         model_status integer,
         ont_vertice_id bigint,
@@ -113,7 +118,7 @@ CREATE_QUERIES = {
     CREATE TABLE IF NOT EXISTS lines_result (
         lines_result_id SERIAL PRIMARY KEY,
         grid_result_id bigint NOT NULL,
-        geom geometry(LineString,3035),
+        geom geometry(LineString,%(epsg)s),
         line_name varchar(15),
         std_type varchar(15),
         from_bus integer,
@@ -143,9 +148,9 @@ CREATE_QUERIES = {
         grid_result_id bigint NOT NULL,
         area numeric,
         type varchar(30),
-        geom geometry(MultiPolygon,3035),
+        geom geometry(MultiPolygon,%(epsg)s),
         houses_per_building integer,
-        center geometry(Point,3035),
+        center geometry(Point,%(epsg)s),
         peak_load_in_kw numeric,
         vertice_id integer,
         floors integer,
@@ -164,7 +169,7 @@ CREATE_QUERIES = {
     ON buildings_result (grid_result_id);
     """,
     "municipal_register": """CREATE TABLE IF NOT EXISTS municipal_register (
-        plz integer,
+        plz bigint,
         pop bigint,
         area double precision,
         lat double precision,
@@ -180,7 +185,7 @@ CREATE_QUERIES = {
     """,
     "sample_set": """CREATE TABLE IF NOT EXISTS sample_set (
         classification_id integer NOT NULL,
-        plz integer NOT NULL,
+        plz bigint NOT NULL,
         ags bigint,
         bin_no int,
         bins numeric,
@@ -243,21 +248,15 @@ CREATE_QUERIES = {
         power varchar,
         geom_type varchar,
         within_shopping boolean,
-        geom geometry(MultiPoint, 3035)
+        geom geometry(MultiPoint, %(epsg)s)
     )
     """,
-        "transformer_positions": """
+    "transformer_positions": """
     CREATE TABLE IF NOT EXISTS transformer_positions (
         grid_result_id bigint PRIMARY KEY,
-        geom geometry(Point,3035),
-        osm_id varchar,
-        version_id varchar(10),
+        geom geometry(Point,%(epsg)s),
+        osm_id varchar UNIQUE,
         "comment" varchar,
-        CONSTRAINT uq_tp_osm_v UNIQUE (osm_id, version_id),
-        CONSTRAINT fk_tp_version_id
-            FOREIGN KEY (version_id)
-            REFERENCES version (version_id)
-            ON DELETE CASCADE,
         CONSTRAINT fk_tp_grid_result_id
             FOREIGN KEY (grid_result_id)
             REFERENCES grid_result (grid_result_id)
@@ -270,7 +269,7 @@ CREATE_QUERIES = {
     "transformer_classified": """
     CREATE TABLE IF NOT EXISTS transformer_classified (
         grid_result_id bigint NOT NULL,
-        geom geometry(Point,3035),
+        geom geometry(Point,%(epsg)s),
         kmedoid_clusters integer,
         kmedoid_representative_grid bool,
         kmeans_clusters integer,
@@ -301,7 +300,7 @@ CREATE_QUERIES = {
         target integer,
         cost double precision,
         reverse_cost double precision,
-        geom geometry(LineString,3035),
+        geom geometry(LineString,%(epsg)s),
         way_id integer PRIMARY KEY
     )
     """,
@@ -313,9 +312,9 @@ CREATE_QUERIES = {
         target integer,
         cost double precision,
         reverse_cost double precision,
-        geom geometry(LineString,3035),
+        geom geometry(LineString,%(epsg)s),
         way_id integer NOT NULL,
-        plz integer,
+        plz bigint,
         CONSTRAINT pk_ways_result PRIMARY KEY (version_id, way_id, plz),
         CONSTRAINT fk_ways_result_version_id_plz
             FOREIGN KEY (version_id, plz)
@@ -328,7 +327,7 @@ CREATE_QUERIES = {
     "plz_parameters": """
     CREATE TABLE IF NOT EXISTS plz_parameters (
         version_id varchar(10) NOT NULL,
-        plz integer NOT NULL,
+        plz bigint NOT NULL,
         trafo_num json,
         cable_length json,
         load_count_per_trafo json,
@@ -345,7 +344,7 @@ CREATE_QUERIES = {
     """,
     "transformer_positions_with_grid": """
     CREATE OR REPLACE VIEW transformer_positions_with_grid AS (
-        SELECT tp.*, gr.kcid, gr.bcid, gr.plz
+        SELECT tp.*, gr.version_id, gr.kcid, gr.bcid, gr.plz
         FROM transformer_positions tp
         JOIN grid_result gr ON tp.grid_result_id = gr.grid_result_id
     )
@@ -391,11 +390,11 @@ TEMP_CREATE_QUERIES = {
         osm_id varchar,
         area numeric,
         type varchar(80),
-        geom geometry(Geometry,3035),  -- needs to be geometry as multipoint & multipolygon get inserted here
+        geom geometry(Geometry,%(epsg)s),  -- needs to be geometry as multipoint & multipolygon get inserted here
         houses_per_building integer,
-        center geometry(Point,3035),
+        center geometry(Point,%(epsg)s),
         peak_load_in_kw numeric,
-        plz integer,
+        plz bigint,
         vertice_id bigint,
         bcid integer,
         kcid integer,
@@ -409,8 +408,8 @@ TEMP_CREATE_QUERIES = {
         target integer,
         cost double precision,
         reverse_cost double precision,
-        geom geometry(LineString,3035),
+        geom geometry(LineString,%(epsg)s),
         way_id integer,
-        plz integer
+        plz bigint
     )""",
 }

@@ -194,7 +194,7 @@ class GridMixin(BaseMixin, ABC):
                                              AND plz = %(plz)s
                                              AND kcid = %(kcid)s
                                              AND bcid = %(bcid)s),
-                                          ST_SetSRID(%(geom)s::geometry, 3035),
+                                          ST_SetSRID(%(geom)s::geometry, %(epsg)s),
                                           %(line_name)s,
                                           %(std_type)s,
                                           %(from_bus)s,
@@ -203,7 +203,7 @@ class GridMixin(BaseMixin, ABC):
         self.cur.execute(line_insertion_query,
                          {"v": VERSION_ID, "geom": LineString(geom).wkb_hex, "plz": int(plz), "bcid": int(bcid),
                              "kcid": int(kcid), "line_name": line_name, "std_type": std_type, "from_bus": int(from_bus),
-                             "to_bus": int(to_bus), "length_km": length_km})
+                             "to_bus": int(to_bus), "length_km": length_km, "epsg": EPSG})
 
     def is_grid_generated(self, plz: int):
         """

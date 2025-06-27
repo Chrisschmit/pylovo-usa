@@ -32,6 +32,11 @@ CONFIG_CLUSTERING = load_yaml_config("../config/config_clustering.yaml")
 # Load database connection configuration from CONFIG_DATA
 load_dotenv(find_dotenv(), override=True)
 DBNAME = os.getenv("DBNAME", CONFIG_DATA["DBNAME"])
+DB_SUFFIX = os.getenv("DB_SUFFIX", CONFIG_DATA["DB_SUFFIX"])
+
+# Append suffix to database name if specified
+if DB_SUFFIX:
+    DBNAME = f"{DBNAME}_{DB_SUFFIX}"
 USER = os.getenv("USER", CONFIG_DATA["USER"])
 HOST = os.getenv("HOST", CONFIG_DATA["HOST"])
 PORT = os.getenv("PORT", CONFIG_DATA["PORT"])
@@ -45,13 +50,13 @@ SAVE_GRID_FOLDER = CONFIG_DATA["SAVE_GRID_FOLDER"]
 LOG_LEVEL = CONFIG_DATA["LOG_LEVEL"]
 CLUSTERING_PARAMETERS = CONFIG_DATA["CLUSTERING_PARAMETERS"]
 MUNICIPAL_REGISTER = CONFIG_DATA["MUNICIPAL_REGISTER"]
+EPSG = CONFIG_DATA["EPSG"]
 CSV_FILE_LIST = [
     {"path": os.path.join("raw_data", "equipment_data.csv"),
      "table_name": "equipment_data"},
     {"path": os.path.join("raw_data", "postcode.csv"),
      "table_name": "postcode"},
 ]
-
 # Assign all variables from CONFIG_VERSION
 VERSION_ID = CONFIG_VERSION["VERSION_ID"]
 VERSION_COMMENT = CONFIG_VERSION["VERSION_COMMENT"]
