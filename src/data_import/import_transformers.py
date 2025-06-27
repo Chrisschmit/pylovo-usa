@@ -5,19 +5,18 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
+from src.config_loader import EPSG
 from src.utils import query_overpass_for_geojson
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 RELATION_ID_BASE = 3600000000  # do not change
 
 # change relation id to desired location according to docs
-RELATION_ID = 2145268
-# Bavaria --> 2145268
+RELATION_ID = 61315
 
 AREA_THRESHOLD = 60
 MIN_DISTANCE_BETWEEN_TRAFOS = 8
 VOLTAGE_THRESHOLD = 110000
-EPSG = 32633
 
 SUBSTATIONS_QUERY_PATH = os.path.join(
     "",

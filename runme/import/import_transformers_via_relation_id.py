@@ -31,13 +31,13 @@ def main(relation_id: int) -> None:
     in_file = get_trafos_processed_geojson_path(relation_id)
     out_file = get_trafos_processed_3035_geojson_path(relation_id)
 
-    # Convert the GeoJSON file to EPSG:3035 and write to a new file
+    # Convert the GeoJSON file to EPSG and write to a new file
     subprocess.run(
         [
             "ogr2ogr",
             "-f", "GeoJSON",
             "-s_srs", f"EPSG:{EPSG}",
-            "-t_srs", "EPSG:3035",
+            "-t_srs", f"EPSG:{EPSG}",
             out_file,  # output
             in_file  # input
         ],
