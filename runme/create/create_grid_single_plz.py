@@ -5,13 +5,14 @@ import os
 import sys
 import time
 
+from plotting.plot_for_plz import plot_boxplot_plz, plot_pie_of_trafo_cables
+from src.config_loader import ANALYZE_GRIDS
+from src.data_import.import_buildings import *
+from src.grid_generator import GridGenerator
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 
-from plotting.plot_for_plz import plot_boxplot_plz, plot_pie_of_trafo_cables
-from src.data_import.import_buildings import *
-from src.grid_generator import GridGenerator
-from src.config_loader import ANALYZE_GRIDS
 
 # enter a plz to generate grid for:
 plz = "80803"
@@ -30,7 +31,7 @@ import_buildings_for_single_plz(gg)
 gg.generate_grid_for_single_plz(plz=plz, analyze_grids=ANALYZE_GRIDS)
 
 if plot_results:
-    ### plot data from the generated grids
+    # plot data from the generated grids
     dbc_client = gg.dbc
     cluster_list = gg.dbc.get_list_from_plz(plz)
     print('The PLZ has', len(cluster_list), 'grids.')
@@ -40,4 +41,5 @@ if plot_results:
 # End timing and print results
 elapsed_time = time.time() - start_time
 minutes, seconds = divmod(elapsed_time, 60)
-print(f"--- Elapsed Time: {int(minutes)} minutes and {seconds:.2f} seconds ---")
+print(
+    f"--- Elapsed Time: {int(minutes)} minutes and {seconds:.2f} seconds ---")

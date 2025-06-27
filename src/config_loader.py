@@ -1,17 +1,23 @@
-import yaml
 import os
+
 import pandas as pd
-from dotenv import load_dotenv, find_dotenv
+import yaml
+from dotenv import find_dotenv, load_dotenv
+
 
 def load_yaml_config(filepath: str):
     """Loads a YAML configuration file."""
-    abs_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filepath)
-    
+    abs_path = os.path.join(
+        os.path.dirname(
+            os.path.abspath(__file__)),
+        filepath)
+
     if not os.path.exists(abs_path):
         raise FileNotFoundError(f"Config file not found: {abs_path}")
-    
+
     with open(abs_path, "r", encoding="utf-8") as file:
         return yaml.safe_load(file)
+
 
 # Load Project Root
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -19,7 +25,8 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 # Load all configurations with correct paths
 CONFIG_DATA = load_yaml_config("../config/config_data.yaml")
 CONFIG_VERSION = load_yaml_config("../config/config_version.yaml")
-CONFIG_CLASSIFICATION = load_yaml_config("../config/config_classification.yaml")
+CONFIG_CLASSIFICATION = load_yaml_config(
+    "../config/config_classification.yaml")
 CONFIG_CLUSTERING = load_yaml_config("../config/config_clustering.yaml")
 
 # Load database connection configuration from CONFIG_DATA
@@ -39,8 +46,10 @@ LOG_LEVEL = CONFIG_DATA["LOG_LEVEL"]
 CLUSTERING_PARAMETERS = CONFIG_DATA["CLUSTERING_PARAMETERS"]
 MUNICIPAL_REGISTER = CONFIG_DATA["MUNICIPAL_REGISTER"]
 CSV_FILE_LIST = [
-    {"path": os.path.join("raw_data", "equipment_data.csv"), "table_name": "equipment_data"},
-    {"path": os.path.join("raw_data", "postcode.csv"), "table_name": "postcode"},
+    {"path": os.path.join("raw_data", "equipment_data.csv"),
+     "table_name": "equipment_data"},
+    {"path": os.path.join("raw_data", "postcode.csv"),
+     "table_name": "postcode"},
 ]
 
 # Assign all variables from CONFIG_VERSION

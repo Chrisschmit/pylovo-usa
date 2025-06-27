@@ -1,9 +1,9 @@
 import json
 import warnings
+from abc import ABC
 
 import geopandas as gpd
 import pandapower as pp
-from abc import ABC
 
 from src.config_loader import *
 from src.database.base_mixin import BaseMixin
@@ -15,11 +15,20 @@ class AnalysisMixin(BaseMixin, ABC):
     def __init__(self):
         super().__init__()
 
-    def insert_plz_parameters(self, plz: int, trafo_string: str, load_count_string: str, bus_count_string: str):
+    def insert_plz_parameters(
+            self, plz: int, trafo_string: str, load_count_string: str, bus_count_string: str):
         update_query = """INSERT INTO plz_parameters (version_id, plz, trafo_num, load_count_per_trafo, bus_count_per_trafo)
                           VALUES (%s, %s, %s, %s,
                                   %s);"""  # TODO: check - should values be updated for same plz and version if analysis is started? And Add a column
-        self.cur.execute(update_query, vars=(VERSION_ID, plz, trafo_string, load_count_string, bus_count_string), )
+        self.cur.execute(
+            update_query,
+            vars=(
+                VERSION_ID,
+                plz,
+                trafo_string,
+                load_count_string,
+                bus_count_string),
+        )
         self.logger.debug("basic parameter count finished")
 
     def insert_cable_length(self, plz: int, cable_length_string: str):
@@ -32,7 +41,7 @@ class AnalysisMixin(BaseMixin, ABC):
         self.logger.debug("cable count finished")
 
     def insert_trafo_parameters(self, plz: int, trafo_load_string: str, trafo_max_distance_string: str,
-            trafo_avg_distance_string: str):
+                                trafo_avg_distance_string: str):
         update_query = """UPDATE plz_parameters
                           SET sim_peak_load_per_trafo = %(l)s,
                               max_distance_per_trafo  = %(m)s,
@@ -45,14 +54,22 @@ class AnalysisMixin(BaseMixin, ABC):
                           "a": trafo_avg_distance_string, }, )
         self.logger.debug("per trafo analysis finished")
 
-    def save_pp_net_with_json(self, plz: int, kcid: int, bcid: int, json_string: str) -> None:
+    def save_pp_net_with_json(
+            self, plz: int, kcid: int, bcid: int, json_string: str) -> None:
         insert_query = ("""UPDATE grid_result
                            SET grid = %s
                            WHERE version_id = %s
                              AND plz = %s
                              AND kcid = %s
                              AND bcid = %s;""")
-        self.cur.execute(insert_query, vars=(json_string, VERSION_ID, plz, kcid, bcid))
+        self.cur.execute(
+            insert_query,
+            vars=(
+                json_string,
+                VERSION_ID,
+                plz,
+                kcid,
+                bcid))
 
     def count_clustering_parameters(self, plz: int) -> int:
         """
@@ -67,7 +84,8 @@ class AnalysisMixin(BaseMixin, ABC):
         self.cur.execute(query, {"v": VERSION_ID, "p": plz})
         return int(self.cur.fetchone()[0])
 
-    def read_per_trafo_dict(self, plz: int) -> tuple[list[dict], list[str], dict]:
+    def read_per_trafo_dict(
+            self, plz: int) -> tuple[list[dict], list[str], dict]:
         read_query = """SELECT load_count_per_trafo,
                                bus_count_per_trafo,
                                sim_peak_load_per_trafo,
@@ -86,7 +104,12 @@ class AnalysisMixin(BaseMixin, ABC):
         max_dict = dict(sorted(result[0][3].items(), key=lambda x: int(x[0])))
         avg_dict = dict(sorted(result[0][4].items(), key=lambda x: int(x[0])))
 
-        trafo_dict = dict(sorted(self.read_trafo_dict(plz).items(), key=lambda x: int(x[0]), reverse=True))
+        trafo_dict = dict(
+            sorted(
+                self.read_trafo_dict(plz).items(),
+                key=lambda x: int(
+                    x[0]),
+                reverse=True))
         # Create list with all parameter dicts
         data_list = [load_dict, bus_dict, peak_dict, max_dict, avg_dict]
         data_labels = ['Load Number [-]', 'Bus Number [-]', 'Simultaneous peak load [kW]', 'Max. Trafo-Distance [m]',
@@ -114,8 +137,10 @@ class AnalysisMixin(BaseMixin, ABC):
 
         result = self.cur.fetchall()
         if not result:
-            self.logger.error(f"Grid not found for plz={plz}, kcid={kcid}, bcid={bcid}, version_id={VERSION_ID}")
-            raise ValueError(f"Grid not found for plz={plz}, kcid={kcid}, bcid={bcid}")
+            self.logger.error(
+                f"Grid not found for plz={plz}, kcid={kcid}, bcid={bcid}, version_id={VERSION_ID}")
+            raise ValueError(
+                f"Grid not found for plz={plz}, kcid={kcid}, bcid={bcid}")
 
         grid_tuple = result[0]
         grid_dict = grid_tuple[0]
@@ -205,7 +230,7 @@ class AnalysisMixin(BaseMixin, ABC):
         return gdf
 
     def get_geo_df_join(self, select: list[str], from_table: str, join_table: str, on: tuple[str, str],
-            **kwargs, ) -> gpd.GeoDataFrame:
+                        **kwargs, ) -> gpd.GeoDataFrame:
         """
         Args:
             **kwargs: equality filters matching with the table column names

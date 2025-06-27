@@ -1,7 +1,9 @@
-import pandas as pd
 import warnings
 
-from src.classification.clustering.cluster_settings import get_best_no_of_clusters_ch_index_for_classification_version
+import pandas as pd
+
+from src.classification.clustering.cluster_settings import \
+    get_best_no_of_clusters_ch_index_for_classification_version
 
 warnings.filterwarnings('ignore')
 

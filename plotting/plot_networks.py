@@ -15,7 +15,8 @@ from plotting.config_plots import *
 from src.grid_generator import GridGenerator
 
 
-def get_network_info_for_plotting(df_network_info: pd.DataFrame) -> (str, int, int):
+def get_network_info_for_plotting(
+        df_network_info: pd.DataFrame) -> (str, int, int):
     """extracts network metadata plz, kcid, bcid of a pandas series if columns exist"""
     plz = df_network_info['plz']
     kcid = int(df_network_info['kcid'])
@@ -43,7 +44,8 @@ def get_colormap_for_treegraph(networkx_graph):
     return color_map
 
 
-def plot_contextily(plz: str, kcid: int, bcid: int, zoomfactor: int = 19) -> None:
+def plot_contextily(plz: str, kcid: int, bcid: int,
+                    zoomfactor: int = 19) -> None:
     """plots a network with all its features (cables, houses and load, trafo) on a contextily basemap
 
     :param plz: PLZ of grid
@@ -66,13 +68,17 @@ def plot_contextily(plz: str, kcid: int, bcid: int, zoomfactor: int = 19) -> Non
         ["gr.version_id", "plz", "kcid", "bcid", "br.*"],
         "buildings_result br", "grid_result gr",
         ("br.grid_result_id", "gr.grid_result_id"),
-    plz=int(plz))
+        plz=int(plz))
     buildings_8_gdf = buildings_gdf[buildings_gdf.bcid == bcid]
     buildings_8_gdf = buildings_8_gdf[buildings_8_gdf.kcid == kcid]
     # cables / lines
     net.line_gdf = gpd.GeoDataFrame(net.line.copy(), geometry=net.line_geodata.coords.map(linestrings),
                                     crs="EPSG:4326").to_crs(buildings_8_gdf.crs.to_string())
-    ax = net.line_gdf.plot(ax=ax, edgecolor="black", linewidth=1, label="Lines")
+    ax = net.line_gdf.plot(
+        ax=ax,
+        edgecolor="black",
+        linewidth=1,
+        label="Lines")
     ax = buildings_8_gdf.plot(ax=ax, column="peak_load_in_kw", cmap="YlOrBr",
                               legend=True, legend_kwds={'label': "Peak load in kW"})
     # trafo
@@ -82,9 +88,21 @@ def plot_contextily(plz: str, kcid: int, bcid: int, zoomfactor: int = 19) -> Non
         ("tp.grid_result_id", "gr.grid_result_id"),
         plz=int(plz), bcid=bcid
     )
-    ax.scatter(trafo_gdf.loc[0].geom.x, trafo_gdf.loc[0].geom.y, marker=(5, 0), s=80, color="blue", label="Transformer")
+    ax.scatter(
+        trafo_gdf.loc[0].geom.x,
+        trafo_gdf.loc[0].geom.y,
+        marker=(
+            5,
+            0),
+        s=80,
+        color="blue",
+        label="Transformer")
     # basemap
-    cx.add_basemap(ax, crs=buildings_8_gdf.crs.to_string(), zoom=zoomfactor, source=cx.providers.OpenStreetMap.Mapnik)
+    cx.add_basemap(
+        ax,
+        crs=buildings_8_gdf.crs.to_string(),
+        zoom=zoomfactor,
+        source=cx.providers.OpenStreetMap.Mapnik)
     ax.legend()
 
     # plt.savefig('contextily.png', dpi=500)
@@ -118,7 +136,8 @@ def plot_grid_on_map(plz: str, kcid: int, bcid: int) -> None:
     # fig.show()
 
 
-def hierarchy_pos(G, root=None, width=1., vert_gap=0.2, vert_loc=0, xcenter=0.5):
+def hierarchy_pos(G, root=None, width=1., vert_gap=0.2,
+                  vert_loc=0, xcenter=0.5):
     '''
     From Joel's answer at https://stackoverflow.com/a/29597209/2966723.
     Licensed under Creative Commons Attribution-Share Alike
@@ -145,15 +164,18 @@ def hierarchy_pos(G, root=None, width=1., vert_gap=0.2, vert_loc=0, xcenter=0.5)
     xcenter: horizontal location of root
     '''
     if not nx.is_tree(G):
-        raise TypeError('cannot use hierarchy_pos on a graph that is not a tree')
+        raise TypeError(
+            'cannot use hierarchy_pos on a graph that is not a tree')
 
     if root is None:
         if isinstance(G, nx.DiGraph):
-            root = next(iter(nx.topological_sort(G)))  # allows back compatibility with nx version 1.11
+            # allows back compatibility with nx version 1.11
+            root = next(iter(nx.topological_sort(G)))
         else:
             root = random.choice(list(G.nodes))
 
-    def _hierarchy_pos(G, root, width=1., vert_gap=0.2, vert_loc=0, xcenter=0.5, pos=None, parent=None):
+    def _hierarchy_pos(G, root, width=1., vert_gap=0.2,
+                       vert_loc=0, xcenter=0.5, pos=None, parent=None):
         '''
         see hierarchy_pos docstring for most arguments
 
@@ -209,12 +231,21 @@ def hierarchy_pos2(G, root, levels=None, width=1., height=1.):
     def make_pos(pos, node=root, currentLevel=0, parent=None, vert_loc=0):
         dx = 1 / levels[currentLevel][TOTAL]
         left = dx / 2
-        pos[node] = ((left + dx * levels[currentLevel][CURRENT]) * width, vert_loc)
+        pos[node] = (
+            (left + dx * levels[currentLevel][CURRENT]) * width,
+            vert_loc)
         levels[currentLevel][CURRENT] += 1
         neighbors = G.neighbors(node)
         for neighbor in neighbors:
             if not neighbor == parent:
-                pos = make_pos(pos, neighbor, currentLevel + 1, node, vert_loc - vert_gap)
+                pos = make_pos(
+                    pos,
+                    neighbor,
+                    currentLevel +
+                    1,
+                    node,
+                    vert_loc -
+                    vert_gap)
         return pos
 
     if levels is None:
@@ -240,7 +271,8 @@ def draw_tree_network(G, width=1.):
     plt.show()
 
 
-def draw_tree_network_with_improved_spacing_from_grid_id(plz: str, kcid: int, bcid: int):
+def draw_tree_network_with_improved_spacing_from_grid_id(
+        plz: str, kcid: int, bcid: int):
     """draws a tree graph of a networkx graph with improved spacing for large networks#
     from grid id"""
     net = read_net_with_grid_generator(plz=plz, kcid=kcid, bcid=bcid)
@@ -271,9 +303,14 @@ def draw_radial_network(G):
     green: consumers"""
     pos = hierarchy_pos(G, 1, width=2 * math.pi, xcenter=0)
     plt.figure(figsize=(20, 10))
-    new_pos = {u: (r * math.cos(theta), r * math.sin(theta)) for u, (theta, r) in pos.items()}
+    new_pos = {u: (r * math.cos(theta), r * math.sin(theta))
+               for u, (theta, r) in pos.items()}
     color_map = get_colormap_for_treegraph(networkx_graph=G)
     ax = nx.draw(G, pos=new_pos, node_size=50)
-    ax = nx.draw_networkx_nodes(G, pos=new_pos, node_color=color_map, node_size=200)
+    ax = nx.draw_networkx_nodes(
+        G,
+        pos=new_pos,
+        node_color=color_map,
+        node_size=200)
     # ax = nx.draw_networkx_nodes(G, pos=new_pos, nodelist = [0], node_color=color_map, node_size=200)
     plt.show()

@@ -36,14 +36,17 @@ class GridMixin(BaseMixin, ABC):
             q_mm2 = int(name.split("_")[-1])  # Extract cross-section from name
 
             pp.create_std_type(net,
-                {"r_ohm_per_km": float(r_ohm_per_km), "x_ohm_per_km": float(x_ohm_per_km), "max_i_ka": float(max_i_ka),
-                    "c_nf_per_km": float(0),  # Set to zero for our standard grids
-                    "q_mm2": q_mm2}, name=pp_name, element="line", )
+                               {"r_ohm_per_km": float(r_ohm_per_km), "x_ohm_per_km": float(x_ohm_per_km), "max_i_ka": float(max_i_ka),
+                                # Set to zero for our standard grids
+                                "c_nf_per_km": float(0),
+                                "q_mm2": q_mm2}, name=pp_name, element="line", )
 
-        self.logger.debug(f"Created {len(cables)} standard cable types from equipment_data table")
+        self.logger.debug(
+            f"Created {len(cables)} standard cable types from equipment_data table")
         return None
 
-    def get_vertices_from_bcid(self, plz: int, kcid: int, bcid: int) -> tuple[dict, int]:
+    def get_vertices_from_bcid(
+            self, plz: int, kcid: int, bcid: int) -> tuple[dict, int]:
         ont = self.get_ont_info_from_bc(plz, kcid, bcid)["ont_vertice_id"]
 
         consumer_query = """SELECT vertice_id
@@ -69,11 +72,13 @@ class GridMixin(BaseMixin, ABC):
                              ORDER BY agg_cost;"""
         self.cur.execute(vertices_query, {"o": ont, "c": consumer})
         data = self.cur.fetchall()
-        vertice_cost_dict = {t[0]: t[1] for t in data if t[0] in consumer or t[0] in connection}
+        vertice_cost_dict = {t[0]: t[1]
+                             for t in data if t[0] in consumer or t[0] in connection}
 
         return vertice_cost_dict, ont
 
-    def get_ont_info_from_bc(self, plz: int, kcid: int, bcid: int) -> dict | None:
+    def get_ont_info_from_bc(self, plz: int, kcid: int,
+                             bcid: int) -> dict | None:
 
         query = """SELECT ont_vertice_id, transformer_rated_power
                    FROM grid_result
@@ -85,10 +90,12 @@ class GridMixin(BaseMixin, ABC):
         self.cur.execute(query, params)
         info = self.cur.fetchall()
         if not info:
-            self.logger.debug(f"found no ont information for kcid {kcid}, bcid {bcid}")
+            self.logger.debug(
+                f"found no ont information for kcid {kcid}, bcid {bcid}")
             return None
 
-        return {"ont_vertice_id": info[0][0], "transformer_rated_power": info[0][1]}
+        return {"ont_vertice_id": info[0][0],
+                "transformer_rated_power": info[0][1]}
 
     def get_ont_geom_from_bcid(self, plz: int, kcid: int, bcid: int):
         query = """SELECT ST_X(ST_Transform(geom, 4326)), ST_Y(ST_Transform(geom, 4326))
@@ -99,19 +106,24 @@ class GridMixin(BaseMixin, ABC):
                      AND plz = %(p)s
                      AND kcid = %(k)s
                      AND bcid = %(b)s;"""
-        self.cur.execute(query, {"v": VERSION_ID, "p": plz, "k": kcid, "b": bcid})
+        self.cur.execute(
+            query, {
+                "v": VERSION_ID, "p": plz, "k": kcid, "b": bcid})
         geo = self.cur.fetchone()
 
         return geo
 
-    def get_transformer_rated_power_from_bcid(self, plz: int, kcid: int, bcid: int) -> int:
+    def get_transformer_rated_power_from_bcid(
+            self, plz: int, kcid: int, bcid: int) -> int:
         query = """SELECT transformer_rated_power
                    FROM grid_result
                    WHERE version_id = %(v)s
                      AND plz = %(p)s
                      AND kcid = %(k)s
                      AND bcid = %(b)s;"""
-        self.cur.execute(query, {"v": VERSION_ID, "p": plz, "k": kcid, "b": bcid})
+        self.cur.execute(
+            query, {
+                "v": VERSION_ID, "p": plz, "k": kcid, "b": bcid})
         transformer_rated_power = self.cur.fetchone()[0]
 
         return transformer_rated_power
@@ -167,7 +179,7 @@ class GridMixin(BaseMixin, ABC):
         return way_list
 
     def insert_lines(self, geom: list, plz: int, bcid: int, kcid: int, line_name: str, std_type: str, from_bus: int,
-            to_bus: int, length_km: float) -> None:
+                     to_bus: int, length_km: float) -> None:
         """writes lines / cables that belong to a network into the database"""
         line_insertion_query = """INSERT INTO lines_result (grid_result_id,
                                                             geom,

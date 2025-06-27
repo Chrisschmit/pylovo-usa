@@ -1,6 +1,6 @@
 import math
-import warnings
 import time
+import warnings
 from abc import ABC
 from decimal import *
 from typing import *
@@ -77,7 +77,8 @@ class ClusteringMixin(BaseMixin, ABC):
         WHERE id IN %(v)s;"""
         self.cur.execute(query, {"v": tuple(map(int, vertices))})
 
-    def update_large_kmeans_cluster(self, vertices: Union[list, tuple], cluster_count: int):
+    def update_large_kmeans_cluster(
+            self, vertices: Union[list, tuple], cluster_count: int):
         """
         Applies k-means clustering to large components and updated values in buildings_tem
         :param vertices:
@@ -99,7 +100,8 @@ class ClusteringMixin(BaseMixin, ABC):
                 FROM kmean AS k,
                      maxk AS m
                 WHERE b.osm_id = k.osm_id;"""
-        self.cur.execute(query, {"ca": cluster_count, "v": tuple(map(int, vertices))})
+        self.cur.execute(query, {"ca": cluster_count,
+                         "v": tuple(map(int, vertices))})
 
     def update_kmeans_cluster(self, vertices: list) -> None:
         """
@@ -118,7 +120,8 @@ class ClusteringMixin(BaseMixin, ABC):
                 WHERE vertice_id IN %(v)s;"""
         self.cur.execute(query, {"v": tuple(map(int, vertices))})
 
-    def get_distance_matrix_from_kcid(self, kcid: int) -> tuple[dict, np.ndarray, dict]:
+    def get_distance_matrix_from_kcid(
+            self, kcid: int) -> tuple[dict, np.ndarray, dict]:
         """
         Creates a distance matrix from the buildings in the kcid
         Args:
@@ -137,11 +140,13 @@ class ClusteringMixin(BaseMixin, ABC):
                                              ORDER BY connection_point) AS b), \
                                       false);"""
         params = {"k": kcid}
-        localid2vid, dist_mat, _ = self.calculate_cost_arr_dist_matrix(costmatrix_query, params)
+        localid2vid, dist_mat, _ = self.calculate_cost_arr_dist_matrix(
+            costmatrix_query, params)
 
         return localid2vid, dist_mat, _
 
-    def calculate_cost_arr_dist_matrix(self, costmatrix_query: str, params: dict) -> tuple[dict, np.ndarray, dict]:
+    def calculate_cost_arr_dist_matrix(
+            self, costmatrix_query: str, params: dict) -> tuple[dict, np.ndarray, dict]:
         """
         Helper function for calculating cost array and distance matrix from given parameters
         """
@@ -170,7 +175,6 @@ class ClusteringMixin(BaseMixin, ABC):
         self.logger.debug(f"Elapsed time for dist_matrix creation: {et - st}")
         return localid2vid, dist_matrix, vid2localid
 
-
     def generate_load_vector(self, kcid: int, bcid: int) -> np.ndarray:
         query = """SELECT SUM(peak_load_in_kw)::float
                    FROM buildings_tem
@@ -184,27 +188,35 @@ class ClusteringMixin(BaseMixin, ABC):
         return load
 
     def try_clustering(self, Z: np.ndarray, cluster_amount: int, localid2vid: dict, buildings: pd.DataFrame,
-            consumer_cat_df: pd.DataFrame, transformer_capacities: np.ndarray, double_trans: np.ndarray, ) -> tuple[
-        dict, dict, int]:
+                       consumer_cat_df: pd.DataFrame, transformer_capacities: np.ndarray, double_trans: np.ndarray, ) -> tuple[
+            dict, dict, int]:
         flat_groups = fcluster(Z, t=cluster_amount, criterion="maxclust")
         cluster_ids = np.unique(flat_groups)
         cluster_count = len(cluster_ids)
-        # Check if simultaneous load can be satisfied with possible transformers
+        # Check if simultaneous load can be satisfied with possible
+        # transformers
         cluster_dict = {}
         invalid_cluster_dict = {}
         for cluster_id in range(1, cluster_count + 1):
-            vid_list = [localid2vid[lid[0]] for lid in np.argwhere(flat_groups == cluster_id)]
-            total_sim_load = utils.simultaneousPeakLoad(buildings, consumer_cat_df, vid_list)
-            if (total_sim_load >= max(transformer_capacities) and len(vid_list) >= 5):  # the cluster is too big
+            vid_list = [localid2vid[lid[0]]
+                        for lid in np.argwhere(flat_groups == cluster_id)]
+            total_sim_load = utils.simultaneousPeakLoad(
+                buildings, consumer_cat_df, vid_list)
+            if (total_sim_load >= max(transformer_capacities)
+                    and len(vid_list) >= 5):  # the cluster is too big
                 invalid_cluster_dict[cluster_id] = vid_list
             elif total_sim_load < max(transformer_capacities):
                 # find the smallest transformer, that satisfies the load
-                opt_transformer = transformer_capacities[transformer_capacities > total_sim_load][0]
-                opt_double_transformer = double_trans[double_trans > total_sim_load * 1.15][0]
-                if (opt_double_transformer - total_sim_load) > (opt_transformer - total_sim_load):
+                opt_transformer = transformer_capacities[transformer_capacities >
+                                                         total_sim_load][0]
+                opt_double_transformer = double_trans[double_trans >
+                                                      total_sim_load * 1.15][0]
+                if (opt_double_transformer -
+                        total_sim_load) > (opt_transformer - total_sim_load):
                     cluster_dict[cluster_id] = (vid_list, opt_transformer)
                 else:
-                    cluster_dict[cluster_id] = (vid_list, opt_double_transformer)
+                    cluster_dict[cluster_id] = (
+                        vid_list, opt_double_transformer)
             else:
                 opt_transformer = math.ceil(total_sim_load)
                 cluster_dict[cluster_id] = (vid_list, opt_transformer)
@@ -246,7 +258,8 @@ class ClusteringMixin(BaseMixin, ABC):
                    WHERE kcid = %(k)s
                      AND type = 'Transformer';"""
         self.cur.execute(query, {"k": kcid})
-        transformers_list = ([t[0] for t in data] if (data := self.cur.fetchall()) else [])
+        transformers_list = ([t[0] for t in data] if (
+            data := self.cur.fetchall()) else [])
         return transformers_list
 
     def clear_grid_result_in_kmean_cluster(self, plz: int, kcid: int):
@@ -260,9 +273,11 @@ class ClusteringMixin(BaseMixin, ABC):
 
         params = {"v": VERSION_ID, "pc": plz, "kc": kcid}
         self.cur.execute(clear_query, params)
-        self.logger.debug(f"Building clusters with plz = {plz}, k_mean cluster = {kcid} area cleared.")
+        self.logger.debug(
+            f"Building clusters with plz = {plz}, k_mean cluster = {kcid} area cleared.")
 
-    def upsert_bcid(self, plz: int, kcid: int, bcid: int, vertices: list, transformer_rated_power: int):
+    def upsert_bcid(self, plz: int, kcid: int, bcid: int,
+                    vertices: list, transformer_rated_power: int):
         """
         Assign buildings in buildings_tem the bcid and stores the cluster in grid_result
         Args:
@@ -281,17 +296,20 @@ class ClusteringMixin(BaseMixin, ABC):
                               AND connection_point IN %(vid)s
                               AND type != 'Transformer'; """
 
-        params = {"v": VERSION_ID, "pc": plz, "bc": bcid, "kc": kcid, "vid": tuple(map(int, vertices)), }
+        params = {"v": VERSION_ID, "pc": plz, "bc": bcid,
+                  "kc": kcid, "vid": tuple(map(int, vertices)), }
         self.cur.execute(building_query, params)
 
         # Insert new clustering
         cluster_query = """INSERT INTO grid_result (version_id, plz, kcid, bcid, transformer_rated_power)
                            VALUES (%(v)s, %(pc)s, %(kc)s, %(bc)s, %(s)s); """
 
-        params = {"v": VERSION_ID, "pc": plz, "bc": bcid, "kc": kcid, "s": int(transformer_rated_power)}
+        params = {"v": VERSION_ID, "pc": plz, "bc": bcid,
+                  "kc": kcid, "s": int(transformer_rated_power)}
         self.cur.execute(cluster_query, params)
 
-    def get_consumer_to_transformer_df(self, kcid: int, transformer_list: list) -> pd.DataFrame:
+    def get_consumer_to_transformer_df(
+            self, kcid: int, transformer_list: list) -> pd.DataFrame:
         consumer_query = """SELECT DISTINCT connection_point
                             FROM buildings_tem
                             WHERE kcid = %(k)s
@@ -344,7 +362,8 @@ class ClusteringMixin(BaseMixin, ABC):
                    ORDER BY bcid; """
         params = {"v": VERSION_ID, "pc": plz, "kc": kcid}
         self.cur.execute(query, params)
-        bcid_list = [t[0] for t in data] if (data := self.cur.fetchall()) else []
+        bcid_list = [t[0] for t in data] if (
+            data := self.cur.fetchall()) else []
         return bcid_list
 
     def get_buildings_from_kcid(self, kcid: int, ) -> pd.DataFrame:
@@ -360,15 +379,18 @@ class ClusteringMixin(BaseMixin, ABC):
                                AND bcid ISNULL;"""
         params = {"k": kcid}
 
-        buildings_df = pd.read_sql_query(buildings_query, con=self.conn, params=params)
+        buildings_df = pd.read_sql_query(
+            buildings_query, con=self.conn, params=params)
         buildings_df.set_index("vertice_id", drop=False, inplace=True)
         buildings_df.sort_index(inplace=True)
 
-        self.logger.debug(f"Building data fetched. {len(buildings_df)} buildings from kc={kcid} ...")
+        self.logger.debug(
+            f"Building data fetched. {len(buildings_df)} buildings from kc={kcid} ...")
 
         return buildings_df
 
-    def get_buildings_from_bcid(self, plz: int, kcid: int, bcid: int) -> pd.DataFrame:
+    def get_buildings_from_bcid(
+            self, plz: int, kcid: int, bcid: int) -> pd.DataFrame:
 
         buildings_query = """SELECT *
                              FROM buildings_tem
@@ -378,7 +400,8 @@ class ClusteringMixin(BaseMixin, ABC):
                                AND kcid = %(k)s;"""
         params = {"p": plz, "b": bcid, "k": kcid}
 
-        buildings_df = pd.read_sql_query(buildings_query, con=self.conn, params=params)
+        buildings_df = pd.read_sql_query(
+            buildings_query, con=self.conn, params=params)
         buildings_df.set_index("vertice_id", drop=False, inplace=True)
         buildings_df.sort_index(inplace=True)
         # dropping duplicate indices
@@ -388,7 +411,8 @@ class ClusteringMixin(BaseMixin, ABC):
 
         return buildings_df
 
-    def update_transformer_rated_power(self, plz: int, kcid: int, bcid: int, note: int):
+    def update_transformer_rated_power(
+            self, plz: int, kcid: int, bcid: int, note: int):
         """
         Updates transformer_rated_power in grid_result
         :param plz:
@@ -407,7 +431,9 @@ class ClusteringMixin(BaseMixin, ABC):
                              AND plz = %(p)s
                              AND kcid = %(k)s
                              AND bcid = %(b)s;"""
-            self.cur.execute(old_query, {"v": VERSION_ID, "p": plz, "k": kcid, "b": bcid})
+            self.cur.execute(
+                old_query, {
+                    "v": VERSION_ID, "p": plz, "k": kcid, "b": bcid})
             transformer_rated_power = self.cur.fetchone()[0]
 
             new_transformer_rated_power = transformer_capacities[transformer_capacities > transformer_rated_power][
@@ -422,7 +448,8 @@ class ClusteringMixin(BaseMixin, ABC):
                              {"v": VERSION_ID, "p": plz, "k": kcid, "b": bcid, "n": new_transformer_rated_power}, )
         else:
             double_trans = np.multiply(transformer_capacities[2:4], 2)
-            combined = np.concatenate((transformer_capacities, double_trans), axis=None)
+            combined = np.concatenate(
+                (transformer_capacities, double_trans), axis=None)
             np.sort(combined, axis=None)
             old_query = """SELECT transformer_rated_power
                            FROM grid_result
@@ -430,11 +457,14 @@ class ClusteringMixin(BaseMixin, ABC):
                              AND plz = %(p)s
                              AND kcid = %(k)s
                              AND bcid = %(b)s;"""
-            self.cur.execute(old_query, {"v": VERSION_ID, "p": plz, "k": kcid, "b": bcid})
+            self.cur.execute(
+                old_query, {
+                    "v": VERSION_ID, "p": plz, "k": kcid, "b": bcid})
             transformer_rated_power = self.cur.fetchone()[0]
             if transformer_rated_power in combined.tolist():
                 return None
-            new_transformer_rated_power = np.ceil(transformer_rated_power / 630) * 630
+            new_transformer_rated_power = np.ceil(
+                transformer_rated_power / 630) * 630
             update_query = """UPDATE grid_result
                               SET transformer_rated_power = %(n)s
                               WHERE version_id = %(v)s
@@ -443,9 +473,11 @@ class ClusteringMixin(BaseMixin, ABC):
                                 AND bcid = %(b)s;"""
             self.cur.execute(update_query,
                              {"v": VERSION_ID, "p": plz, "k": kcid, "b": bcid, "n": new_transformer_rated_power}, )
-            self.logger.debug("double or multiple transformer group transformer_rated_power assigned")
+            self.logger.debug(
+                "double or multiple transformer group transformer_rated_power assigned")
 
-    def get_transformer_data(self, settlement_type: int = None) -> tuple[np.array, dict]:
+    def get_transformer_data(
+            self, settlement_type: int = None) -> tuple[np.array, dict]:
         """
         Args:
             Settlement type: 1=City, 2=Village, 3=Rural
@@ -476,7 +508,7 @@ class ClusteringMixin(BaseMixin, ABC):
         return np.array(capacities), transformer2cost
 
     def update_building_cluster(self, transformer_id: int, conn_id_list: Union[list, tuple], count: int, kcid: int,
-            plz: int, transformer_rated_power: int) -> None:
+                                plz: int, transformer_rated_power: int) -> None:
         """
         Update building cluster information by performing multiple operations:
           - Update the 'bcid' in 'buildings_tem' where 'vertice_id' matches the transformer_id.
@@ -515,7 +547,7 @@ class ClusteringMixin(BaseMixin, ABC):
                         'Normal'); \
                 """
         params = {"v": VERSION_ID, "count": count, "c": tuple(conn_id_list), "t": transformer_id, "k": kcid, "pc": plz,
-            "l": transformer_rated_power, }
+                  "l": transformer_rated_power, }
         self.cur.execute(query, params)
 
     def calculate_sim_load(self, conn_list: Union[tuple, list]) -> Decimal:
@@ -538,10 +570,11 @@ class ClusteringMixin(BaseMixin, ABC):
             residential_count = Decimal(data[1])
             residential_factor = Decimal(data[2])
             residential_sim_load = residential_load * (
-                    residential_factor + (1 - residential_factor) * (residential_count ** Decimal(-3 / 4)))
+                residential_factor + (1 - residential_factor) * (residential_count ** Decimal(-3 / 4)))
         else:
             residential_sim_load = 0
-        # TODO can the following 4 repetitions simplified with a general function?
+        # TODO can the following 4 repetitions simplified with a general
+        # function?
         commercial = """WITH commercial AS
                                  (SELECT b.peak_load_in_kw AS load, b.houses_per_building AS count, c.sim_factor
                                   FROM buildings_tem AS b
@@ -560,7 +593,7 @@ class ClusteringMixin(BaseMixin, ABC):
             commercial_count = Decimal(data[1])
             commercial_factor = Decimal(data[2])
             commercial_sim_load = commercial_load * (
-                    commercial_factor + (1 - commercial_factor) * (commercial_count ** Decimal(-3 / 4)))
+                commercial_factor + (1 - commercial_factor) * (commercial_count ** Decimal(-3 / 4)))
         else:
             commercial_sim_load = 0
 
@@ -581,7 +614,9 @@ class ClusteringMixin(BaseMixin, ABC):
             public_load = Decimal(data[0])
             public_count = Decimal(data[1])
             public_factor = Decimal(data[2])
-            public_sim_load = public_load * (public_factor + (1 - public_factor) * (public_count ** Decimal(-3 / 4)))
+            public_sim_load = public_load * \
+                (public_factor + (1 - public_factor)
+                 * (public_count ** Decimal(-3 / 4)))
         else:
             public_sim_load = 0
 
@@ -603,15 +638,20 @@ class ClusteringMixin(BaseMixin, ABC):
             industrial_count = Decimal(data[1])
             industrial_factor = Decimal(data[2])
             industrial_sim_load = industrial_load * (
-                    industrial_factor + (1 - industrial_factor) * (industrial_count ** Decimal(-3 / 4)))
+                industrial_factor + (1 - industrial_factor) * (industrial_count ** Decimal(-3 / 4)))
         else:
             industrial_sim_load = 0
 
-        total_sim_load = (residential_sim_load + commercial_sim_load + industrial_sim_load + public_sim_load)
+        total_sim_load = (
+            residential_sim_load +
+            commercial_sim_load +
+            industrial_sim_load +
+            public_sim_load)
 
         return total_sim_load
 
-    def get_building_connection_points_from_bc(self, kcid: int, bcid: int) -> list:
+    def get_building_connection_points_from_bc(
+            self, kcid: int, bcid: int) -> list:
         """
         Args:
             kcid: kmeans_cluster ID
@@ -627,12 +667,13 @@ class ClusteringMixin(BaseMixin, ABC):
         self.cur.execute(count_query, params)
         try:
             cp = [t[0] for t in self.cur.fetchall()]
-        except:
+        except BaseException:
             cp = []
 
         return cp
 
-    def upsert_transformer_selection(self, plz: int, kcid: int, bcid: int, connection_id: int):
+    def upsert_transformer_selection(
+            self, plz: int, kcid: int, bcid: int, connection_id: int):
         """Writes the vertice_id of chosen building as ONT location in the grid_result table"""
 
         query = """UPDATE grid_result
@@ -660,11 +701,17 @@ class ClusteringMixin(BaseMixin, ABC):
                    AND bcid = %(b)s),
                 (SELECT the_geom FROM ways_tem_vertices_pgr WHERE id = %(c)s),
                 'on_way');"""
-        params = {"v": VERSION_ID, "c": connection_id, "b": bcid, "k": kcid, "p": plz}
+        params = {
+            "v": VERSION_ID,
+            "c": connection_id,
+            "b": bcid,
+            "k": kcid,
+            "p": plz}
 
         self.cur.execute(query, params)
 
-    def get_distance_matrix_from_bcid(self, kcid: int, bcid: int) -> tuple[dict, np.ndarray, dict]:
+    def get_distance_matrix_from_bcid(
+            self, kcid: int, bcid: int) -> tuple[dict, np.ndarray, dict]:
         """
         Args:
             kcid: k mean cluster ID
@@ -683,7 +730,8 @@ class ClusteringMixin(BaseMixin, ABC):
                                              ORDER BY connection_point) AS b),
                                       false);"""
         params = {"b": bcid, "k": kcid}
-        localid2vid, dist_mat, _ = self.calculate_cost_arr_dist_matrix(costmatrix_query, params)
+        localid2vid, dist_mat, _ = self.calculate_cost_arr_dist_matrix(
+            costmatrix_query, params)
 
         return localid2vid, dist_mat, _
 

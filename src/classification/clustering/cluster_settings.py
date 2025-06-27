@@ -1,10 +1,11 @@
 import pandas as pd
 from factor_analyzer import FactorAnalyzer
 
+from plotting.plotting_classification import (
+    get_parameters_for_clustering, plot_ch_index_for_clustering_algos)
+from src.classification.database_communication.database_communication import \
+    DatabaseCommunication
 from src.config_loader import NO_OF_CLUSTERS_ALLOWED
-from src.classification.database_communication.database_communication import DatabaseCommunication
-from plotting.plotting_classification import get_parameters_for_clustering
-from plotting.plotting_classification import plot_ch_index_for_clustering_algos
 
 
 def print_parameters_for_clustering_for_classification_version() -> list:
@@ -31,7 +32,8 @@ def print_parameters_for_clustering_for_classification_version() -> list:
     no_of_factors = (ev[0] > 1).sum()
 
     # print parameters
-    parameters = get_parameters_for_clustering(df_plz_parameters=df, n_comps=no_of_factors)
+    parameters = get_parameters_for_clustering(
+        df_plz_parameters=df, n_comps=no_of_factors)
     return parameters
 
 

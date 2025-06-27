@@ -1,8 +1,8 @@
 import glob
 
-from src.grid_generator import GridGenerator
-from src.database.database_constructor import DatabaseConstructor
 from src.config_loader import *
+from src.database.database_constructor import DatabaseConstructor
+from src.grid_generator import GridGenerator
 
 
 def import_buildings_for_single_plz(gg):
@@ -21,21 +21,29 @@ def import_buildings_for_single_plz(gg):
         raise Exception("PLZ does not exist in the municipal register.")
 
     # Extract name and AGS for the desired PLZ
-    gg.logger.info(f"LV grids will be generated for {ags_to_add.iloc[0]['plz']} {ags_to_add.iloc[0]['name_city']}")
+    gg.logger.info(
+        f"LV grids will be generated for {ags_to_add.iloc[0]['plz']} {ags_to_add.iloc[0]['name_city']}")
     ags = ags_to_add.iloc[0]["ags"]
     gg.logger.info(f"It's AGS is: {ags}")
 
     # Check if AGS is already in the database (avoid duplication)
     df_log = dbc_client.get_ags_log()
     if ags in df_log["ags"].values:
-        gg.logger.info("Buildings of this AGS are already in the src database.")
+        gg.logger.info(
+            "Buildings of this AGS are already in the src database.")
         return
     else:
-        gg.logger.info("Buildings for this AGS are not in the database and will be added.")
+        gg.logger.info(
+            "Buildings for this AGS are not in the database and will be added.")
 
     # Define the path for building shapefiles
-    data_path = os.path.abspath(os.path.join(PROJECT_ROOT, "raw_data", "buildings"))
-    shapefiles_pattern = os.path.join(data_path, "*.shp")  # Pattern for shapefiles
+    data_path = os.path.abspath(
+        os.path.join(
+            PROJECT_ROOT,
+            "raw_data",
+            "buildings"))
+    shapefiles_pattern = os.path.join(
+        data_path, "*.shp")  # Pattern for shapefiles
 
     # Retrieve all matching shapefiles
     files_list = glob.glob(shapefiles_pattern, recursive=True)
@@ -45,7 +53,8 @@ def import_buildings_for_single_plz(gg):
 
     # Handle cases where no matching files are found
     if not files_to_add:
-        raise FileNotFoundError(f"No shapefiles found for AGS {ags} in {data_path}")
+        raise FileNotFoundError(
+            f"No shapefiles found for AGS {ags} in {data_path}")
 
     # Create a list of dictionaries for ogr_to_db()
     ogr_ls_dict = create_list_of_shp_files(files_to_add)
@@ -57,8 +66,8 @@ def import_buildings_for_single_plz(gg):
     # Log the successfully added AGS to the log table in the database
     dbc_client.write_ags_log(ags)
 
-    gg.logger.info(f"Buildings for AGS {ags} have been successfully added to the database.")
-
+    gg.logger.info(
+        f"Buildings for AGS {ags} have been successfully added to the database.")
 
 
 def import_buildings_for_multiple_plz(sample_plz):
@@ -66,8 +75,13 @@ def import_buildings_for_multiple_plz(sample_plz):
     imports building data to db for multiple plz
     """
     # Define the path for building shapefiles
-    data_path = os.path.abspath(os.path.join(PROJECT_ROOT, "raw_data", "buildings"))
-    shapefiles_pattern = os.path.join(data_path, "*.shp")  # Pattern for shapefiles
+    data_path = os.path.abspath(
+        os.path.join(
+            PROJECT_ROOT,
+            "raw_data",
+            "buildings"))
+    shapefiles_pattern = os.path.join(
+        data_path, "*.shp")  # Pattern for shapefiles
 
     # retrieving all shape files
     files_list = glob.glob(shapefiles_pattern, recursive=True)
@@ -82,7 +96,8 @@ def import_buildings_for_multiple_plz(sample_plz):
     dbc_client = gg.dbc
     df_log = dbc_client.get_ags_log()
     log_ags_list = df_log['ags'].values.tolist()
-    ags_to_add = list(set(ags_to_add).difference(log_ags_list))  # dropping already imported ags
+    ags_to_add = list(set(ags_to_add).difference(
+        log_ags_list))  # dropping already imported ags
     ags_to_add = list(map(str, ags_to_add))
 
     # creating a list that only contains the files to add
@@ -94,7 +109,8 @@ def import_buildings_for_multiple_plz(sample_plz):
     files_to_add = list(set(files_to_add))  # dropping duplicates
 
     if files_to_add:
-        # define a list of required shapefiles to add to the database for the function scg.ogr_to_db()
+        # define a list of required shapefiles to add to the database for the
+        # function scg.ogr_to_db()
         ogr_ls_dict = create_list_of_shp_files(files_to_add)
 
         # adding the buildings to the database
@@ -104,6 +120,7 @@ def import_buildings_for_multiple_plz(sample_plz):
         # adding the added ags to the log file
         for ags in ags_to_add:
             dbc_client.write_ags_log(int(ags))
+
 
 def create_list_of_shp_files(files_to_add):
     """
@@ -122,7 +139,8 @@ def create_list_of_shp_files(files_to_add):
         elif "Res" in file_path:
             table_name = "res"
         else:
-            raise ValueError(f"Shapefile '{file_path}' cannot be assigned to 'res' or 'oth'.")
+            raise ValueError(
+                f"Shapefile '{file_path}' cannot be assigned to 'res' or 'oth'.")
 
         ogr_ls_dict.append({"path": file_path, "table_name": table_name})
 

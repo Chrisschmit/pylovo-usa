@@ -1,17 +1,17 @@
-import math
 import json
+import math
 import statistics
 from math import radians
 
 import geopandas as gpd
 import networkx as nx
 import pandapower as pp
-from sklearn.metrics.pairwise import haversine_distances
 import pandapower.topology as top
+from sklearn.metrics.pairwise import haversine_distances
 
 import src.database.database_client as dbc
-from src.config_loader import *
 from src import utils
+from src.config_loader import *
 
 
 class ParameterCalculator:
@@ -46,16 +46,16 @@ class ParameterCalculator:
         self.vsw_per_branch = None
         self.max_vsw_of_a_branch = None
 
-
-
     def calc_parameters_per_plz(self, plz):
         grid_generated = self.dbc.is_grid_generated(plz)
         if not grid_generated:
-            self.dbc.logger.info(f"Grid for the postcode area {plz} is not generated, yet. Generate it first.")
+            self.dbc.logger.info(
+                f"Grid for the postcode area {plz} is not generated, yet. Generate it first.")
             return
         grid_analysed = self.dbc.is_grid_analyzed(plz)
         if grid_analysed:
-            self.dbc.logger.info(f"Grid for the postcode area {plz} has already been analyzed.")
+            self.dbc.logger.info(
+                f"Grid for the postcode area {plz} has already been analyzed.")
             return
 
         try:
@@ -70,13 +70,15 @@ class ParameterCalculator:
         except Exception as e:
             self.dbc.logger.error(f"Error during analysis for PLZ {plz}: {e}")
             self.dbc.logger.info(f"Skipped PLZ {plz} due to analysis error.")
-            self.dbc.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION),plz)  # delete from sample set
+            self.dbc.delete_plz_from_sample_set_table(
+                str(CLASSIFICATION_VERSION), plz)  # delete from sample set
 
     def calc_parameters_per_grid(self, plz: int) -> None:
         """Calculate parameters for all grids of a PLZ."""
         grid_analysed = self.dbc.is_grid_analyzed(plz)
         if not grid_analysed:
-            self.dbc.logger.info(f"PLZ parameters for the postcode area {plz} missing. Please run calc_parameters_per_plz() first.")
+            self.dbc.logger.info(
+                f"PLZ parameters for the postcode area {plz} missing. Please run calc_parameters_per_plz() first.")
             return
         plz = str(plz)
         parameter_count = self.dbc.count_clustering_parameters(plz=plz)
@@ -102,27 +104,29 @@ class ParameterCalculator:
         self.compute_parameters(net)
 
         params = {"version_id": self.version_id, "plz": self.plz, "bcid": self.bcid, "kcid": self.kcid,
-            "no_connection_buses": int(self.no_connection_buses), "no_branches": int(self.no_branches),
-            "no_house_connections": int(self.no_house_connections),
-            "no_house_connections_per_branch": float(self.no_house_connections_per_branch),
-            "no_households": int(self.no_households), "no_household_equ": float(self.no_household_equ),
-            "no_households_per_branch": float(self.no_households_per_branch),
-            "max_no_of_households_of_a_branch": float(self.max_no_of_households_of_a_branch),
-            "house_distance_km": float(self.house_distance_km), "transformer_mva": float(self.transformer_mva),
-            "osm_trafo": bool(self.osm_trafo), "max_trafo_dis": float(self.max_trafo_dis),
-            "avg_trafo_dis": float(self.avg_trafo_dis), "cable_length_km": float(self.cable_length_km),
-            "cable_len_per_house": float(self.cable_len_per_house), "max_power_mw": float(self.max_power_mw),
-            "simultaneous_peak_load_mw": float(self.simultaneous_peak_load_mw), "resistance": float(self.resistance),
-            "reactance": float(self.reactance), "ratio": float(self.ratio),
-            "vsw_per_branch": float(self.vsw_per_branch), "max_vsw_of_a_branch": float(self.max_vsw_of_a_branch), }
+                  "no_connection_buses": int(self.no_connection_buses), "no_branches": int(self.no_branches),
+                  "no_house_connections": int(self.no_house_connections),
+                  "no_house_connections_per_branch": float(self.no_house_connections_per_branch),
+                  "no_households": int(self.no_households), "no_household_equ": float(self.no_household_equ),
+                  "no_households_per_branch": float(self.no_households_per_branch),
+                  "max_no_of_households_of_a_branch": float(self.max_no_of_households_of_a_branch),
+                  "house_distance_km": float(self.house_distance_km), "transformer_mva": float(self.transformer_mva),
+                  "osm_trafo": bool(self.osm_trafo), "max_trafo_dis": float(self.max_trafo_dis),
+                  "avg_trafo_dis": float(self.avg_trafo_dis), "cable_length_km": float(self.cable_length_km),
+                  "cable_len_per_house": float(self.cable_len_per_house), "max_power_mw": float(self.max_power_mw),
+                  "simultaneous_peak_load_mw": float(self.simultaneous_peak_load_mw), "resistance": float(self.resistance),
+                  "reactance": float(self.reactance), "ratio": float(self.ratio),
+                  "vsw_per_branch": float(self.vsw_per_branch), "max_vsw_of_a_branch": float(self.max_vsw_of_a_branch), }
 
         self.dbc.insert_clustering_parameters(params)
 
     def compute_parameters(self, net: pp.pandapowerNet) -> None:
         """Compute all grid parameters."""
 
-        self.no_house_connections = self.get_no_of_buses(net, "Consumer Nodebus")
-        self.no_connection_buses = self.get_no_of_buses(net, "Connection Nodebus")
+        self.no_house_connections = self.get_no_of_buses(
+            net, "Consumer Nodebus")
+        self.no_connection_buses = self.get_no_of_buses(
+            net, "Connection Nodebus")
         self.no_households = self.get_no_households(net)
         self.max_power_mw = self.get_max_power(net)
 
@@ -133,9 +137,11 @@ class ParameterCalculator:
         G = pp.topology.create_nxgraph(net)
 
         self.no_branches = self.get_no_branches(G, net)
-        self.avg_trafo_dis, self.max_trafo_dis = self.get_distances_in_graph(net, G)
+        self.avg_trafo_dis, self.max_trafo_dis = self.get_distances_in_graph(
+            net, G)
         self.no_house_connections_per_branch = self.no_house_connections / self.no_branches
-        self.no_households_per_branch = self.max_power_mw * 1000.0 / (PEAK_LOAD_HOUSEHOLD * self.no_branches)
+        self.no_households_per_branch = self.max_power_mw * \
+            1000.0 / (PEAK_LOAD_HOUSEHOLD * self.no_branches)
 
         self.transformer_mva = self.get_trafo_power(net)
         self.house_distance_km = self.calc_avg_house_distance(net)
@@ -155,7 +161,8 @@ class ParameterCalculator:
         transformer_type_str = str(int(self.transformer_mva * 1000))
         max_trafo_distance_list = data_list[3][transformer_type_str]
         if self.max_trafo_dis * 1000 in max_trafo_distance_list:
-            sim_load_index = max_trafo_distance_list.index(self.max_trafo_dis * 1000)
+            sim_load_index = max_trafo_distance_list.index(
+                self.max_trafo_dis * 1000)
             simultaneous_peak_load_mw = data_list[2][transformer_type_str][sim_load_index] / 1000
             return simultaneous_peak_load_mw
         return None
@@ -167,34 +174,34 @@ class ParameterCalculator:
         params = [value for key, value in vars(self).items() if key != "dbc"]
         print(*params)
 
-
     def get_max_power(self, pandapower_net: pp.pandapowerNet) -> float:
         df_load = pandapower_net.load
         return df_load["max_p_mw"].sum()
-
 
     def get_no_households(self, pandapower_net: pp.pandapowerNet) -> int:
         df_load = pandapower_net.load
         return len(df_load["name"])
 
-
-    def get_no_of_buses(self, pandapower_net: pp.pandapowerNet, bus_description: str) -> int:
+    def get_no_of_buses(self, pandapower_net: pp.pandapowerNet,
+                        bus_description: str) -> int:
         df_bus = pandapower_net.bus
         df_bus["type_bus"] = df_bus["name"].str.contains(bus_description)
         return df_bus["type_bus"].sum()
-
 
     def get_cable_length(self, pandapower_net: pp.pandapowerNet) -> float:
         df_line = pandapower_net.line
         return df_line["length_km"].sum()
 
-
-    def calc_avg_house_distance(self, pandapower_net: pp.pandapowerNet) -> float:
+    def calc_avg_house_distance(
+            self, pandapower_net: pp.pandapowerNet) -> float:
         bus_geo = pandapower_net.bus_geodata
-        bus_geo = gpd.GeoDataFrame(bus_geo, geometry=gpd.points_from_xy(bus_geo["x"], bus_geo["y"]))
+        bus_geo = gpd.GeoDataFrame(
+            bus_geo, geometry=gpd.points_from_xy(
+                bus_geo["x"], bus_geo["y"]))
         bus = pandapower_net.bus
         bus_geo = bus_geo.merge(bus, left_index=True, right_index=True)
-        bus_geo["consumer_bus"] = bus_geo["name"].str.contains("Consumer Nodebus")
+        bus_geo["consumer_bus"] = bus_geo["name"].str.contains(
+            "Consumer Nodebus")
         bus_geo = bus_geo[bus_geo["consumer_bus"]]
 
         list_pt = []
@@ -215,7 +222,6 @@ class ParameterCalculator:
         median_dis = statistics.median(list_avg_dis4pts)
         return median_dis
 
-
     def get_root(self, pandapower_net: pp.pandapowerNet):
         root = pandapower_net.bus
         root["LV_bus"] = root["name"].str.contains("LVbus")
@@ -223,22 +229,24 @@ class ParameterCalculator:
         root = list(root.index)[0]
         return root
 
-
-    def get_no_branches(self, networkx_graph: nx.Graph, pandapower_net: pp.pandapowerNet) -> int:
+    def get_no_branches(self, networkx_graph: nx.Graph,
+                        pandapower_net: pp.pandapowerNet) -> int:
         root = self.get_root(pandapower_net)
         return networkx_graph.degree(root) - 1
 
-
-    def get_distances_in_graph(self, pandapower_net: pp.pandapowerNet, networkx_graph: nx.Graph) -> tuple[float, float]:
+    def get_distances_in_graph(self, pandapower_net: pp.pandapowerNet,
+                               networkx_graph: nx.Graph) -> tuple[float, float]:
         root = self.get_root(pandapower_net)
         leaves = pandapower_net.bus
-        leaves["consumer_bus"] = leaves["name"].str.contains("Consumer Nodebus")
+        leaves["consumer_bus"] = leaves["name"].str.contains(
+            "Consumer Nodebus")
         leaves = list(leaves[leaves["consumer_bus"]].index)
         no_leaves = len(leaves)
 
         path_length_to_leaves = []
         for leaf in leaves:
-            weighted_length = nx.dijkstra_path_length(networkx_graph, root, leaf)
+            weighted_length = nx.dijkstra_path_length(
+                networkx_graph, root, leaf)
             path_length_to_leaves.append(weighted_length)
 
         max_path_length = max(path_length_to_leaves)
@@ -246,19 +254,20 @@ class ParameterCalculator:
 
         return avg_path_length, max_path_length
 
-
     def get_trafo_power(self, pandapower_net: pp.pandapowerNet) -> float:
         df_trafo = pandapower_net.trafo.sn_mva
         return df_trafo.iloc[0]
 
     def calc_resistance(self, pandapower_net: pp.pandapowerNet, networkx_graph: nx.Graph) -> tuple[
-        float, float, float, float, float]:
+            float, float, float, float, float]:
         df_load = pandapower_net.load
-        df_vsw = df_load.groupby("bus")["max_p_mw"].sum() * 1000.0 / PEAK_LOAD_HOUSEHOLD
+        df_vsw = df_load.groupby(
+            "bus")["max_p_mw"].sum() * 1000.0 / PEAK_LOAD_HOUSEHOLD
         df_vsw = df_vsw.to_frame().reset_index().rename(
             columns={"bus": "house_connection", "max_p_mw": "household_equivalents"})
 
-        df_line = self.calculate_line_with_sim_factor(pandapower_net, networkx_graph)
+        df_line = self.calculate_line_with_sim_factor(
+            pandapower_net, networkx_graph)
         root = self.get_root(pandapower_net)
 
         df_vsw["path"] = ""
@@ -272,7 +281,8 @@ class ParameterCalculator:
                 if branch[1] in row["path"]:
                     df_vsw.at[index, "branch"] = branch
 
-        max_no_of_households_of_a_branch = df_vsw.groupby("branch")["household_equivalents"].sum().max()
+        max_no_of_households_of_a_branch = df_vsw.groupby(
+            "branch")["household_equivalents"].sum().max()
 
         df_vsw["resistance"] = ""
         df_vsw["resistance_sections"] = ""
@@ -305,13 +315,16 @@ class ParameterCalculator:
         resistance = df_vsw["resistance"].sum()
         reactance = df_vsw["reactance"].sum()
         ratio = resistance / reactance
-        max_vsw_of_a_branch = df_vsw.groupby("branch")["resistance"].sum().max()
+        max_vsw_of_a_branch = df_vsw.groupby(
+            "branch")["resistance"].sum().max()
 
         return max_no_of_households_of_a_branch, resistance, reactance, ratio, max_vsw_of_a_branch
 
-    def calculate_line_with_sim_factor(self, pandapower_net, networkx_graph) -> pd.DataFrame:
+    def calculate_line_with_sim_factor(
+            self, pandapower_net, networkx_graph) -> pd.DataFrame:
         """calculate the sim factor for each line segment"""
-        df_sim_factor_definitions = pd.DataFrame.from_dict(SIM_FACTOR, orient='index')
+        df_sim_factor_definitions = pd.DataFrame.from_dict(
+            SIM_FACTOR, orient='index')
         df_sim_factor_definitions.reset_index(inplace=True)
         df_sim_factor_definitions.columns = ['description', 'sim_factor']
 
@@ -347,7 +360,11 @@ class ParameterCalculator:
         load_count = load_count.reset_index()
         load_count = load_count.rename(columns={'name_x': 'count'})
 
-        load_count = pd.merge(left=load_count, left_on='bus', right=load_value, right_on='bus')
+        load_count = pd.merge(
+            left=load_count,
+            left_on='bus',
+            right=load_value,
+            right_on='bus')
         load_count.drop(['zone_y'], axis=1, inplace=True)
 
         load_count_cat = pd.merge(left=load_count, left_on='zone_x', right=df_sim_factor_definitions,
@@ -355,58 +372,81 @@ class ParameterCalculator:
 
         load_count_cat = load_count_cat.assign(
             sim_factor_level1=lambda x: utils.oneSimultaneousLoad(installed_power=1, load_count=x['count'],
-                                                            sim_factor=x['sim_factor']))
+                                                                  sim_factor=x['sim_factor']))
 
-        load_count_cat = load_count_cat.assign(sim_load_level1=lambda x: x['max_p_mw'] * x['sim_factor_level1'])
+        load_count_cat = load_count_cat.assign(
+            sim_load_level1=lambda x: x['max_p_mw'] *
+            x['sim_factor_level1'])
 
         # we can now enter these values in our lines table
 
         for index, row in load_count_cat.iterrows():
             bus = row['bus']
-            index_line = net_line_with_sim_factor.index[net_line_with_sim_factor['to_bus'] == bus].tolist()
-            net_line_with_sim_factor.at[index_line[0], 'sim_factor_cumulated'] = row['sim_factor_level1']
-            net_line_with_sim_factor.at[index_line[0], 'sim_load'] = row['sim_load_level1']
+            index_line = net_line_with_sim_factor.index[net_line_with_sim_factor['to_bus'] == bus].tolist(
+            )
+            net_line_with_sim_factor.at[index_line[0],
+                                        'sim_factor_cumulated'] = row['sim_factor_level1']
+            net_line_with_sim_factor.at[index_line[0],
+                                        'sim_load'] = row['sim_load_level1']
             if row['description'] == 'Commercial':
-                net_line_with_sim_factor.at[index_line[0], 'no_commercial'] = row['count']
-                net_line_with_sim_factor.at[index_line[0], 'load_commercial_mw'] = row['max_p_mw']
+                net_line_with_sim_factor.at[index_line[0],
+                                            'no_commercial'] = row['count']
+                net_line_with_sim_factor.at[index_line[0],
+                                            'load_commercial_mw'] = row['max_p_mw']
                 net_line_with_sim_factor.at[index_line[0], 'no_public'] = 0
-                net_line_with_sim_factor.at[index_line[0], 'load_public_mw'] = 0
-                net_line_with_sim_factor.at[index_line[0], 'no_residential'] = 0
-                net_line_with_sim_factor.at[index_line[0], 'load_residential_mw'] = 0
+                net_line_with_sim_factor.at[index_line[0],
+                                            'load_public_mw'] = 0
+                net_line_with_sim_factor.at[index_line[0],
+                                            'no_residential'] = 0
+                net_line_with_sim_factor.at[index_line[0],
+                                            'load_residential_mw'] = 0
             elif row['description'] == 'Public':
                 net_line_with_sim_factor.at[index_line[0], 'no_commercial'] = 0
-                net_line_with_sim_factor.at[index_line[0], 'load_commercial_mw'] = 0
-                net_line_with_sim_factor.at[index_line[0], 'no_public'] = row['count']
-                net_line_with_sim_factor.at[index_line[0], 'load_public_mw'] = row['max_p_mw']
-                net_line_with_sim_factor.at[index_line[0], 'no_residential'] = 0
-                net_line_with_sim_factor.at[index_line[0], 'load_residential_mw'] = 0
+                net_line_with_sim_factor.at[index_line[0],
+                                            'load_commercial_mw'] = 0
+                net_line_with_sim_factor.at[index_line[0],
+                                            'no_public'] = row['count']
+                net_line_with_sim_factor.at[index_line[0],
+                                            'load_public_mw'] = row['max_p_mw']
+                net_line_with_sim_factor.at[index_line[0],
+                                            'no_residential'] = 0
+                net_line_with_sim_factor.at[index_line[0],
+                                            'load_residential_mw'] = 0
             elif row['description'] == 'Residential':
                 net_line_with_sim_factor.at[index_line[0], 'no_commercial'] = 0
-                net_line_with_sim_factor.at[index_line[0], 'load_commercial_mw'] = 0
+                net_line_with_sim_factor.at[index_line[0],
+                                            'load_commercial_mw'] = 0
                 net_line_with_sim_factor.at[index_line[0], 'no_public'] = 0
-                net_line_with_sim_factor.at[index_line[0], 'load_public_mw'] = 0
-                net_line_with_sim_factor.at[index_line[0], 'no_residential'] = row['count']
-                net_line_with_sim_factor.at[index_line[0], 'load_residential_mw'] = row['max_p_mw']
+                net_line_with_sim_factor.at[index_line[0],
+                                            'load_public_mw'] = 0
+                net_line_with_sim_factor.at[index_line[0],
+                                            'no_residential'] = row['count']
+                net_line_with_sim_factor.at[index_line[0],
+                                            'load_residential_mw'] = row['max_p_mw']
 
         # lets work on the connection nodebuses and their sim factor
 
         connection_bus = pandapower_net.bus
-        connection_bus['connection_bus'] = connection_bus['name'].str.contains("Connection Nodebus")
+        connection_bus['connection_bus'] = connection_bus['name'].str.contains(
+            "Connection Nodebus")
         connection_bus = connection_bus[connection_bus['connection_bus']]
         connection_bus = connection_bus.index
         connection_bus = list(connection_bus)
 
-        # we sort them by their distance ( number of edges that need to be passed ) along the graph to the trafo.
+        # we sort them by their distance ( number of edges that need to be
+        # passed ) along the graph to the trafo.
         df_connection_bus = pd.DataFrame(connection_bus, columns=['bus'])
         df_connection_bus['source'] = 0
 
         len_path_list = []
         for index, row in df_connection_bus.iterrows():
-            length = nx.shortest_path_length(networkx_graph, source=row['source'], target=row['bus'])
+            length = nx.shortest_path_length(
+                networkx_graph, source=row['source'], target=row['bus'])
             len_path_list.append(length)
         df_connection_bus['len_to_trafo_in_graph'] = len_path_list
         # The connection nodebuses furthest away need to be adressed first.
-        df_connection_bus = df_connection_bus.sort_values(by=['len_to_trafo_in_graph'], ascending=False)
+        df_connection_bus = df_connection_bus.sort_values(
+            by=['len_to_trafo_in_graph'], ascending=False)
 
         # turn it into a loop
         for index, row in df_connection_bus.iterrows():
@@ -414,13 +454,15 @@ class ParameterCalculator:
             connected_downstream = net_line_with_sim_factor[
                 net_line_with_sim_factor['from_bus'] == furthest_connection_bus]
             # upstream: towards the trafo
-            connected_upstream = net_line_with_sim_factor[net_line_with_sim_factor['to_bus'] == furthest_connection_bus]
+            connected_upstream = net_line_with_sim_factor[net_line_with_sim_factor['to_bus']
+                                                          == furthest_connection_bus]
             upstream_index = connected_upstream.index
             net_line_with_sim_factor.at[upstream_index[0], 'no_commercial'] = connected_downstream[
                 'no_commercial'].sum()
             net_line_with_sim_factor.at[upstream_index[0], 'load_commercial_mw'] = connected_downstream[
                 'load_commercial_mw'].sum()
-            net_line_with_sim_factor.at[upstream_index[0], 'no_public'] = connected_downstream['no_public'].sum()
+            net_line_with_sim_factor.at[upstream_index[0],
+                                        'no_public'] = connected_downstream['no_public'].sum()
             net_line_with_sim_factor.at[upstream_index[0], 'load_public_mw'] = connected_downstream[
                 'load_public_mw'].sum()
             net_line_with_sim_factor.at[upstream_index[0], 'no_residential'] = connected_downstream[
@@ -429,31 +471,37 @@ class ParameterCalculator:
                 'load_residential_mw'].sum()
 
             load_commercial = utils.oneSimultaneousLoad(
-                installed_power=net_line_with_sim_factor.at[upstream_index[0], 'load_commercial_mw'],
-                load_count=net_line_with_sim_factor.at[upstream_index[0], 'no_commercial'],
+                installed_power=net_line_with_sim_factor.at[upstream_index[0],
+                                                            'load_commercial_mw'],
+                load_count=net_line_with_sim_factor.at[upstream_index[0],
+                                                       'no_commercial'],
                 sim_factor=SIM_FACTOR['Commercial'])
 
             load_public = utils.oneSimultaneousLoad(
-                installed_power=net_line_with_sim_factor.at[upstream_index[0], 'load_public_mw'],
+                installed_power=net_line_with_sim_factor.at[upstream_index[0],
+                                                            'load_public_mw'],
                 load_count=net_line_with_sim_factor.at[upstream_index[0], 'no_public'], sim_factor=SIM_FACTOR['Public'])
 
             load_residential = utils.oneSimultaneousLoad(
-                installed_power=net_line_with_sim_factor.at[upstream_index[0], 'load_residential_mw'],
-                load_count=net_line_with_sim_factor.at[upstream_index[0], 'no_residential'],
+                installed_power=net_line_with_sim_factor.at[upstream_index[0],
+                                                            'load_residential_mw'],
+                load_count=net_line_with_sim_factor.at[upstream_index[0],
+                                                       'no_residential'],
                 sim_factor=SIM_FACTOR['Residential'])
 
             net_line_with_sim_factor.at[
                 upstream_index[0], 'sim_load'] = load_commercial + load_public + load_residential
 
             peak_load_all_consumer_types = net_line_with_sim_factor.at[upstream_index[0], 'load_commercial_mw'] + \
-                                           net_line_with_sim_factor.at[upstream_index[0], 'load_public_mw'] + \
-                                           net_line_with_sim_factor.at[upstream_index[0], 'load_residential_mw']
+                net_line_with_sim_factor.at[upstream_index[0], 'load_public_mw'] + \
+                net_line_with_sim_factor.at[upstream_index[0],
+                                            'load_residential_mw']
             if peak_load_all_consumer_types == 0:
                 net_line_with_sim_factor.at[
                     upstream_index[0], 'sim_factor_cumulated'] = 0  # print('Connection nodebus error')
             else:
                 net_line_with_sim_factor.at[upstream_index[0], 'sim_factor_cumulated'] = (
-                            net_line_with_sim_factor.at[upstream_index[0], 'sim_load'] / peak_load_all_consumer_types)
+                    net_line_with_sim_factor.at[upstream_index[0], 'sim_load'] / peak_load_all_consumer_types)
 
         return net_line_with_sim_factor
 
@@ -474,7 +522,8 @@ class ParameterCalculator:
             try:
                 net = self.dbc.read_net(plz, kcid, bcid)
             except Exception as e:
-                self.dbc.logger.warning(f" local network {kcid},{bcid} is problematic")
+                self.dbc.logger.warning(
+                    f" local network {kcid},{bcid} is problematic")
                 raise e
             else:
                 for row in net.load[["name", "bus"]].itertuples():
@@ -511,7 +560,8 @@ class ParameterCalculator:
         load_count_string = json.dumps(load_count_dict)
         bus_count_string = json.dumps(bus_count_dict)
 
-        self.dbc.insert_plz_parameters(plz, trafo_string, load_count_string, bus_count_string)
+        self.dbc.insert_plz_parameters(
+            plz, trafo_string, load_count_string, bus_count_string)
 
     def analyse_cables_per_plz(self, plz: int):
         cluster_list = self.dbc.get_list_from_plz(plz)
@@ -525,7 +575,8 @@ class ParameterCalculator:
             try:
                 net = self.dbc.read_net(plz, kcid, bcid)
             except Exception as e:
-                self.dbc.logger.debug(f" local network {kcid},{bcid} is problematic")
+                self.dbc.logger.debug(
+                    f" local network {kcid},{bcid} is problematic")
                 raise e
             else:
                 cable_df = net.line[net.line["in_service"] == True]
@@ -563,7 +614,8 @@ class ParameterCalculator:
             try:
                 net = self.dbc.read_net(plz, kcid, bcid)
             except Exception as e:
-                self.dbc.logger.warning(f" local network {kcid},{bcid} is problematic")
+                self.dbc.logger.warning(
+                    f" local network {kcid},{bcid} is problematic")
                 raise e
             else:
                 trafo_sizes = net.trafo["sn_mva"].tolist()[0]
@@ -576,17 +628,26 @@ class ParameterCalculator:
                                              respect_switches=False, ).loc[load_bus].tolist())
 
                 # calculate total sim_peak_load
-                residential_bus_index = net.bus[~net.bus["zone"].isin(["Commercial", "Public"])].index.tolist()
-                commercial_bus_index = net.bus[net.bus["zone"] == "Commercial"].index.tolist()
-                public_bus_index = net.bus[net.bus["zone"] == "Public"].index.tolist()
+                residential_bus_index = net.bus[~net.bus["zone"].isin(
+                    ["Commercial", "Public"])].index.tolist()
+                commercial_bus_index = net.bus[net.bus["zone"]
+                                               == "Commercial"].index.tolist()
+                public_bus_index = net.bus[net.bus["zone"]
+                                           == "Public"].index.tolist()
 
-                residential_house_num = net.load[net.load["bus"].isin(residential_bus_index)].shape[0]
-                public_house_num = net.load[net.load["bus"].isin(public_bus_index)].shape[0]
-                commercial_house_num = net.load[net.load["bus"].isin(commercial_bus_index)].shape[0]
+                residential_house_num = net.load[net.load["bus"].isin(
+                    residential_bus_index)].shape[0]
+                public_house_num = net.load[net.load["bus"].isin(
+                    public_bus_index)].shape[0]
+                commercial_house_num = net.load[net.load["bus"].isin(
+                    commercial_bus_index)].shape[0]
 
-                residential_sum_load = (net.load[net.load["bus"].isin(residential_bus_index)]["max_p_mw"].sum() * 1e3)
-                public_sum_load = (net.load[net.load["bus"].isin(public_bus_index)]["max_p_mw"].sum() * 1e3)
-                commercial_sum_load = (net.load[net.load["bus"].isin(commercial_bus_index)]["max_p_mw"].sum() * 1e3)
+                residential_sum_load = (net.load[net.load["bus"].isin(
+                    residential_bus_index)]["max_p_mw"].sum() * 1e3)
+                public_sum_load = (net.load[net.load["bus"].isin(
+                    public_bus_index)]["max_p_mw"].sum() * 1e3)
+                commercial_sum_load = (net.load[net.load["bus"].isin(
+                    commercial_bus_index)]["max_p_mw"].sum() * 1e3)
 
                 sim_peak_load = 0
                 for building_type, sum_load, house_num in zip(["Residential", "Public", "Commercial"],
@@ -598,7 +659,8 @@ class ParameterCalculator:
                         sim_peak_load += utils.oneSimultaneousLoad(installed_power=sum_load, load_count=house_num,
                                                                    sim_factor=SIM_FACTOR[building_type], )
 
-                avg_distance = (sum(trafo_distance_to_buses) / len(trafo_distance_to_buses)) * 1e3
+                avg_distance = (sum(trafo_distance_to_buses) /
+                                len(trafo_distance_to_buses)) * 1e3
                 max_distance = max(trafo_distance_to_buses) * 1e3
 
                 trafo_size = round(trafo_sizes * 1e3)
@@ -625,4 +687,8 @@ class ParameterCalculator:
         trafo_load_string = json.dumps(trafo_load_dict)
         trafo_max_distance_string = json.dumps(trafo_max_distance_dict)
         trafo_avg_distance_string = json.dumps(trafo_avg_distance_dict)
-        self.dbc.insert_trafo_parameters(plz, trafo_load_string, trafo_max_distance_string, trafo_avg_distance_string)
+        self.dbc.insert_trafo_parameters(
+            plz,
+            trafo_load_string,
+            trafo_max_distance_string,
+            trafo_avg_distance_string)

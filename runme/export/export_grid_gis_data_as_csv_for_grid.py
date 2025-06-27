@@ -13,9 +13,15 @@ kcid = 4
 bcid = 30
 
 # define the datapaths you want to export the grids to
-line_datapath = os.path.join(os.path.dirname(__file__), '../QGIS', 'lines_single_grid_test.csv')
+line_datapath = os.path.join(
+    os.path.dirname(__file__),
+    '../QGIS',
+    'lines_single_grid_test.csv')
 sys.path.append(line_datapath)
-bus_datapath = os.path.join(os.path.dirname(__file__), '../QGIS', 'bus_single_grid_test.csv')
+bus_datapath = os.path.join(
+    os.path.dirname(__file__),
+    '../QGIS',
+    'bus_single_grid_test.csv')
 sys.path.append(bus_datapath)
 
 # read grid from DB

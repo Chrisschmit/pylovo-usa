@@ -1,13 +1,14 @@
 import os
 import sys
+
 import pandas as pd
 import psycopg2 as psy
+
+from src.config_loader import *
 
 # Determine the project's root directory and add to Python's module search path
 PROJECT_ROOT = os.path.abspath(os.path.join(os.getcwd(), "../../.."))
 sys.path.append(PROJECT_ROOT)
-
-from src.config_loader import *
 
 
 def get_clustering_parameters_for_kmeans_cluster_0() -> pd.DataFrame:
@@ -24,8 +25,8 @@ def get_clustering_parameters_for_kmeans_cluster_0() -> pd.DataFrame:
 
     The current clustering algorithm is applied to grids within 100 postcodes. The selected
     clustering parameters are:
-        - avg_trafo_dis 
-        - no_house_connections 
+        - avg_trafo_dis
+        - no_house_connections
         - vsw_per_branch
         - no_households
 
@@ -67,7 +68,9 @@ def get_clustering_parameters_for_kmeans_cluster_0() -> pd.DataFrame:
 
     return df
 
-def calculate_average_clustering_parameters(df: pd.DataFrame, parameters: list) -> dict:
+
+def calculate_average_clustering_parameters(
+        df: pd.DataFrame, parameters: list) -> dict:
     """
     Calculate the average values for the given clustering parameters.
 
@@ -88,7 +91,8 @@ def main():
     df_clustering_parameters = get_clustering_parameters_for_kmeans_cluster_0()
 
     # Calculate average values using LIST_OF_CLUSTERING_PARAMETERS
-    averages = calculate_average_clustering_parameters(df_clustering_parameters, LIST_OF_CLUSTERING_PARAMETERS)
+    averages = calculate_average_clustering_parameters(
+        df_clustering_parameters, LIST_OF_CLUSTERING_PARAMETERS)
 
     # Print the average values
     print("Average Clustering Parameter Values:")

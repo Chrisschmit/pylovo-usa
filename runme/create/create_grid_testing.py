@@ -1,5 +1,6 @@
 # Grids for the indicated PLZ are generated
-# can also be used for PLZ areas that are not part of the official municipal register and have been created by the user
+# can also be used for PLZ areas that are not part of the official
+# municipal register and have been created by the user
 
 import time
 

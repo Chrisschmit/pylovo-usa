@@ -1,7 +1,6 @@
 import pandas as pd
+from sample import get_samples_with_regiostar, perc_of_pop_per_class
 
-from sample import get_samples_with_regiostar
-from sample import perc_of_pop_per_class
 from src.grid_generator import GridGenerator
 
 
@@ -27,7 +26,8 @@ def replace_plz(plz, regiostar_set):
 
     # get rows with same attributes that should not be inserted again
     rows_with_same_attributes = regiostar_set[regiostar_set['regio7'] == regio]
-    rows_with_same_attributes = rows_with_same_attributes[rows_with_same_attributes['bin_no'] == bin_no]
+    rows_with_same_attributes = rows_with_same_attributes[
+        rows_with_same_attributes['bin_no'] == bin_no]
 
     # create a new sample set from which replacement plz can be taken
     gg = GridGenerator(plz='85375')
@@ -36,7 +36,8 @@ def replace_plz(plz, regiostar_set):
 
     regiostar_plz = regiostar_plz[regiostar_plz['fed_state'] == 9]
     samples_bayern = perc_of_pop_per_class(regiostar_plz)
-    regiostar_samples_result = get_samples_with_regiostar(samples_bayern, regiostar_plz)
+    regiostar_samples_result = get_samples_with_regiostar(
+        samples_bayern, regiostar_plz)
     regiostar_samples_result = regiostar_samples_result.reset_index()
 
     # the plz for the replacement need to have the same bin_no and regio class
@@ -44,7 +45,8 @@ def replace_plz(plz, regiostar_set):
     rows_to_replace_from = rows_to_replace_from[rows_to_replace_from['bin_no'] == bin_no]
 
     # the plz should not already exist in sample set
-    rows_to_replace_from[rows_to_replace_from['plz'] != rows_with_same_attributes]
+    rows_to_replace_from[rows_to_replace_from['plz']
+                         != rows_with_same_attributes]
 
     if rows_to_replace_from.empty:
         # raise Exception('No PlZ that can replace given PLZ was found. Try again.')
@@ -85,7 +87,9 @@ def replace_multiple_plz(df_plz, regiostar_set):
 # regiostar_set_new.to_csv("regiostar_samples_bayern_replaced.csv")
 
 # example for single replacement
-regiostar_set = pd.read_csv('../figures_thesis/regiostar_samples_bayern_replaced_06062023_4.csv', index_col=0)
+regiostar_set = pd.read_csv(
+    '../figures_thesis/regiostar_samples_bayern_replaced_06062023_4.csv',
+    index_col=0)
 plz = 63877
 df_new_plz, regiostar_set_new = replace_plz(plz, regiostar_set)
 regiostar_set_new.to_csv("regiostar_samples_bayern_replaced_06062023_5.csv")

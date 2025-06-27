@@ -3,10 +3,11 @@
 
 import time
 
-from src.classification.sampling.sample import get_municipal_register_as_dataframe
+from src.classification.sampling.sample import \
+    get_municipal_register_as_dataframe
+from src.config_loader import ANALYZE_GRIDS
 from src.data_import.import_buildings import import_buildings_for_multiple_plz
 from src.grid_generator import GridGenerator
-from src.config_loader import ANALYZE_GRIDS
 
 ags = 9161000
 
@@ -27,4 +28,5 @@ gg.generate_grid_for_multiple_plz(df_plz=df_plz, analyze_grids=ANALYZE_GRIDS)
 # End timing and print results
 elapsed_time = time.time() - start_time
 minutes, seconds = divmod(elapsed_time, 60)
-print(f"--- Elapsed Time: {int(minutes)} minutes and {seconds:.2f} seconds ---")
+print(
+    f"--- Elapsed Time: {int(minutes)} minutes and {seconds:.2f} seconds ---")

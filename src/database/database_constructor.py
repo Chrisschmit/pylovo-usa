@@ -6,12 +6,12 @@ from pathlib import Path
 import psycopg2 as psy
 import sqlparse
 
-from src.config_loader import *
-from config.config_table_structure import *
 import src.database.database_client as dbc
-from src.data_import.import_transformers import process_trafos, get_trafos_processed_3035_geojson_path, \
-    fetch_trafos, RELATION_ID, EPSG, get_trafos_processed_geojson_path
-
+from config.config_table_structure import *
+from src.config_loader import *
+from src.data_import.import_transformers import (
+    EPSG, RELATION_ID, fetch_trafos, get_trafos_processed_3035_geojson_path,
+    get_trafos_processed_geojson_path, process_trafos)
 
 # uncomment for automated building import of buildings in regiostar_samples
 # from raw_data.import_building_data import OGR_FILE_LIST
@@ -30,7 +30,6 @@ class DatabaseConstructor:
             self.dbc = dbc_obj
         else:
             self.dbc = dbc.DatabaseClient()
-
 
     def get_table_name_list(self):
         with self.dbc.conn.cursor() as cur:
@@ -53,7 +52,8 @@ class DatabaseConstructor:
         # create extension if not exists for recognition of geom datatypes
         if not self.extensions_added:
             with self.dbc.conn.cursor() as cur:
-                # create extension if not exists for recognition of geom datatypes
+                # create extension if not exists for recognition of geom
+                # datatypes
                 cur.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
                 print("CREATE EXTENSION postgis")
                 cur.execute("CREATE EXTENSION IF NOT EXISTS pgRouting;")
@@ -99,43 +99,53 @@ class DatabaseConstructor:
             table_exists = self.table_exists(table_name=table_name)
             print("ogr working for table", table_name)
             command = [
-                    "ogr2ogr",
-                    "-append" if table_exists else "-overwrite",
-                    "-progress",
-                    "-f",
-                    "PostgreSQL",
-                    f"PG:dbname={DBNAME} user={USER} password={PASSWORD} host={HOST} port={PORT}",
-                    file_path,
-                    "-nln",
-                    f"{TARGET_SCHEMA}.{table_name}",  # explicitly tells ogr2ogr where to append (for the case of table already existing)
-                    "-nlt",
-                    # "MULTIPOLYGON",
-                    "PROMOTE_TO_MULTI",
-                    "-t_srs",
-                    "EPSG:3035",
-                    "-lco",
-                    "geometry_name=geom",
-                    "-lco", f"SCHEMA={TARGET_SCHEMA}", # ensures creation happens in correct schema
+                "ogr2ogr",
+                "-append" if table_exists else "-overwrite",
+                "-progress",
+                "-f",
+                "PostgreSQL",
+                f"PG:dbname={DBNAME} user={USER} password={PASSWORD} host={HOST} port={PORT}",
+                file_path,
+                "-nln",
+                # explicitly tells ogr2ogr where to append (for the case of
+                # table already existing)
+                f"{TARGET_SCHEMA}.{table_name}",
+                "-nlt",
+                # "MULTIPOLYGON",
+                "PROMOTE_TO_MULTI",
+                "-t_srs",
+                "EPSG:3035",
+                "-lco",
+                "geometry_name=geom",
+                # ensures creation happens in correct schema
+                "-lco", f"SCHEMA={TARGET_SCHEMA}",
             ]
             if skip_failures:
                 command.append("-skipfailures")
 
-            result = subprocess.run(command, check=True, shell=False, stderr=subprocess.PIPE if skip_failures else None)
+            result = subprocess.run(
+                command,
+                check=True,
+                shell=False,
+                stderr=subprocess.PIPE if skip_failures else None)
             if skip_failures:
                 error_list = result.stderr.decode().replace("\r", "").split("\n")
-                error_list = [e[e.find("ERROR: "):e.find("DETAIL: ")] for e in error_list]
-                error_list = [e.strip("\n") for e in error_list if "ERROR: " in e]
+                error_list = [e[e.find("ERROR: "):e.find("DETAIL: ")]
+                              for e in error_list]
+                error_list = [e.strip("\n")
+                              for e in error_list if "ERROR: " in e]
                 error_set = set(error_list)
-                
-                print(f"Warning: Error(s) occurred while processing {file_name}:")
+
+                print(
+                    f"Warning: Error(s) occurred while processing {file_name}:")
                 for error in error_set:
                     print("\t" + error)
                     if "duplicate key value violates unique constraint" in error:
-                        print("\tThis is likely due to importing already existing data.")
+                        print(
+                            "\tThis is likely due to importing already existing data.")
 
             et = time.time()
             print(f"{file_name} is successfully imported to db in {int(et - st)} s")
-
 
     def transformers_to_db(self):
         """Call the overpass api for transformer data and populate the transformers table.
@@ -143,13 +153,16 @@ class DatabaseConstructor:
         fetch fresh data from OSM.
 
         """
-        trafos_processed_geojson_path = get_trafos_processed_geojson_path(RELATION_ID)
-        trafos_processed_3035_geojson_path = get_trafos_processed_3035_geojson_path(RELATION_ID)
+        trafos_processed_geojson_path = get_trafos_processed_geojson_path(
+            RELATION_ID)
+        trafos_processed_3035_geojson_path = get_trafos_processed_3035_geojson_path(
+            RELATION_ID)
 
         update_trafos = not os.path.isfile(trafos_processed_geojson_path)
 
         if update_trafos:
-            print(f"{trafos_processed_geojson_path} does not exist -> fetch transformer data from API and process it")
+            print(
+                f"{trafos_processed_geojson_path} does not exist -> fetch transformer data from API and process it")
             fetch_trafos(RELATION_ID)
             process_trafos(RELATION_ID)
 
@@ -193,7 +206,10 @@ class DatabaseConstructor:
                     self.dbc.conn.commit()
             # read and write
             df = pd.read_csv(file_path, index_col=False)
-            df = df.rename(columns={"einwohner": "population", "gid": "postcode_id"})
+            df = df.rename(
+                columns={
+                    "einwohner": "population",
+                    "gid": "postcode_id"})
             df.to_sql(
                 name=table_name,
                 con=self.dbc.sqla_engine,
@@ -204,7 +220,6 @@ class DatabaseConstructor:
             et = time.time()
             print(f"{file_name} is successfully imported to db in {int(et - st)} s")
 
-
     def create_public_2po_table(self):
         """
         Reads the large SQL file in 10% chunks, executes complete statements on-the-fly,
@@ -213,10 +228,15 @@ class DatabaseConstructor:
         cur = self.dbc.conn.cursor()
 
         # Path to your SQL file, which includes creation of the table
-        sc_path = os.path.join(os.getcwd(), "raw_data", "ways", "ways_public_2po_4pgr.sql")
+        sc_path = os.path.join(
+            os.getcwd(),
+            "raw_data",
+            "ways",
+            "ways_public_2po_4pgr.sql")
         file_size = os.path.getsize(sc_path)
 
-        # We read 10% at a time.  (Or pick a chunk size in bytes that works for your environment.)
+        # We read 10% at a time.  (Or pick a chunk size in bytes that works for
+        # your environment.)
         chunk_size = max(1, file_size // 100)
         chars_read = 0
 
@@ -313,9 +333,13 @@ class DatabaseConstructor:
         Creates the SQL functions that are needed for the app to operate
         """
         cur = self.dbc.conn.cursor()
-        sc_path = os.path.join(os.getcwd(), "src", "postgres_dump_functions.sql")
+        sc_path = os.path.join(
+            os.getcwd(),
+            "src",
+            "postgres_dump_functions.sql")
         with open(sc_path, 'r') as sc_file:
-            print(f"Executing postgres_dump_functions.sql script with schema '{TARGET_SCHEMA}'.")
+            print(
+                f"Executing postgres_dump_functions.sql script with schema '{TARGET_SCHEMA}'.")
             sql = sc_file.read()
             cur.execute(sql)
             self.dbc.conn.commit()

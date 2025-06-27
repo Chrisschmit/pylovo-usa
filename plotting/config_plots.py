@@ -15,7 +15,14 @@ TUMBlue2 = '#005293'
 TUMGray2 = '#7F7F7F'
 
 TUMPalette = [TUMBlue, TUMGreen, TUMOrange, TUMBlue4, TUMGray2, TUMBlue2]
-TUMPalette1 = [TUMBlue, TUMGreen, TUMOrange, TUMIvory, TUMBlue4, TUMBlue2, TUMGray2]
+TUMPalette1 = [
+    TUMBlue,
+    TUMGreen,
+    TUMOrange,
+    TUMIvory,
+    TUMBlue4,
+    TUMBlue2,
+    TUMGray2]
 TUMPalette2 = [TUMBlue, TUMGreen, TUMOrange, TUMBlue4, TUMBlue2, TUMGray2]
 TUMPalette3 = [TUMBlue, TUMGreen, TUMOrange]
 

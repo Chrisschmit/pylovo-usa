@@ -1,19 +1,16 @@
+import argparse
+import subprocess
 import time
 from subprocess import CalledProcessError
-import subprocess
-import argparse
+
 import requests
 
-from src.data_import.import_transformers import (
-    get_trafos_processed_geojson_path,
-    get_trafos_processed_3035_geojson_path,
-    fetch_trafos,
-    process_trafos,
-    EPSG,
-    RELATION_ID,
-    OVERPASS_URL
-)
 import src.database.database_constructor
+from src.data_import.import_transformers import (
+    EPSG, OVERPASS_URL, RELATION_ID, fetch_trafos,
+    get_trafos_processed_3035_geojson_path, get_trafos_processed_geojson_path,
+    process_trafos)
+
 
 def main(relation_id: int) -> None:
     """Fetch transformers from Overpass API, process the fetched data, and finally load them into the database.
@@ -63,8 +60,8 @@ def main(relation_id: int) -> None:
         print("\nMost likely cause is data already existing in database. Try the --ignore-existing flag.")
         exit(1)
 
-
     print("--- %s seconds ---" % (time.time() - start_time))
+
 
 def handle_user_input() -> int:
     parser = argparse.ArgumentParser(
@@ -93,7 +90,9 @@ def handle_user_input() -> int:
     print(f"Selected relation ID: {relation_id}")
 
     # get the hint of area and print it to the console
-    response = requests.get(OVERPASS_URL, params={'data': f"[out:json]; relation({relation_id}); out tags;"})
+    response = requests.get(
+        OVERPASS_URL, params={
+            'data': f"[out:json]; relation({relation_id}); out tags;"})
     response.raise_for_status()
     area_hint = None
     tags = response.json()["elements"][0]["tags"]

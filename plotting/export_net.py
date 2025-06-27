@@ -22,7 +22,9 @@ def get_bus_line_geo_for_network(pandapower_net, plz, net_index=0):
 
     # bus data
     bus_geo = pandapower_net.bus_geodata
-    bus_geo = gpd.GeoDataFrame(bus_geo, geometry=gpd.points_from_xy(bus_geo['x'], bus_geo['y']))
+    bus_geo = gpd.GeoDataFrame(
+        bus_geo, geometry=gpd.points_from_xy(
+            bus_geo['x'], bus_geo['y']))
     bus_geo['net'] = net_index
     bus = pandapower_net.bus
     bus_geo = bus_geo.merge(bus, left_index=True, right_index=True)
@@ -53,7 +55,8 @@ def get_bus_line_geo_for_plz(plz):
     # loop over all networks and extract line and bus data
     for kcid, bcid in cluster_list:
         net = dbc_client.read_net(plz, kcid, bcid)
-        line_geo, bus_geo = get_bus_line_geo_for_network(pandapower_net=net, net_index=net_index, plz=plz)
+        line_geo, bus_geo = get_bus_line_geo_for_network(
+            pandapower_net=net, net_index=net_index, plz=plz)
 
         gdf_line = pd.concat([gdf_line, line_geo])
         gdf_bus = pd.concat([gdf_bus, bus_geo])
@@ -63,7 +66,8 @@ def get_bus_line_geo_for_plz(plz):
     return gdf_line, gdf_bus
 
 
-def save_geodata_as_csv(df_plz: pd.DataFrame, data_path_lines: str, data_path_bus: str) -> None:
+def save_geodata_as_csv(df_plz: pd.DataFrame,
+                        data_path_lines: str, data_path_bus: str) -> None:
     """saves the geodata to csv"""
     gdf_line = gpd.GeoDataFrame()
     gdf_bus = gpd.GeoDataFrame()

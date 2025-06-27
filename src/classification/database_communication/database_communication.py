@@ -1,10 +1,11 @@
 import geopandas as gpd
 import pandas as pd
 from geoalchemy2 import Geometry, WKTElement
-import src.database.database_client as dbc
 
+import src.database.database_client as dbc
+from src.classification.clustering.clustering_algorithms import (
+    gmm_tied_clustering, kmeans_clustering, kmedoids_clustering)
 from src.config_loader import *
-from src.classification.clustering.clustering_algorithms import gmm_tied_clustering, kmeans_clustering, kmedoids_clustering
 
 
 class DatabaseCommunication:
@@ -23,7 +24,8 @@ class DatabaseCommunication:
         self.dbc.conn.close()
         print("Database connection closed.")
 
-    def get_clustering_parameters_for_classification_version(self) -> pd.DataFrame:
+    def get_clustering_parameters_for_classification_version(
+            self) -> pd.DataFrame:
         """get clustering parameter for a specific classification version indicated in config classification
 
         :return: a table with all grid parameters for all grids for PLZ included in the classification version
@@ -37,11 +39,11 @@ class DatabaseCommunication:
                 ),
                 clustering AS (
                     SELECT version_id, plz, kcid, bcid, cp.*
-                    FROM clustering_parameters cp 
+                    FROM clustering_parameters cp
                     JOIN grid_result gr ON cp.grid_result_id = gr.grid_result_id
                     WHERE gr.version_id = %(v)s AND cp.filtered = false
                 )
-                SELECT c.* 
+                SELECT c.*
                 FROM clustering c
                 JOIN plz_table p
                 ON c.plz = p.plz;"""
@@ -51,7 +53,8 @@ class DatabaseCommunication:
         df_parameter = pd.DataFrame(df_query, columns=columns)
         return df_parameter
 
-    def municipal_register_with_clustering_parameters_for_classification_version(self) -> pd.DataFrame:
+    def municipal_register_with_clustering_parameters_for_classification_version(
+            self) -> pd.DataFrame:
         """get full information about a samples set indicated by a classification version
         Information about:
         - clustering parameter
@@ -71,7 +74,7 @@ class DatabaseCommunication:
                 ),
                 clustering AS (
                     SELECT version_id, plz, kcid, bcid, cp.*
-                    FROM clustering_parameters cp 
+                    FROM clustering_parameters cp
                     JOIN grid_result gr ON cp.grid_result_id = gr.grid_result_id
                     WHERE gr.version_id = %(v)s AND cp.filtered = false
                 )
@@ -93,7 +96,8 @@ class DatabaseCommunication:
         # retrieve clustering parameters
         df_parameters_of_grids = self.get_clustering_parameters_for_classification_version()
 
-        # load transformer positions from database, preserve geo-datatype of geom column
+        # load transformer positions from database, preserve geo-datatype of
+        # geom column
         query = """
                 SELECT version_id, plz, kcid, bcid, geom
                 FROM transformer_positions tp
@@ -101,8 +105,10 @@ class DatabaseCommunication:
                   ON tp.grid_result_id = gr.grid_result_id
                 WHERE gr.version_id=%(v)s;"""
         params = {"v": VERSION_ID}
-        df_transformer_positions = gpd.read_postgis(query, con=self.dbc.sqla_engine, params=params, )
-        df_transformer_positions['geom'] = df_transformer_positions['geom'].apply(self.create_wkt_element)
+        df_transformer_positions = gpd.read_postgis(
+            query, con=self.dbc.sqla_engine, params=params, )
+        df_transformer_positions['geom'] = df_transformer_positions['geom'].apply(
+            self.create_wkt_element)
 
         # calculate the clusters
         # KMEDOIDS
@@ -110,7 +116,11 @@ class DatabaseCommunication:
             df_parameters_of_grids=df_parameters_of_grids,
             list_of_clustering_parameters=LIST_OF_CLUSTERING_PARAMETERS,
             n_clusters=N_CLUSTERS_KMEDOID)
-        df_parameters_of_grids.rename(mapper={'clusters': 'kmedoid_clusters'}, axis=1, inplace=True)
+        df_parameters_of_grids.rename(
+            mapper={
+                'clusters': 'kmedoid_clusters'},
+            axis=1,
+            inplace=True)
         df_parameters_of_grids['kmedoid_representative_grid'] = False
         for i in list(representative_networks_kmedoid['index']):
             df_parameters_of_grids.at[i, 'kmedoid_representative_grid'] = True
@@ -122,7 +132,11 @@ class DatabaseCommunication:
             df_parameters_of_grids=df_parameters_of_grids,
             list_of_clustering_parameters=LIST_OF_CLUSTERING_PARAMETERS,
             n_clusters=N_CLUSTERS_KMEANS)
-        df_parameters_of_grids.rename(mapper={'clusters': 'kmeans_clusters'}, axis=1, inplace=True)
+        df_parameters_of_grids.rename(
+            mapper={
+                'clusters': 'kmeans_clusters'},
+            axis=1,
+            inplace=True)
         df_parameters_of_grids['kmeans_representative_grid'] = False
         for i in list(representative_networks_kmeans['index']):
             df_parameters_of_grids.at[i, 'kmeans_representative_grid'] = True
@@ -134,7 +148,11 @@ class DatabaseCommunication:
             df_parameters_of_grids=df_parameters_of_grids,
             list_of_clustering_parameters=LIST_OF_CLUSTERING_PARAMETERS,
             n_clusters=N_CLUSTERS_GMM)
-        df_parameters_of_grids.rename(mapper={'clusters': 'gmm_clusters'}, axis=1, inplace=True)
+        df_parameters_of_grids.rename(
+            mapper={
+                'clusters': 'gmm_clusters'},
+            axis=1,
+            inplace=True)
         df_parameters_of_grids['gmm_representative_grid'] = False
         for i in list(representative_networks_gmm['index']):
             df_parameters_of_grids.at[i, 'gmm_representative_grid'] = True
@@ -146,26 +164,37 @@ class DatabaseCommunication:
                                                          'kmedoid_clusters', 'kmedoid_representative_grid',
                                                          'kmeans_clusters', 'kmeans_representative_grid',
                                                          'gmm_clusters', 'gmm_representative_grid']]
-        df_parameters_of_grids['version_id'] = df_parameters_of_grids['version_id'].astype('string')
-        df_parameters_of_grids['plz'] = df_parameters_of_grids['plz'].astype('int')
+        df_parameters_of_grids['version_id'] = df_parameters_of_grids['version_id'].astype(
+            'string')
+        df_parameters_of_grids['plz'] = df_parameters_of_grids['plz'].astype(
+            'int')
 
         # merge transformer positions with cluster information
         df_transformers_classified = pd.merge(df_transformer_positions, df_parameters_of_grids, how='right',
-                                              left_on=['version_id', 'plz', 'kcid', 'bcid'],
+                                              left_on=[
+                                                  'version_id', 'plz', 'kcid', 'bcid'],
                                               right_on=['version_id', 'plz', 'kcid', 'bcid'])
-        
+
         query = """
                 SELECT grid_result_id, version_id, plz, kcid, bcid
                 FROM grid_result
                 WHERE version_id=%(v)s;"""
         params = {"v": VERSION_ID}
-        df_grid_result = pd.read_sql_query(query, con=self.dbc.sqla_engine, params=params)
+        df_grid_result = pd.read_sql_query(
+            query, con=self.dbc.sqla_engine, params=params)
 
-        df_transformers_classified  = pd.merge(df_grid_result, df_transformers_classified, how='right',
-                                               left_on=['version_id', 'plz', 'kcid', 'bcid'],
-                                               right_on=['version_id', 'plz', 'kcid', 'bcid'])
+        df_transformers_classified = pd.merge(df_grid_result, df_transformers_classified, how='right',
+                                              left_on=[
+                                                  'version_id', 'plz', 'kcid', 'bcid'],
+                                              right_on=['version_id', 'plz', 'kcid', 'bcid'])
 
-        df_transformers_classified.drop(columns=['version_id', 'plz', 'kcid', 'bcid'], inplace=True)
+        df_transformers_classified.drop(
+            columns=[
+                'version_id',
+                'plz',
+                'kcid',
+                'bcid'],
+            inplace=True)
 
         # add classification id
         df_transformers_classified['classification_id'] = CLASSIFICATION_VERSION
@@ -196,7 +225,7 @@ class DatabaseCommunication:
                        FROM buildings_result
                        WHERE houses_per_building > %(h)s
                    )
-                   
+
                    UPDATE clustering_parameters c
                    SET filtered = true
                    FROM buildings b
@@ -204,7 +233,7 @@ class DatabaseCommunication:
         self.dbc.cur.execute(query, {"h": THRESHOLD_HOUSEHOLDS_PER_BUILDING})
         print(self.dbc.cur.statusmessage)
         self.dbc.conn.commit()
-    
+
     def apply_list_of_clustering_parameters_thresholds(self) -> None:
         """
         Apply thresholds on selected clustering parameters.
@@ -234,7 +263,7 @@ class DatabaseCommunication:
     def set_remaining_filter_values_false(self) -> None:
         """setting filtered value to false for grids that should not be filtered according to their parameters
         """
-        query = """UPDATE clustering_parameters 
+        query = """UPDATE clustering_parameters
             SET filtered = false
             WHERE filtered IS NULL;"""
         self.dbc.cur.execute(query)

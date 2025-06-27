@@ -1,23 +1,26 @@
 import warnings
+from typing import override
+
 import psycopg2 as psy
 from sqlalchemy import create_engine
-from typing import override
 
 from src import utils
 from src.config_loader import *
-from src.database.preprocessing_mixin import PreprocessingMixin
+from src.database.analysis_mixin import AnalysisMixin
 from src.database.clustering_mixin import ClusteringMixin
 from src.database.grid_mixin import GridMixin
-from src.database.analysis_mixin import AnalysisMixin
+from src.database.preprocessing_mixin import PreprocessingMixin
 from src.database.utils_mixin import UtilsMixin
 
 warnings.simplefilter(action='ignore', category=UserWarning)
 
 
-class DatabaseClient(PreprocessingMixin, ClusteringMixin, GridMixin, AnalysisMixin, UtilsMixin):
+class DatabaseClient(PreprocessingMixin, ClusteringMixin,
+                     GridMixin, AnalysisMixin, UtilsMixin):
     """Main database client handling connections."""
 
-    def __init__(self, dbname=DBNAME, user=USER, pw=PASSWORD, host=HOST, port=PORT, **kwargs):
+    def __init__(self, dbname=DBNAME, user=USER, pw=PASSWORD,
+                 host=HOST, port=PORT, **kwargs):
         self.logger = utils.create_logger(
             "DatabaseClient", log_file=kwargs.get("log_file", "../log.txt"), log_level=LOG_LEVEL
         )
@@ -34,7 +37,8 @@ class DatabaseClient(PreprocessingMixin, ClusteringMixin, GridMixin, AnalysisMix
             self.db_path = f"postgresql+psycopg2://{user}:{pw}@{host}:{port}/{dbname}"
             self.sqla_engine = create_engine(
                 self.db_path,
-                connect_args={"options": f"-c search_path={TARGET_SCHEMA},public"},
+                connect_args={
+                    "options": f"-c search_path={TARGET_SCHEMA},public"},
             )
         except psy.OperationalError as err:
             self.logger.warning(
@@ -45,7 +49,8 @@ class DatabaseClient(PreprocessingMixin, ClusteringMixin, GridMixin, AnalysisMix
         # init supers after everything is set up
         super().__init__()
 
-        self.logger.debug(f"DatabaseClient is constructed and connected to {self.db_path}.")
+        self.logger.debug(
+            f"DatabaseClient is constructed and connected to {self.db_path}.")
 
     def __del__(self):
         self.cur.close()
@@ -119,7 +124,8 @@ class DatabaseClient(PreprocessingMixin, ClusteringMixin, GridMixin, AnalysisMix
                      AND postcode_result_plz = %(p)s;"""
         self.cur.execute(query, {"v": version_id, "p": int(plz)})
         self.conn.commit()
-        self.logger.info(f"All data for PLZ {plz} and version {version_id} deleted")
+        self.logger.info(
+            f"All data for PLZ {plz} and version {version_id} deleted")
 
     def delete_version_from_all_tables(self, version_id: str) -> None:
         """Delete all entries of the given version ID from all tables."""
@@ -128,7 +134,8 @@ class DatabaseClient(PreprocessingMixin, ClusteringMixin, GridMixin, AnalysisMix
         self.conn.commit()
         self.logger.info(f"Version {version_id} deleted from all tables")
 
-    def delete_classification_version_from_related_tables(self, classification_id: str) -> None:
+    def delete_classification_version_from_related_tables(
+            self, classification_id: str) -> None:
         """
         Deletes all rows with the given classification_id from related tables:
         transformer_classified, sample_set, and classification_version.
@@ -141,7 +148,8 @@ class DatabaseClient(PreprocessingMixin, ClusteringMixin, GridMixin, AnalysisMix
 
         self.logger.info(f"Deleted classification ID {classification_id}.")
 
-    def delete_plz_from_sample_set_table(self, classification_id: str, plz: int) -> None:
+    def delete_plz_from_sample_set_table(
+            self, classification_id: str, plz: int) -> None:
         """
         Deletes the row corresponding to the given classification ID and PLZ from the sample_set table.
 
@@ -156,7 +164,8 @@ class DatabaseClient(PreprocessingMixin, ClusteringMixin, GridMixin, AnalysisMix
                 """
         self.cur.execute(query, {"cid": classification_id, "p": plz})
         self.conn.commit()
-        self.logger.info(f"Deleted PLZ {plz} for classification ID {classification_id} from sample_set table.")
+        self.logger.info(
+            f"Deleted PLZ {plz} for classification ID {classification_id} from sample_set table.")
 
     def delete_transformers(self) -> None:
         """all transformers are deleted from table transformers in database"""

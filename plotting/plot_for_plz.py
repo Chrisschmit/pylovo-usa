@@ -1,18 +1,19 @@
-from plotting.config_plots import ACCESS_TOKEN_PLOTLY
-from src.grid_generator import GridGenerator
-from src.config_loader import *
-
 import os
 import sys
-import pandas as pd
+from pathlib import Path
+
 import numpy as np
+import pandapower as pp
+import pandas as pd
+import plotly
 import plotly.express as px
 from matplotlib import pyplot as plt
-import pandapower as pp
-import plotly
 from pandapower.plotting.plotly import vlevel_plotly
 from pandapower.plotting.plotly.mapbox_plot import set_mapbox_token
-from pathlib import Path
+
+from plotting.config_plots import ACCESS_TOKEN_PLOTLY
+from src.config_loader import *
+from src.grid_generator import GridGenerator
 
 sys.path.append(os.path.abspath('..'))
 px.set_mapbox_access_token(ACCESS_TOKEN_PLOTLY)
@@ -24,7 +25,8 @@ def plot_pie_of_trafo_cables(plz):
     """
     gg = GridGenerator(plz=plz)
     dbc_client = gg.dbc
-    data_list, data_labels, trafo_dict = dbc_client.read_per_trafo_dict(plz=plz)
+    data_list, data_labels, trafo_dict = dbc_client.read_per_trafo_dict(
+        plz=plz)
     fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(16, 4))
     # Plot Transformer size distribution
     axs[0].pie(trafo_dict.values(), labels=trafo_dict.keys(), autopct='%1.1f%%',
@@ -43,7 +45,8 @@ def plot_hist_trafos(plz):
     """
     gg = GridGenerator(plz=plz)
     dbc_client = gg.dbc
-    data_list, data_labels, trafo_dict = dbc_client.read_per_trafo_dict(plz=plz)
+    data_list, data_labels, trafo_dict = dbc_client.read_per_trafo_dict(
+        plz=plz)
     plt.bar(trafo_dict.keys(), height=trafo_dict.values(), width=0.3)
     plt.title('Transformer Size Distribution', fontsize=14)
     plt.xlabel("Trafo size")
@@ -57,14 +60,23 @@ def plot_boxplot_plz(plz):
     """
     gg = GridGenerator(plz=plz)
     dbc_client = gg.dbc
-    data_list, data_labels, trafo_dict = dbc_client.read_per_trafo_dict(plz=plz)
+    data_list, data_labels, trafo_dict = dbc_client.read_per_trafo_dict(
+        plz=plz)
     trafo_sizes = list(data_list[0].keys())
     values = [list(d.values()) for d in data_list]
 
     # Create the figure and axes objects
-    fig, axs = plt.subplots(nrows=1, ncols=len(data_list), figsize=(16, 4), sharey=True)
+    fig, axs = plt.subplots(
+        nrows=1, ncols=len(data_list), figsize=(
+            16, 4), sharey=True)
     for i, data_label in enumerate(data_labels):
-        axs[i].boxplot(values[i], labels=trafo_sizes, vert=False, showfliers=False, patch_artist=True, notch=False)
+        axs[i].boxplot(
+            values[i],
+            labels=trafo_sizes,
+            vert=False,
+            showfliers=False,
+            patch_artist=True,
+            notch=False)
         axs[i].set_title(data_label, fontsize=12)
     fig.supxlabel('Values', fontsize=12)
     fig.supylabel('Transformer Size (kVA)', fontsize=12)
@@ -97,16 +109,19 @@ def plot_cable_length_of_types(plz):
 
                 if type in cable_length_dict:
                     cable_length_dict[type] += (
-                            cable_df[cable_df["std_type"] == type]["parallel"]
-                            * cable_df[cable_df["std_type"] == type]["length_km"]
+                        cable_df[cable_df["std_type"] == type]["parallel"]
+                        * cable_df[cable_df["std_type"] == type]["length_km"]
                     ).sum()
 
                 else:
                     cable_length_dict[type] = (
-                            cable_df[cable_df["std_type"] == type]["parallel"]
-                            * cable_df[cable_df["std_type"] == type]["length_km"]
+                        cable_df[cable_df["std_type"] == type]["parallel"]
+                        * cable_df[cable_df["std_type"] == type]["length_km"]
                     ).sum()
-    plt.bar(cable_length_dict.keys(), height=cable_length_dict.values(), width=0.3)
+    plt.bar(
+        cable_length_dict.keys(),
+        height=cable_length_dict.values(),
+        width=0.3)
     plt.title('Cable Type Distribution', fontsize=14)
     plt.xlabel("Cable type")
     plt.ylabel("Length in m")
@@ -154,6 +169,7 @@ def get_trafo_dicts(plz):
                 cable_length_dict[capacity] = [cable_length]
     return load_count_dict, bus_count_dict, cable_length_dict
 
+
 def plot_trafo_on_map(plz, save_plots: bool = False) -> None:
     """
     Transformer types are plotted by their capacity on a plotly basemap
@@ -164,7 +180,8 @@ def plot_trafo_on_map(plz, save_plots: bool = False) -> None:
     dbc_client = gg.dbc
     cluster_list = dbc_client.get_list_from_plz(plz)
     grid_index = 1
-    set_mapbox_token("pk.eyJ1IjoiYmVuZWhhcm8iLCJhIjoiY205OGdwejJ1MDJsbzJsczl1ajdyYmlzaSJ9.HWA8ZLQm1Sp0Whs5PADxrw") # public token
+    set_mapbox_token(
+        "pk.eyJ1IjoiYmVuZWhhcm8iLCJhIjoiY205OGdwejJ1MDJsbzJsczl1ajdyYmlzaSJ9.HWA8ZLQm1Sp0Whs5PADxrw")  # public token
     for kcid, bcid in cluster_list:
         net = dbc_client.read_net(plz, kcid, bcid)
         for row in net.trafo[["sn_mva", "lv_bus"]].itertuples():

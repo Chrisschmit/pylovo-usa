@@ -23,12 +23,16 @@ def reindex_cluster_indices(df_parameters_of_grids: pd.DataFrame, representative
     :return: representative_networks with re-indexed clusters
     :rtype: pd.DataFrame
     """
-    df_map = representative_networks.sort_values(by=['no_households'])['clusters'].reset_index()
+    df_map = representative_networks.sort_values(
+        by=['no_households'])['clusters'].reset_index()
     df_map['index'] = range(0, len(representative_networks))
     mapping = dict(df_map[['clusters', 'index']].values)
-    df_parameters_of_grids = df_parameters_of_grids.replace({'clusters': mapping})
-    representative_networks = representative_networks.replace({'clusters': mapping})
-    representative_networks = representative_networks.sort_values(by=['clusters']).reset_index()
+    df_parameters_of_grids = df_parameters_of_grids.replace(
+        {'clusters': mapping})
+    representative_networks = representative_networks.replace(
+        {'clusters': mapping})
+    representative_networks = representative_networks.sort_values(
+        by=['clusters']).reset_index()
 
     return df_parameters_of_grids, representative_networks
 
@@ -96,7 +100,10 @@ def gmm_tied_clustering(df_parameters_of_grids: pd.DataFrame, list_of_clustering
     # scaling and clustering
     X = df_parameters_of_grids[list_of_clustering_parameters]
     X = preprocessing.scale(X)
-    gm = GaussianMixture(n_components=n_clusters, covariance_type='tied', random_state=1).fit(X)
+    gm = GaussianMixture(
+        n_components=n_clusters,
+        covariance_type='tied',
+        random_state=1).fit(X)
     print('converged:', gm.converged_)
     print('no of iterations', gm.n_iter_)
     # we store the cluster labels

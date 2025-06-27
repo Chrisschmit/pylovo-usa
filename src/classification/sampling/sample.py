@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import src.database.database_client as dbc
 
+import src.database.database_client as dbc
 from src.config_loader import *
 
 # According to the population distribution and energy consumption
@@ -19,6 +19,7 @@ samples_per_class_pop = {
 
 db_client = dbc.DatabaseClient()
 
+
 def check_if_classification_version_exists():
     """checks whether classification version already exists.
      creates a new entry in classification version
@@ -26,13 +27,14 @@ def check_if_classification_version_exists():
     :raises Exception: if classification version already exists
     """
     cur = db_client.cur
-    count_query = f"""SELECT COUNT(*) 
-            FROM classification_version 
+    count_query = f"""SELECT COUNT(*)
+            FROM classification_version
             WHERE "classification_id" = {CLASSIFICATION_VERSION}"""
     cur.execute(count_query)
     version_exists = cur.fetchone()[0]
     if version_exists:
-        raise Exception(f"Classification version:  {CLASSIFICATION_VERSION} already exists. Create a new one.")
+        raise Exception(
+            f"Classification version:  {CLASSIFICATION_VERSION} already exists. Create a new one.")
     # df_plz.to_sql('sample_set', con=sqlalchemy_engine, if_exists='replace', index=False)
     # print(cur.statusmessage)
     # conn.commit()
@@ -91,7 +93,8 @@ def get_samples_within_regiostar_class(reg_class, no_samples, regiostar_plz):
     regiostar_i.loc[:, "bin_no"] = pd.cut(x=regiostar_i['pop_den'], bins=df_bins["bins"], labels=labels,
                                           include_lowest=True, ordered=False)
     regiostar_i_bins = pd.merge(regiostar_i, df_bins, on="bin_no")
-    regiostar_i_bins["perc"] = regiostar_i_bins["perc_bin"] / regiostar_i_bins["count"]
+    regiostar_i_bins["perc"] = regiostar_i_bins["perc_bin"] / \
+        regiostar_i_bins["count"]
     # Sampling:
     selected = np.random.choice(regiostar_i_bins["plz"], no_samples, p=regiostar_i_bins["perc"],
                                 replace=False)
@@ -112,12 +115,13 @@ def get_samples_with_regiostar(samples_per_class, regiostar_plz):
 
     reg_selected = pd.DataFrame()
     for i in samples_per_class:
-        reg_i_selected = get_samples_within_regiostar_class(i, samples_per_class[i], regiostar_plz)
+        reg_i_selected = get_samples_within_regiostar_class(
+            i, samples_per_class[i], regiostar_plz)
         reg_selected = pd.concat([reg_selected, reg_i_selected])
     # Drop columns before returning
     reg_selected = reg_selected.drop(columns=[
         'pop', 'area', 'lat', 'lon', 'name_city', 'fed_state', 'regio7', 'regio5', 'pop_den'
-    ], errors='ignore') 
+    ], errors='ignore')
     return reg_selected
 
 
@@ -129,7 +133,11 @@ def sample_set_to_db(regiostar_samples_result: pd.DataFrame):
 
     """
     cur = db_client.cur
-    regiostar_samples_result.to_sql('sample_set', con=db_client.sqla_engine, if_exists='append', index=False)
+    regiostar_samples_result.to_sql(
+        'sample_set',
+        con=db_client.sqla_engine,
+        if_exists='append',
+        index=False)
     print(cur.statusmessage)
     db_client.conn.commit()
 
@@ -157,19 +165,23 @@ def create_sample_set():
     check_if_classification_version_exists()
     regiostar_plz = get_municipal_register_as_dataframe()
 
-    # some PLZ might appear multiple times for small municipalities that share PLZ
+    # some PLZ might appear multiple times for small municipalities that share
+    # PLZ
     regiostar_plz = regiostar_plz.drop_duplicates(subset="plz")
 
     # restrict to federal state if indicated in config classification
     if CLASSIFICATION_REGION != 'Germany':
         federal_state_id = get_federal_state_id()
-        regiostar_plz = regiostar_plz[regiostar_plz['fed_state'] == federal_state_id]
+        regiostar_plz = regiostar_plz[regiostar_plz['fed_state']
+                                      == federal_state_id]
 
     # create sample dataset
     samples = perc_of_pop_per_class(regiostar_plz)
-    regiostar_samples_result = get_samples_with_regiostar(samples, regiostar_plz)
+    regiostar_samples_result = get_samples_with_regiostar(
+        samples, regiostar_plz)
     regiostar_samples_result = regiostar_samples_result.reset_index()
-    regiostar_samples_result = regiostar_samples_result.rename(columns={'index': 'classification_id'})
+    regiostar_samples_result = regiostar_samples_result.rename(
+        columns={'index': 'classification_id'})
     regiostar_samples_result['classification_id'] = CLASSIFICATION_VERSION
     sample_set_to_db(regiostar_samples_result)
 

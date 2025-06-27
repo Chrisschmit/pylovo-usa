@@ -8,7 +8,7 @@ import seaborn as sns
 def calc_deviation_of_clustering_method(df_parameters_of_grids: pd.DataFrame, representative_networks: pd.DataFrame,
                                         n_clusters: int) -> float:
     """
-    Calculate the overall deviation of a cluster-analysis. E.g. use to compare different clustering approaches 
+    Calculate the overall deviation of a cluster-analysis. E.g. use to compare different clustering approaches
     Calculate the deviation of all values from the medioid.
     see also clustering/kmedoids_calc_deviation
 
@@ -30,7 +30,8 @@ def calc_deviation_of_clustering_method(df_parameters_of_grids: pd.DataFrame, re
     for cluster in range(0, n_clusters):
 
         # get current cluster and its medoid
-        current_cluster = df_parameters_of_grids.groupby('clusters').get_group(cluster)
+        current_cluster = df_parameters_of_grids.groupby(
+            'clusters').get_group(cluster)
         representative_grid = representative_networks.iloc[cluster]
 
         # no grids in cluster
@@ -43,12 +44,15 @@ def calc_deviation_of_clustering_method(df_parameters_of_grids: pd.DataFrame, re
                                              representative_grid[
                                                  column]) ** 2
 
-        # for each parameter (column) add up all deviations and divide by no of grids in cluster
+        # for each parameter (column) add up all deviations and divide by no of
+        # grids in cluster
         deviation_of_parameters = representative_grid
         deviation_of_parameters = deviation_of_parameters.to_frame().T.reset_index()
         for column in df_parameters_of_grids:
-            deviation_of_parameters.at[0, column] = math.sqrt(deviation_from_medoid[column].sum() / no_grids_in_cluster)
-        deviation_of_parameters = deviation_of_parameters.drop(['index', 'clusters'], axis=1)
+            deviation_of_parameters.at[0, column] = math.sqrt(
+                deviation_from_medoid[column].sum() / no_grids_in_cluster)
+        deviation_of_parameters = deviation_of_parameters.drop(
+            ['index', 'clusters'], axis=1)
 
         # plot deviation
         fig, ax = plt.subplots()
@@ -59,7 +63,8 @@ def calc_deviation_of_clustering_method(df_parameters_of_grids: pd.DataFrame, re
         fig
 
         # calculate mean over all parameters
-        deviation_of_curr_cluster = deviation_of_parameters.to_numpy().sum() / no_parameters
+        deviation_of_curr_cluster = deviation_of_parameters.to_numpy().sum() / \
+            no_parameters
         deviation_of_clusters.append(deviation_of_curr_cluster)
 
     print('deviation of individual clusters:')
