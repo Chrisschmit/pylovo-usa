@@ -323,7 +323,7 @@ class ClusteringMixin(BaseMixin, ABC):
                                 %(cl)s, %(tl)s,
                                 false);"""
         cost_df = pd.read_sql_query(cost_query, con=self.conn, params={"cl": consumer_list, "tl": transformer_list},
-                                    dtype={"start_vid": np.int16, "end_vid": np.int16, "agg_cost": np.int16}, )
+                                    dtype={"start_vid": np.int32, "end_vid": np.int32, "agg_cost": np.int32}, )
 
         return cost_df
 
