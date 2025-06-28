@@ -12,17 +12,21 @@ from src.database.grid_mixin import GridMixin
 from src.database.preprocessing_mixin import PreprocessingMixin
 from src.database.utils_mixin import UtilsMixin
 
-warnings.simplefilter(action='ignore', category=UserWarning)
+warnings.simplefilter(action="ignore", category=UserWarning)
 
 
-class DatabaseClient(PreprocessingMixin, ClusteringMixin,
-                     GridMixin, AnalysisMixin, UtilsMixin):
+class DatabaseClient(
+    PreprocessingMixin, ClusteringMixin, GridMixin, AnalysisMixin, UtilsMixin
+):
     """Main database client handling connections."""
 
-    def __init__(self, dbname=DBNAME, user=USER, pw=PASSWORD,
-                 host=HOST, port=PORT, **kwargs):
+    def __init__(
+        self, dbname=DBNAME, user=USER, pw=PASSWORD, host=HOST, port=PORT, **kwargs
+    ):
         self.logger = utils.create_logger(
-            "DatabaseClient", log_file=kwargs.get("log_file", "../log.txt"), log_level=LOG_LEVEL
+            "DatabaseClient",
+            log_file=kwargs.get("log_file", "../log.txt"),
+            log_level=LOG_LEVEL,
         )
         try:
             self.conn = psy.connect(
@@ -34,6 +38,7 @@ class DatabaseClient(PreprocessingMixin, ClusteringMixin,
                 options=f"-c search_path={TARGET_SCHEMA},public",
             )
             self.cur = self.conn.cursor()
+            self.conn.autocommit = True
             self.db_path = f"postgresql+psycopg2://{user}:{pw}@{host}:{port}/{dbname}"
             self.sqla_engine = create_engine(
                 self.db_path,
@@ -50,7 +55,8 @@ class DatabaseClient(PreprocessingMixin, ClusteringMixin,
         super().__init__()
 
         self.logger.debug(
-            f"DatabaseClient is constructed and connected to {self.db_path}.")
+            f"DatabaseClient is constructed and connected to {self.db_path}."
+        )
 
     def __del__(self):
         self.cur.close()
@@ -135,7 +141,8 @@ class DatabaseClient(PreprocessingMixin, ClusteringMixin,
         self.logger.info(f"Version {version_id} deleted from all tables")
 
     def delete_classification_version_from_related_tables(
-            self, classification_id: str) -> None:
+        self, classification_id: str
+    ) -> None:
         """
         Deletes all rows with the given classification_id from related tables:
         transformer_classified, sample_set, and classification_version.
@@ -149,7 +156,8 @@ class DatabaseClient(PreprocessingMixin, ClusteringMixin,
         self.logger.info(f"Deleted classification ID {classification_id}.")
 
     def delete_plz_from_sample_set_table(
-            self, classification_id: str, plz: int) -> None:
+        self, classification_id: str, plz: int
+    ) -> None:
         """
         Deletes the row corresponding to the given classification ID and PLZ from the sample_set table.
 
@@ -165,22 +173,28 @@ class DatabaseClient(PreprocessingMixin, ClusteringMixin,
         self.cur.execute(query, {"cid": classification_id, "p": plz})
         self.conn.commit()
         self.logger.info(
-            f"Deleted PLZ {plz} for classification ID {classification_id} from sample_set table.")
+            f"Deleted PLZ {plz} for classification ID {classification_id} from sample_set table."
+        )
 
     def delete_transformers(self) -> None:
         """all transformers are deleted from table transformers in database"""
         delete_query = "TRUNCATE TABLE transformers;"
         self.cur.execute(delete_query)
         self.conn.commit()
-        self.logger.info('Transformers deleted.')
+        self.logger.info("Transformers deleted.")
 
-    def write_ags_log(self, ags: int) -> None:
+    def write_fips_log(self, fips_code: int) -> None:
         """write ags log to database: the amtliche gemeindeschluessel of the municipalities of which the buildings
         have already been imported to the database
-        :param ags:  ags to be added
+        :param fips_code:  fips_code to be added
         :rtype ags: numpy integer 64
-         """
-        query = """INSERT INTO ags_log (ags)
-                   VALUES (%(a)s); """
-        self.cur.execute(query, {"a": int(ags), })
+        """
+        query = """INSERT INTO fips_log (fips_code)
+                   VALUES (%(f)s); """
+        self.cur.execute(
+            query,
+            {
+                "f": int(fips_code),
+            },
+        )
         self.conn.commit()

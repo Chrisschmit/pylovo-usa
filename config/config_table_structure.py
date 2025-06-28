@@ -288,9 +288,9 @@ CREATE_QUERIES = {
             ON DELETE CASCADE
     )
     """,
-    "ags_log": """
-    CREATE TABLE IF NOT EXISTS ags_log (
-        ags bigint PRIMARY KEY
+    "fips_log": """
+    CREATE TABLE IF NOT EXISTS fips_log (
+        fips_code bigint PRIMARY KEY
     )
     """,
     "ways": """

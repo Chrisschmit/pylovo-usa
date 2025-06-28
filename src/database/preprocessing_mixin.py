@@ -48,6 +48,19 @@ class PreprocessingMixin(BaseMixin, ABC):
             self.logger.info(
                 f"Version: {VERSION_ID} (created for the first time)")
 
+    def get_postcode_table_for_plz(self, plz: int) -> pd.DataFrame:
+        """get postcode table for given PLZ"""
+        query = """SELECT *
+                   FROM postcode
+                   WHERE plz = %(p)s;"""
+        df_postcode = pd.read_sql_query(
+            query, con=self.conn, params={
+                "p": plz})
+        if len(df_postcode) == 0:
+            raise ValueError(
+                f"No entry in postcode table found for PLZ: {plz}")
+        return df_postcode
+
     def copy_postcode_result_table(self, plz: int) -> None:
         """
         Copies the given plz entry from postcode to the postcode_result table
@@ -420,13 +433,13 @@ class PreprocessingMixin(BaseMixin, ABC):
 
         return count
 
-    def get_ags_log(self) -> pd.DataFrame:
-        """get ags log: the amtliche gemeindeschluessel of the municipalities of which the buildings
+    def get_fips_log(self) -> pd.DataFrame:
+        """get fips log: the fips code of the region of interest of which the buildings
         have already been imported to the database
-        :return: table with column of ags
+        :return: table with column of fips_code
         :rtype: DataFrame
          """
         query = """SELECT *
-                   FROM ags_log;"""
+                   FROM fips_log;"""
         df_query = pd.read_sql_query(query, con=self.conn, )
         return df_query
