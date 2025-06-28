@@ -1,6 +1,8 @@
 import json
 import math
 import statistics
+from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from math import radians
 
 import geopandas as gpd
@@ -505,56 +507,86 @@ class ParameterCalculator:
 
         return net_line_with_sim_factor
 
-    def analyse_basic_parameters_per_plz(self, plz: int):
+    def _run_analysis_in_parallel(self, plz: int, worker_function):
+        """
+        Run analysis for all grids of a PLZ in parallel.
+        :param plz: Postcal code
+        :param worker_function: The function to execute for each grid.
+        :return: A list of results from the worker function.
+        """
         cluster_list = self.dbc.get_list_from_plz(plz)
+        results = []
         count = len(cluster_list)
-        time = 0
-        percent = 0
+        finished_count = 0
+        last_logged_percent = -1
 
-        load_count_dict = {}
-        bus_count_dict = {}
-        cable_length_dict = {}
-        trafo_dict = {}
+        with ProcessPoolExecutor() as executor:
+            futures = {
+                executor.submit(
+                    worker_function,
+                    plz,
+                    kcid,
+                    bcid): (
+                    kcid,
+                    bcid) for kcid,
+                bcid in cluster_list}
+
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                    if result is not None:
+                        results.append(result)
+                except Exception as e:
+                    kcid, bcid = futures[future]
+                    self.dbc.logger.warning(
+                        f" local network {kcid},{bcid} is problematic: {e}")
+                finally:
+                    finished_count += 1
+                    percent = int((finished_count / count) * 100)
+                    if percent % 10 == 0 and percent > last_logged_percent:
+                        self.dbc.logger.info(f"{percent}% processed")
+                        last_logged_percent = percent
+        return results
+
+    @staticmethod
+    def _process_basic_parameters(plz: int, kcid: int, bcid: int) -> list:
+        """Worker function for basic parameter analysis of a single grid."""
+        dbc_worker = dbc.DatabaseClient()
+        net = dbc_worker.read_net(plz, kcid, bcid)
+
+        load_count = len(net.load)
+        bus_count = len(set(net.load["bus"]))
+        cable_length = net.line["length_km"].sum()
+
+        results = []
+        for row in net.trafo[["sn_mva"]].itertuples():
+            capacity = round(row.sn_mva * 1e3)
+            results.append({
+                "capacity": capacity,
+                "load_count": load_count,
+                "bus_count": bus_count,
+                "cable_length": cable_length
+            })
+        return results
+
+    def analyse_basic_parameters_per_plz(self, plz: int):
         self.dbc.logger.debug("start basic parameter counting")
-        for kcid, bcid in cluster_list:
-            load_count = 0
-            bus_list = []
-            try:
-                net = self.dbc.read_net(plz, kcid, bcid)
-            except Exception as e:
-                self.dbc.logger.warning(
-                    f" local network {kcid},{bcid} is problematic")
-                raise e
-            else:
-                for row in net.load[["name", "bus"]].itertuples():
-                    load_count += 1
-                    bus_list.append(row.bus)
-                bus_list = list(set(bus_list))
-                bus_count = len(bus_list)
-                cable_length = net.line["length_km"].sum()
+        results = self._run_analysis_in_parallel(
+            plz, self._process_basic_parameters)
 
-                for row in net.trafo[["sn_mva", "lv_bus"]].itertuples():
-                    capacity = round(row.sn_mva * 1e3)
+        load_count_dict = defaultdict(list)
+        bus_count_dict = defaultdict(list)
+        cable_length_dict = defaultdict(list)
+        trafo_dict = defaultdict(int)
 
-                    if capacity in trafo_dict:
-                        trafo_dict[capacity] += 1
+        for grid_results in results:
+            for result in grid_results:
+                capacity = result["capacity"]
+                trafo_dict[capacity] += 1
+                load_count_dict[capacity].append(result["load_count"])
+                bus_count_dict[capacity].append(result["bus_count"])
+                cable_length_dict[capacity].append(result["cable_length"])
 
-                        load_count_dict[capacity].append(load_count)
-                        bus_count_dict[capacity].append(bus_count)
-                        cable_length_dict[capacity].append(cable_length)
-
-                    else:
-                        trafo_dict[capacity] = 1
-
-                        load_count_dict[capacity] = [load_count]
-                        bus_count_dict[capacity] = [bus_count]
-                        cable_length_dict[capacity] = [cable_length]
-
-            time += 1
-            if time / count >= 0.1:
-                percent += 10
-                self.dbc.logger.info(f"{percent} percent finished")
-                time = 0
         self.dbc.logger.info("analyse_basic_parameters finished.")
         trafo_string = json.dumps(trafo_dict)
         load_count_string = json.dumps(load_count_dict)
@@ -563,125 +595,98 @@ class ParameterCalculator:
         self.dbc.insert_plz_parameters(
             plz, trafo_string, load_count_string, bus_count_string)
 
-    def analyse_cables_per_plz(self, plz: int):
-        cluster_list = self.dbc.get_list_from_plz(plz)
-        count = len(cluster_list)
-        time = 0
-        percent = 0
+    @staticmethod
+    def _process_cables(plz: int, kcid: int, bcid: int) -> dict:
+        """Worker function for cable analysis of a single grid."""
+        dbc_worker = dbc.DatabaseClient()
+        net = dbc_worker.read_net(plz, kcid, bcid)
 
-        # distributed according to cross_section
         cable_length_dict = {}
-        for kcid, bcid in cluster_list:
-            try:
-                net = self.dbc.read_net(plz, kcid, bcid)
-            except Exception as e:
-                self.dbc.logger.debug(
-                    f" local network {kcid},{bcid} is problematic")
-                raise e
-            else:
-                cable_df = net.line[net.line["in_service"] == True]
+        cable_df = net.line[net.line["in_service"]]
+        cable_types = pd.unique(cable_df["std_type"]).tolist()
 
-                cable_type = pd.unique(cable_df["std_type"]).tolist()
-                for type in cable_type:
+        for cable_type in cable_types:
+            type_mask = cable_df["std_type"] == cable_type
+            cable_length_dict[cable_type] = (
+                cable_df.loc[type_mask, "parallel"] * cable_df.loc[type_mask, "length_km"]).sum()
 
-                    if type in cable_length_dict:
-                        cable_length_dict[type] += (cable_df[cable_df["std_type"] == type]["parallel"] *
-                                                    cable_df[cable_df["std_type"] == type]["length_km"]).sum()
+        return cable_length_dict
 
-                    else:
-                        cable_length_dict[type] = (cable_df[cable_df["std_type"] == type]["parallel"] *
-                                                   cable_df[cable_df["std_type"] == type]["length_km"]).sum()
-            time += 1
-            if time / count >= 0.1:
-                percent += 10
-                self.dbc.logger.info(f"{percent} % processed")
-                time = 0
+    def analyse_cables_per_plz(self, plz: int):
+        self.dbc.logger.debug("start cable analysis")
+        results = self._run_analysis_in_parallel(plz, self._process_cables)
+
+        cable_length_dict = defaultdict(float)
+        for grid_cable_lengths in results:
+            for cable_type, length in grid_cable_lengths.items():
+                cable_length_dict[cable_type] += length
+
         self.dbc.logger.info("analyse_cables finished.")
         cable_length_string = json.dumps(cable_length_dict)
         self.dbc.insert_cable_length(plz, cable_length_string)
 
-    def analyse_trafo_parameters_per_plz(self, plz: int):
-        cluster_list = self.dbc.get_list_from_plz(plz)
-        count = len(cluster_list)
-        time = 0
-        percent = 0
+    @staticmethod
+    def _process_trafo_parameters(plz: int, kcid: int, bcid: int) -> dict:
+        """Worker for transformer parameter analysis of a single grid."""
+        dbc_worker = dbc.DatabaseClient()
+        net = dbc_worker.read_net(plz, kcid, bcid)
 
-        trafo_load_dict = {}
-        trafo_max_distance_dict = {}
-        trafo_avg_distance_dict = {}
+        trafo_size_mva = net.trafo["sn_mva"].iloc[0]
+        trafo_size_kva = round(trafo_size_mva * 1e3)
 
-        for kcid, bcid in cluster_list:
+        load_buses = pd.unique(net.load["bus"]).tolist()
+
+        top.create_nxgraph(net, respect_switches=False)
+        trafo_distances_to_buses = top.calc_distance_to_bus(
+            net, net.trafo["lv_bus"].iloc[0], weight="weight", respect_switches=False
+        ).loc[load_buses].tolist()
+
+        sim_peak_load = 0
+        building_types = ["Residential", "Public", "Commercial"]
+        bus_zones = net.bus.set_index('zone')
+
+        for building_type in building_types:
             try:
-                net = self.dbc.read_net(plz, kcid, bcid)
-            except Exception as e:
-                self.dbc.logger.warning(
-                    f" local network {kcid},{bcid} is problematic")
-                raise e
-            else:
-                trafo_sizes = net.trafo["sn_mva"].tolist()[0]
+                type_buses = bus_zones.loc[[building_type]]
+            except KeyError:
+                continue
 
-                load_bus = pd.unique(net.load["bus"]).tolist()
+            loads_in_type = net.load[net.load["bus"].isin(type_buses.index)]
+            house_num = len(loads_in_type)
 
-                top.create_nxgraph(net, respect_switches=False)
-                trafo_distance_to_buses = (
-                    top.calc_distance_to_bus(net, net.trafo["lv_bus"].tolist()[0], weight="weight",
-                                             respect_switches=False, ).loc[load_bus].tolist())
+            if house_num > 0:
+                sum_load = loads_in_type["max_p_mw"].sum() * 1e3
+                sim_peak_load += utils.oneSimultaneousLoad(
+                    installed_power=sum_load, load_count=house_num, sim_factor=SIM_FACTOR[
+                        building_type]
+                )
 
-                # calculate total sim_peak_load
-                residential_bus_index = net.bus[~net.bus["zone"].isin(
-                    ["Commercial", "Public"])].index.tolist()
-                commercial_bus_index = net.bus[net.bus["zone"]
-                                               == "Commercial"].index.tolist()
-                public_bus_index = net.bus[net.bus["zone"]
-                                           == "Public"].index.tolist()
+        avg_distance = (sum(trafo_distances_to_buses) /
+                        len(trafo_distances_to_buses)) * 1e3
+        max_distance = max(trafo_distances_to_buses) * 1e3
 
-                residential_house_num = net.load[net.load["bus"].isin(
-                    residential_bus_index)].shape[0]
-                public_house_num = net.load[net.load["bus"].isin(
-                    public_bus_index)].shape[0]
-                commercial_house_num = net.load[net.load["bus"].isin(
-                    commercial_bus_index)].shape[0]
+        return {
+            "trafo_size": trafo_size_kva,
+            "sim_peak_load": sim_peak_load,
+            "max_distance": max_distance,
+            "avg_distance": avg_distance,
+        }
 
-                residential_sum_load = (net.load[net.load["bus"].isin(
-                    residential_bus_index)]["max_p_mw"].sum() * 1e3)
-                public_sum_load = (net.load[net.load["bus"].isin(
-                    public_bus_index)]["max_p_mw"].sum() * 1e3)
-                commercial_sum_load = (net.load[net.load["bus"].isin(
-                    commercial_bus_index)]["max_p_mw"].sum() * 1e3)
+    def analyse_trafo_parameters_per_plz(self, plz: int):
+        self.dbc.logger.debug("start per trafo analysis")
+        results = self._run_analysis_in_parallel(
+            plz, self._process_trafo_parameters)
 
-                sim_peak_load = 0
-                for building_type, sum_load, house_num in zip(["Residential", "Public", "Commercial"],
-                                                              [residential_sum_load, public_sum_load,
-                                                               commercial_sum_load],
-                                                              [residential_house_num, public_house_num,
-                                                               commercial_house_num], ):
-                    if house_num:
-                        sim_peak_load += utils.oneSimultaneousLoad(installed_power=sum_load, load_count=house_num,
-                                                                   sim_factor=SIM_FACTOR[building_type], )
+        trafo_load_dict = defaultdict(list)
+        trafo_max_distance_dict = defaultdict(list)
+        trafo_avg_distance_dict = defaultdict(list)
 
-                avg_distance = (sum(trafo_distance_to_buses) /
-                                len(trafo_distance_to_buses)) * 1e3
-                max_distance = max(trafo_distance_to_buses) * 1e3
+        for result in results:
+            trafo_size = result["trafo_size"]
+            trafo_load_dict[trafo_size].append(result["sim_peak_load"])
+            trafo_max_distance_dict[trafo_size].append(result["max_distance"])
+            trafo_avg_distance_dict[trafo_size].append(result["avg_distance"])
 
-                trafo_size = round(trafo_sizes * 1e3)
-
-                if trafo_size in trafo_load_dict:
-                    trafo_load_dict[trafo_size].append(sim_peak_load)
-
-                    trafo_max_distance_dict[trafo_size].append(max_distance)
-
-                    trafo_avg_distance_dict[trafo_size].append(avg_distance)
-
-                else:
-                    trafo_load_dict[trafo_size] = [sim_peak_load]
-                    trafo_max_distance_dict[trafo_size] = [max_distance]
-                    trafo_avg_distance_dict[trafo_size] = [avg_distance]
-
-            time += 1
-            if time / count >= 0.1:
-                percent += 10
-                self.dbc.logger.info(f"{percent} % processed")
-                time = 0
         self.dbc.logger.info("analyse_per_trafo_parameters finished.")
 
         trafo_load_string = json.dumps(trafo_load_dict)

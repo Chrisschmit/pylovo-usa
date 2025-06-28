@@ -969,9 +969,6 @@ class GridGenerator:
             self.logger.warning(f"No clusters to process for PLZ {self.plz}")
             return
 
-        if max_workers is None:
-            max_workers = min(len(cluster_list), mp.cpu_count())
-
         self.logger.info(
             f"Starting parallel cable installation for {len(cluster_list)} clusters using {max_workers} workers.")
 
