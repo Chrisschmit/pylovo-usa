@@ -1,7 +1,7 @@
 from src.grid_generator import GridGenerator
 
 # select plz and version you want to delete the networks for
-plz = "80803"
+plz = 2501711000
 version_id = "1.0"
 
 # delete networks

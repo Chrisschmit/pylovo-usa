@@ -18,7 +18,7 @@ class UtilsMixin(BaseMixin, ABC):
 
     def create_temp_tables(self) -> None:
         for query in TEMP_CREATE_QUERIES.values():
-            self.cur.execute(query)
+            self.cur.execute(query, {"epsg": EPSG})
 
     def drop_temp_tables(self) -> None:
         for table_name in TEMP_CREATE_QUERIES.keys():
