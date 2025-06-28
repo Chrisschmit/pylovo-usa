@@ -24,7 +24,7 @@ class GridGenerator:
     """
 
     def __init__(self, plz=999999, **kwargs):
-        self.plz = str(plz)
+        self.plz = plz
         self.dbc = dbc.DatabaseClient()
         self.dbc.insert_version_if_not_exists()
         self.dbc.insert_parameter_tables(
@@ -94,7 +94,7 @@ class GridGenerator:
         """
         self.dbc.create_temp_tables()  # create temp tables for the grid generation
 
-        for index, row in df_plz.iterrows():
+        for _, row in df_plz.iterrows():
             self.plz = str(row['plz'])
             print(
                 '-------------------- start',
