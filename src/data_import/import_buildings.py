@@ -5,36 +5,31 @@ from src.database.database_constructor import DatabaseConstructor
 from src.grid_generator import GridGenerator
 
 
-def import_buildings_for_single_plz(gg):
+def import_buildings_for_single_plz(gg: GridGenerator):
     """
-    Imports ags building data to the database for a given PLZ specified in the GridGenerator object.
-    AGS is added to ags_log table to avoid importing the same building data again.
+    Imports building data to the database for a given FIPS code specified in the GridGenerator object.
+    FIPS code is added to fips_log table to avoid importing the same building data again.
 
-    :param gg: Grid generator object for querying relevant PLZ and AGS data
+    :param gg: Grid generator object for querying relevant FIPS code data
     """
-    # Retrieve AGS for the specified PLZ
+    # Retrieve plz from GridGenerator object
     dbc_client = gg.dbc
-    ags_to_add = dbc_client.get_municipal_register_for_plz(plz=gg.plz)
+    plz = gg.plz
 
-    # Check if the PLZ exists
-    if ags_to_add.empty:
-        raise Exception("PLZ does not exist in the municipal register.")
-
-    # Extract name and AGS for the desired PLZ
+    # Check wether building data for this FIPS code is already in the database
+    postcode_entry = dbc_client.get_postcode_table_for_plz(plz)
     gg.logger.info(
-        f"LV grids will be generated for {ags_to_add.iloc[0]['plz']} {ags_to_add.iloc[0]['name_city']}")
-    ags = ags_to_add.iloc[0]["ags"]
-    gg.logger.info(f"It's AGS is: {ags}")
+        f"LV grids will be generated for {postcode_entry.iloc[0]['plz']} "
+        f"{postcode_entry.iloc[0]['county_name']}")
 
-    # Check if AGS is already in the database (avoid duplication)
-    df_log = dbc_client.get_ags_log()
-    if ags in df_log["ags"].values:
+    logs = dbc_client.get_fips_log()
+    if plz in logs['fips_code'].values:
         gg.logger.info(
-            "Buildings of this AGS are already in the src database.")
+            f"Buildings for FIPS code {plz} have already been added to the database.")
         return
     else:
         gg.logger.info(
-            "Buildings for this AGS are not in the database and will be added.")
+            f"Buildings for FIPS code {plz} will be added to the database.")
 
     # Define the path for building shapefiles
     data_path = os.path.abspath(
@@ -49,28 +44,28 @@ def import_buildings_for_single_plz(gg):
     files_list = glob.glob(shapefiles_pattern, recursive=True)
 
     # Filter files containing the specific AGS in their filenames
-    files_to_add = [file for file in files_list if str(ags) in file]
+    files_to_add = [file for file in files_list if str(plz) in file]
 
     # Handle cases where no matching files are found
     if not files_to_add:
         raise FileNotFoundError(
-            f"No shapefiles found for AGS {ags} in {data_path}")
+            f"No shapefiles found for PLZ {plz} in {data_path}")
 
     # Create a list of dictionaries for ogr_to_db()
     ogr_ls_dict = create_list_of_shp_files(files_to_add)
 
     # Add building data to the database
     sgc = DatabaseConstructor(dbc_obj=dbc_client)
-    sgc.ogr_to_db(ogr_ls_dict)
+    sgc.ogr_to_db(ogr_ls_dict, skip_failures=True)
 
-    # Log the successfully added AGS to the log table in the database
-    dbc_client.write_ags_log(ags)
+    # adding the added fips_code to the log file
+    dbc_client.write_fips_log(int(plz))
 
     gg.logger.info(
-        f"Buildings for AGS {ags} have been successfully added to the database.")
+        f"Buildings for FIPS code {plz} have been successfully added to the database.")
 
 
-def import_buildings_for_multiple_plz(sample_plz):
+def import_buildings_for_multiple_plz(plz_list: list[int]):
     """
     imports building data to db for multiple plz
     """
@@ -86,25 +81,23 @@ def import_buildings_for_multiple_plz(sample_plz):
     # retrieving all shape files
     files_list = glob.glob(shapefiles_pattern, recursive=True)
 
-    # get all AGS that need to be imported for the classification
-    ags_to_add = sample_plz['ags']
-    ags_to_add = ags_to_add.tolist()
-    ags_to_add = list(set(ags_to_add))  # dropping duplicates
+    # get all PLZs that need to be imported for the classification
+    plz_to_add = list(set(plz_list))  # dropping duplicates
 
-    # check in ags_log if any ags are already on the database
-    gg = GridGenerator(plz='80639')
+    # check in fips_log if any plz are already on the database
+    gg = GridGenerator(plz=999999)
     dbc_client = gg.dbc
-    df_log = dbc_client.get_ags_log()
-    log_ags_list = df_log['ags'].values.tolist()
-    ags_to_add = list(set(ags_to_add).difference(
-        log_ags_list))  # dropping already imported ags
-    ags_to_add = list(map(str, ags_to_add))
+    df_log = dbc_client.get_fips_log()
+    log_plz_list = df_log['fips_code'].values.tolist()
+    plz_to_add = list(set(plz_to_add).difference(
+        log_plz_list))  # dropping already imported plz
+    plz_to_add = list(map(str, plz_to_add))
 
     # creating a list that only contains the files to add
     files_to_add = []
     for file in files_list:
-        for ags in ags_to_add:
-            if ags in file:
+        for plz in plz_to_add:
+            if plz in file:
                 files_to_add.append(file)
     files_to_add = list(set(files_to_add))  # dropping duplicates
 
@@ -118,8 +111,8 @@ def import_buildings_for_multiple_plz(sample_plz):
         sgc.ogr_to_db(ogr_ls_dict)
 
         # adding the added ags to the log file
-        for ags in ags_to_add:
-            dbc_client.write_ags_log(int(ags))
+        for plz in plz_to_add:
+            dbc_client.write_fips_log(int(plz))
 
 
 def create_list_of_shp_files(files_to_add):

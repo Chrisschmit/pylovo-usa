@@ -3,8 +3,6 @@ This script creates a src database and fills with raw data from referenced files
 Do not use DatabaseConstructor class unless you want to create a new database.
 """
 
-from raw_data.municipal_register.join_regiostar_gemeindeverz import \
-    create_municipal_register
 from src import utils
 from src.config_loader import LOG_LEVEL
 from src.database.database_constructor import DatabaseConstructor
@@ -47,10 +45,6 @@ def main():
     # Add additional required sql functions to the database
     logger.info("### DUMP NECESSARY FUNCTIONS INTO DB ###")
     sgc.dump_functions()
-
-    # Create table with entries of all German municipalities and cities
-    logger.info("### FILL municipal_register TABLE ###")
-    create_municipal_register()
 
     logger.info("### DONE ###")
 
