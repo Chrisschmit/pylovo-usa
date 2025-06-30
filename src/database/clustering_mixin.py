@@ -536,8 +536,9 @@ class ClusteringMixin(BaseMixin, ABC):
                 INSERT INTO grid_result (version_id, plz, kcid, bcid, ont_vertice_id, transformer_rated_power)
                 VALUES (%(v)s, %(pc)s, %(k)s, %(count)s, %(t)s, %(l)s);
 
-                INSERT INTO transformer_positions (grid_result_id, geom, osm_id, comment)
+                INSERT INTO transformer_positions (version_id, grid_result_id, geom, osm_id, comment)
                 VALUES (
+                        %(v)s,
                         (SELECT grid_result_id
                          FROM grid_result
                          WHERE version_id = %(v)s AND plz = %(pc)s AND kcid = %(k)s AND bcid = %(count)s),
@@ -689,8 +690,9 @@ class ClusteringMixin(BaseMixin, ABC):
           AND kcid = %(k)s
           AND bcid = %(b)s;
 
-        INSERT INTO transformer_positions (grid_result_id, geom, comment)
+        INSERT INTO transformer_positions (version_id, grid_result_id, geom, comment)
         VALUES(
+                %(v)s,
                 (SELECT grid_result_id
                  FROM grid_result
                  WHERE version_id = %(v)s \
