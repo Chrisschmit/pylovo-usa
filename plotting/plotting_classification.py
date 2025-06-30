@@ -255,9 +255,11 @@ def plot_eigendecomposition(df_plz_parameters: pd.DataFrame) -> None:
     # Create the visualization plot
     #
     plt.bar(range(0, len(exp_var_pca)), exp_var_pca, alpha=0.5, align='center',
-            label='Erklärte Varianz der einzelnen Faktoren')  # 'Individual explained variance')
+            # 'Individual explained variance')
+            label='Erklärte Varianz der einzelnen Faktoren')
     plt.step(range(0, len(cum_sum_eigenvalues)), cum_sum_eigenvalues, where='mid',
-             label='Kumulativ erklärte Varianz')  # 'Cumulative explained variance')
+             # 'Cumulative explained variance')
+             label='Kumulativ erklärte Varianz')
     plt.ylabel('Anteil der erklärten Varianz')  # 'Explained variance ratio')
     plt.xlabel('Index des Faktors')  # Principal component index')
     plt.legend(loc='best')

@@ -500,7 +500,8 @@ class ParameterCalculator:
                                             'load_residential_mw']
             if peak_load_all_consumer_types == 0:
                 net_line_with_sim_factor.at[
-                    upstream_index[0], 'sim_factor_cumulated'] = 0  # print('Connection nodebus error')
+                    # print('Connection nodebus error')
+                    upstream_index[0], 'sim_factor_cumulated'] = 0
             else:
                 net_line_with_sim_factor.at[upstream_index[0], 'sim_factor_cumulated'] = (
                     net_line_with_sim_factor.at[upstream_index[0], 'sim_load'] / peak_load_all_consumer_types)

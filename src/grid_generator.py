@@ -73,7 +73,8 @@ class GridGenerator:
                 f"Skipped PLZ {self.plz} due to generation error.")
             self.dbc.conn.rollback()  # rollback the transaction
             self.dbc.delete_plz_from_sample_set_table(
-                str(CLASSIFICATION_VERSION), self.plz)  # delete from sample set
+                # delete from sample set
+                str(CLASSIFICATION_VERSION), self.plz)
             traceback.print_exc()
             return
 
@@ -133,7 +134,8 @@ class GridGenerator:
     def generate_grid(self):
         if self.dbc.is_grid_generated(self.plz):
             raise ResultExistsError(
-                f"The grids for the postcode area {self.plz} is already generated "
+                f"The grids for the postcode area {
+                    self.plz} is already generated "
                 f"for the version {VERSION_ID}."
             )
         self.prepare_postcodes()
@@ -617,7 +619,9 @@ class GridGenerator:
             parallel = 1
         elif transformer_rated_power in (500, 800):
             trafo_name = f"{str(transformer_rated_power * 0.5)} transformer"
-            trafo_std = f"{str(transformer_rated_power * 1e-3 * 0.5)} MVA 20/0.4 kV"
+            trafo_std = f"{str(transformer_rated_power *
+                               1e-3 *
+                               0.5)} MVA 20/0.4 kV"
             parallel = 2
         else:
             trafo_name = "630 transformer"
@@ -871,17 +875,24 @@ class GridGenerator:
             # to get the line geodata, we now need to consider all the nodes in
             # database, not only connection points
             node_path_list = self.dbc.get_path_to_bus(
-                branch_node_list[i], ont_vertice)  # gets the path along ways_result
+                # gets the path along ways_result
+                branch_node_list[i], ont_vertice)
             # end at next connection point
             # if next node of branch node list not in node path list
             if branch_node_list[i + 1] not in node_path_list:
                 self.logger.debug(
                     f"creating line to node i + 1: {i + 1} node: {branch_node_list[i + 1]}")
                 node_path_list = self.dbc.get_path_to_bus(branch_node_list[i], branch_node_list[
-                    i + 1])  # node_path_list = [branch_node_list[i], branch_node_list[i + 1]]  # intermediate nodes up to next connection nodebus are neglected  # the cable will directly connect to next connection nodebus
+                    # node_path_list = [branch_node_list[i], branch_node_list[i
+                    # + 1]]  # intermediate nodes up to next connection nodebus
+                    # are neglected  # the cable will directly connect to next
+                    # connection nodebus
+                    i + 1])
 
             node_path_list = node_path_list[: node_path_list.index(
-                branch_node_list[i + 1]) + 1]  # the node path list goes up to the index (branch_node_list[i + 1]) +1
+                # the node path list goes up to the index (branch_node_list[i +
+                # 1]) +1
+                branch_node_list[i + 1]) + 1]
             node_path_list.reverse()  # to keep the correct direction
 
             start_vid = node_path_list[0]
