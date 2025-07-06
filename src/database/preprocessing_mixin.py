@@ -343,14 +343,14 @@ class PreprocessingMixin(BaseMixin, ABC):
 
     def set_ways_tem_table(self, plz: int) -> int:
         """
-        * Inserts ways inside the plz area to the ways_tem table
+        * Inserts ways inside the plz area (with buffer) to the ways_tem table
         :param plz:
         :return: number of ways in ways_tem
         """
         query = """INSERT INTO ways_tem
                    SELECT *
                    FROM ways AS w
-                   WHERE ST_Intersects(w.geom, (SELECT geom
+                   WHERE ST_Intersects(w.geom, (SELECT ST_Buffer(geom, 25)
                                                 FROM postcode_result
                                                 WHERE version_id = %(v)s
                                                   AND postcode_result_plz = %(p)s));
