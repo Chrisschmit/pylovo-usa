@@ -205,7 +205,7 @@ class GridGenerator:
         """
         ways_count = self.dbc.set_ways_tem_table(self.plz)
         self.logger.info(f"The ways_tem table filled with {ways_count} ways")
-        self.dbc.connect_unconnected_ways()
+        # self.dbc.connect_unconnected_ways()
         self.logger.info("Ways connection finished in ways_tem")
         self.dbc.draw_building_connection()
         self.logger.info("Building connection finished in ways_tem")
@@ -972,7 +972,6 @@ class GridGenerator:
         Args:
             max_workers: Maximum number of worker processes. If None, uses CPU count.
         """
-        import multiprocessing as mp
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
         cluster_list = self.dbc.get_list_from_plz(self.plz)
@@ -983,37 +982,51 @@ class GridGenerator:
         self.logger.info(
             f"Starting parallel cable installation for {len(cluster_list)} clusters using {max_workers} workers.")
 
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            future_to_cluster = {
-                executor.submit(GridGenerator._run_cluster_worker, self.plz, kcid, bcid): (kcid, bcid)
-                for kcid, bcid in cluster_list
+        # Create batches of clusters to process
+        def create_batches(items, batch_size):
+            for i in range(0, len(items), batch_size):
+                yield items[i:i + batch_size]
+
+        # Calculate batch size to distribute work evenly
+        batch_size = max(1, len(cluster_list) // max_workers)
+        cluster_batches = list(create_batches(cluster_list, batch_size))
+
+        with ProcessPoolExecutor(max_workers=max_workers, initializer=GridGenerator._init_worker, initargs=(self.plz,)) as executor:
+            future_to_batch = {
+                executor.submit(GridGenerator._process_cluster_batch, batch): batch
+                for batch in cluster_batches
             }
 
-            for future in as_completed(future_to_cluster):
-                kcid, bcid = future_to_cluster[future]
+            for future in as_completed(future_to_batch):
+                batch = future_to_batch[future]
                 try:
                     future.result()
                     self.logger.debug(
-                        f"Successfully processed cluster kcid:{kcid}, bcid:{bcid}")
+                        f"Successfully processed batch with {len(batch)} clusters")
                 except Exception as e:
                     self.logger.error(
-                        f"Failed to process cluster kcid:{kcid}, bcid:{bcid}: {e}",
+                        f"Failed to process batch with {
+                            len(batch)} clusters: {e}",
                         exc_info=True)
 
         self.logger.info(
             f"Parallel cable installation completed for PLZ {self.plz}")
 
     @staticmethod
-    def _run_cluster_worker(plz, kcid, bcid):
-        """Static worker that creates a fresh GridGenerator and runs the task."""
+    def _init_worker(plz):
+        """Initialize worker process with one GridGenerator per worker."""
+        global _worker_grid_generator
+        _worker_grid_generator = GridGenerator(plz=plz)
+
+    @staticmethod
+    def _process_cluster_batch(cluster_batch):
+        """Process a batch of clusters using the worker's GridGenerator."""
+        global _worker_grid_generator
         try:
-            gg = GridGenerator(plz=plz)
-            gg._install_cables_for_cluster(kcid, bcid)
+            for kcid, bcid in cluster_batch:
+                _worker_grid_generator._install_cables_for_cluster(kcid, bcid)
         except Exception as e:
-            # Re-raise the exception to be caught by the main process's
-            # future.result().
-            print(
-                f"Error in worker for plz {plz}, kcid {kcid}, bcid {bcid}: {e}")
+            print(f"Error in worker batch processing: {e}")
             raise
 
     def _install_cables_for_cluster(self, kcid, bcid):
