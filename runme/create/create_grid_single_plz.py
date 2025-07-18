@@ -7,8 +7,8 @@ import time
 
 from plotting.plot_for_plz import plot_boxplot_plz, plot_pie_of_trafo_cables
 from src.config_loader import ANALYZE_GRIDS
-from src.load_data.load_buildings import import_buildings_for_single_plz
 from src.grid_generator import GridGenerator
+from src.load_data.load_buildings import import_buildings_for_single_plz
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))

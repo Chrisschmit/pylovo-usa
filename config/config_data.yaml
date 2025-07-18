@@ -12,7 +12,8 @@ ANALYZE_GRIDS: True
 SAVE_GRID_FOLDER: False
 
 # Logging configuration for PgReaderWriter & GridGenerator
-LOG_LEVEL: DEBUG
+LOG_LEVEL: INFO
+LOG_FILE: "log.txt"
 
 # Suffix for the database name
 DB_SUFFIX: usa
@@ -21,6 +22,29 @@ DB_SUFFIX: usa
 # 3035 is for Europe (ETRS89-extended / LAEA Europe)
 # 5070 is for USA (NAD83 / Conus Albers)
 EPSG: 5070
+
+# Data import Section
+# Region Selection is done via the official US Census Bureau FIPS codes
+# An overview can be found here: https://www2.census.gov/geo/docs/reference/codes/files/national_cousub.txt
+# states: MA = Massachusetts, AL = Alabama, CA = California, etc.
+# counties: Autauga County, 003 = Baldwin County, etc.
+# count_subdivisions: Autaugaville CCD,
+REGION:
+  STATE: "MA" 
+  COUNTY: "Middlesex County" 
+  COUNTY_SUBDIVISION: "Cambridge city"   
+  LOOKUP_URL: https://www2.census.gov/geo/docs/reference/codes/files/national_cousub.txt
+
+# Base output directory
+OUTPUT_DIR: "raw_data/imports/"  
+  
+INPUT_DATA:
+  # OSM PBF file path
+  # Download from https://download.geofabrik.de/ or similar source
+  OSM_PBF_FILE: "/Users/magic-rabbit/Library/Mobile Documents/com~apple~CloudDocs/01_University/06_MIT_Stay/Master_Thesis/02_Data/GridTracer/Input/geofabrik_massachusetts_latest_osm.pbf"
+  # NREL file
+  # Download from https://data.openei.org/s3_viewer?bucket=oedi-data-lake&prefix=nrel-pds-building-stock%2Fend-use-load-profiles-for-us-building-stock%2F2021%2Fresstock_tmy3_release_1%2Ftimeseries_aggregates_metadata%2F
+  NREL_FILE: "/Users/magic-rabbit/Library/Mobile Documents/com~apple~CloudDocs/01_University/06_MIT_Stay/Master_Thesis/02_Data/GridTracer/Input/NREL_Residential_typology.tsv"
 
 CLUSTERING_PARAMETERS:
   - version_id

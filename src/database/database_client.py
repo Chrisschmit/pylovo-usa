@@ -24,9 +24,9 @@ class DatabaseClient(
         self, dbname=DBNAME, user=USER, pw=PASSWORD, host=HOST, port=PORT, **kwargs
     ):
         self.logger = utils.create_logger(
-            "DatabaseClient",
-            log_file=kwargs.get("log_file", "../log.txt"),
+            name="DatabaseClient",
             log_level=LOG_LEVEL,
+            log_file=LOG_FILE,
         )
         try:
             self.conn = psy.connect(

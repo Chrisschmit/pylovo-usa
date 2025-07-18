@@ -241,7 +241,7 @@ def plot_eigendecomposition(df_plz_parameters: pd.DataFrame) -> None:
     #
     # Determine transformed features
     #
-    X_train_pca = pca.fit_transform(X_train_std)
+    pca.fit_transform(X_train_std)
     #
     # Determine explained variance using explained_variance_ration_ attribute
     #

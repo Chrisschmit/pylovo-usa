@@ -262,7 +262,7 @@ def draw_tree_network(G, width=1.):
     blue: connection nodes
     green: consumers"""
     pos = hierarchy_pos(G, root=1, width=width)
-    labels = nx.get_edge_attributes(G, 'weight')
+    nx.get_edge_attributes(G, 'weight')
     plt.figure(figsize=(9, 6))
     color_map = get_colormap_for_treegraph(networkx_graph=G)
     plt.figure(figsize=(20, 10))
@@ -287,7 +287,7 @@ def draw_tree_network_improved_spacing(G):
     blue: connection nodes
     green: consumers"""
     pos = hierarchy_pos2(G, root=1)
-    labels = nx.get_edge_attributes(G, 'weight')
+    nx.get_edge_attributes(G, 'weight')
     plt.figure(figsize=(9, 6))
 
     color_map = get_colormap_for_treegraph(networkx_graph=G)

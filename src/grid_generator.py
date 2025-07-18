@@ -1,4 +1,3 @@
-import time
 import traceback
 import warnings
 from pathlib import Path
@@ -17,7 +16,6 @@ from src.parameter_calculator import ParameterCalculator
 
 class ResultExistsError(Exception):
     "Raised when the PLZ has already been created."
-    pass
 
 
 class GridGenerator:
@@ -32,7 +30,9 @@ class GridGenerator:
         self.dbc.insert_parameter_tables(
             consumer_categories=CONSUMER_CATEGORIES)
         self.logger = utils.create_logger(
-            name="GridGenerator", log_file=kwargs.get("log_file", "log.txt"), log_level=LOG_LEVEL
+            name="GridGenerator",
+            log_level=LOG_LEVEL,
+            log_file=LOG_FILE
         )
 
     def __del__(self):

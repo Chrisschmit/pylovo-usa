@@ -6,7 +6,7 @@ from src.classification.database_communication.database_communication import \
 
 def apply_clustering_for_visualisation() -> None:
     dc = DatabaseCommunication()
-    df_parameters_of_grids = dc.municipal_register_with_clustering_parameters_for_classification_version()
+    dc.municipal_register_with_clustering_parameters_for_classification_version()
 
     dc.save_transformers_with_classification_info()
 

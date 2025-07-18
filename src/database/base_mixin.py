@@ -12,14 +12,11 @@ class BaseMixin(ABC):
     @abstractmethod
     def get_connection(self):
         """Subclass must provide database client"""
-        pass
 
     @abstractmethod
     def get_logger(self):
         """Subclass must provide logger"""
-        pass
 
     @abstractmethod
     def get_sqla_engine(self):
         """Subclass must provide logger"""
-        pass

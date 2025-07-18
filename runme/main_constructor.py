@@ -4,13 +4,14 @@ Do not use DatabaseConstructor class unless you want to create a new database.
 """
 
 from src import utils
-from src.config_loader import LOG_LEVEL
+from src.config_loader import LOG_FILE, LOG_LEVEL
 from src.database.database_constructor import DatabaseConstructor
 
 logger = utils.create_logger(
     name="main_constructor",
-    log_file="log.txt",
-    log_level=LOG_LEVEL)
+    log_level=LOG_LEVEL,
+    log_file=LOG_FILE
+)
 
 
 def main():
