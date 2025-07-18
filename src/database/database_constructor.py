@@ -212,7 +212,7 @@ class DatabaseConstructor:
             df = pd.read_csv(file_path, index_col=False)
             df = df.rename(
                 columns={
-                    "subdivision_name": "note",
+                    "subdivision_name": "subdivision_name",
                     "fipscode": "plz"})
             df.to_sql(
                 name=table_name,

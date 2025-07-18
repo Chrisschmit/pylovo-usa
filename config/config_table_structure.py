@@ -66,9 +66,9 @@ CREATE_QUERIES = {
         county_fips varchar,
         county_name varchar,
         subdivision_fips varchar,
+        subdivision_name varchar,
         funcstat varchar,
         plz bigint UNIQUE NOT NULL,
-        note varchar,
         qkm double precision,
         population integer,
         geom geometry(MultiPolygon,%(epsg)s)
