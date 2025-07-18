@@ -1,3 +1,4 @@
+import os
 import subprocess
 import time
 import warnings
@@ -235,8 +236,13 @@ class DatabaseConstructor:
         sc_path = os.path.join(
             os.getcwd(),
             "raw_data",
-            "ways",
+            "imports",
+            REGION['STATE'].replace(' ', '_'),
+            REGION['COUNTY'].replace(' ', '_'),
+            REGION['COUNTY_SUBDIVISION'].replace(' ', '_'),
+            "STREET_NETWORK",
             "ways_public_2po_4pgr.sql")
+
         file_size = os.path.getsize(sc_path)
 
         # We read 10% at a time.  (Or pick a chunk size in bytes that works for
@@ -271,13 +277,14 @@ class DatabaseConstructor:
                     # Execute all statements except possibly the last
                     for stmt in statements[:-1]:
                         stmt = stmt.strip()
-                        if stmt:
+                        if stmt and not stmt.startswith('--'):
                             cur.execute(stmt)
                             self.dbc.conn.commit()
 
                     # Check if the last statement ends with a semicolon or not
                     last_stmt = statements[-1].strip()
-                    if last_stmt.endswith(';'):
+                    if last_stmt.endswith(
+                            ';') and not last_stmt.startswith('--'):
                         # It's a complete statement
                         cur.execute(last_stmt)
                         self.dbc.conn.commit()
@@ -289,7 +296,7 @@ class DatabaseConstructor:
                     if len(statements) == 1:
                         # Could be complete or incomplete
                         stmt = statements[0].strip()
-                        if stmt.endswith(';'):
+                        if stmt.endswith(';') and not stmt.startswith('--'):
                             # It's complete, execute it
                             cur.execute(stmt)
                             self.dbc.conn.commit()

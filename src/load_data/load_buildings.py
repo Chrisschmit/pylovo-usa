@@ -36,15 +36,21 @@ def import_buildings_for_single_plz(gg: GridGenerator):
         os.path.join(
             PROJECT_ROOT,
             "raw_data",
-            "buildings"))
+            "imports",
+            REGION['STATE'].replace(' ', '_'),
+            REGION['COUNTY'].replace(' ', '_'),
+            REGION['COUNTY_SUBDIVISION'].replace(' ', '_'),
+            "BUILDINGS_OUTPUT",
+            "shp"
+        ))
+    print(data_path)
     shapefiles_pattern = os.path.join(
         data_path, "*.shp")  # Pattern for shapefiles
+    print(shapefiles_pattern)
 
     # Retrieve all matching shapefiles
-    files_list = glob.glob(shapefiles_pattern, recursive=True)
-
-    # Filter files containing the specific AGS in their filenames
-    files_to_add = [file for file in files_list if str(plz) in file]
+    files_to_add = glob.glob(shapefiles_pattern, recursive=True)
+    print(files_to_add)
 
     # Handle cases where no matching files are found
     if not files_to_add:

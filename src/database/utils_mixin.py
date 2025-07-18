@@ -1,5 +1,6 @@
 import warnings
 from abc import ABC
+from typing import Dict
 
 from config.config_table_structure import *
 from src.config_loader import *
@@ -38,6 +39,19 @@ class UtilsMixin(BaseMixin, ABC):
         cluster_list = self.cur.fetchall()
 
         return cluster_list
+
+    def get_plz_from_region(self, region: Dict[str, str]) -> int:
+        query = """SELECT plz
+                   FROM postcode
+                   WHERE state_abbr = %(st)s
+                    AND county_name = %(c)s
+                    AND subdivision_name = %(s)s;"""
+        self.cur.execute(query,
+                         {"st": region['STATE'],
+                          "c": region['COUNTY'],
+                             "s": region['COUNTY_SUBDIVISION']})
+        plz = self.cur.fetchone()[0]
+        return plz
 
     def delete_transformers_from_buildings_tem(self, vertices: list) -> None:
         """

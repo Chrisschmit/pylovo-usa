@@ -6,7 +6,8 @@ import sys
 import time
 
 from plotting.plot_for_plz import plot_boxplot_plz, plot_pie_of_trafo_cables
-from src.config_loader import ANALYZE_GRIDS
+from src.config_loader import ANALYZE_GRIDS, REGION
+from src.database.database_client import DatabaseClient
 from src.grid_generator import GridGenerator
 from src.load_data.load_buildings import import_buildings_for_single_plz
 
@@ -15,12 +16,14 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 
 def main():
-    # enter a plz to generate grid for:
-    plz = 1
+
     plot_results = True
 
     # timing of the script
     start_time = time.time()
+    # Resolve Cnfig data to fiupscode
+    dbc = DatabaseClient()
+    plz = dbc.get_plz_from_region(REGION)
 
     # initialize GridGenerator with the provided postal code (PLZ)
     gg = GridGenerator(plz=plz)
