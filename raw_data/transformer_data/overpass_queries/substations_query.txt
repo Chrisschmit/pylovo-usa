@@ -9,15 +9,15 @@ query for transformers
 
 // gather results
 (
-  // query part for: “power=transformer"
-  node     ["power"="transformer" ]["abandoned"!~"yes"]["abandoned:substation"!~"y"](if: t["operator"] != "DB Energie GmbH" && t["operator"] != "Deutsche Bahn" )(area.searchArea);
-  way      ["power"="transformer" ]["abandoned:building"!~"transformer"](if:t["operator"] != "DB Energie GmbH" && t["operator"] != "Deutsche Bahn")(area.searchArea);
-  relation ["power"="transformer" ](if: t["operator"] != "DB Energie GmbH" && t["operator"] != "Deutsche Bahn")(area.searchArea);
+  // query part for: "power=transformer"
+  node     ["power"="transformer"]["abandoned"!~"yes"]["abandoned:substation"!~"y"](area.searchArea);
+  way      ["power"="transformer"]["abandoned:building"!~"transformer"](area.searchArea);
+  relation ["power"="transformer"](area.searchArea);
 
-  // query part for: “power=substation"
-  node     ["power"="substation" ]["name"!~"Historische"]["abandoned"!~"yes"]["abandoned:substation"!~"y"](if: t["operator"] != "DB Energie GmbH" && t["operator"] != "Deutsche Bahn")(area.searchArea);
-  way      ["power"="substation" ]["name"!~"Historische"]["abandoned:building"!~"transformer"](if: t["operator"] != "DB Energie GmbH" && t["operator"] != "Deutsche Bahn")(area.searchArea);
-  relation ["power"="substation" ](if:t["operator"] != "DB Energie GmbH" && t["operator"] != "Deutsche Bahn")(area.searchArea);
+  // query part for: "power=substation"
+  node     ["power"="substation"]["abandoned"!~"yes"]["abandoned:substation"!~"y"](area.searchArea);
+  way      ["power"="substation"]["abandoned:building"!~"transformer"](area.searchArea);
+  relation ["power"="substation"](area.searchArea);
 );
 
 
