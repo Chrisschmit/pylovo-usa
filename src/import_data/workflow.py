@@ -24,7 +24,6 @@ ALL_DATASETS: List[str] = [
     "STREET_NETWORK",
     "COUNTY_SEGMENTATION",
     "PLOTS",
-    "TMP"
 ]
 
 
