@@ -6,7 +6,7 @@ import time
 import pandas as pd
 
 from src.config_loader import ANALYZE_GRIDS
-from src.data_import.import_buildings import import_buildings_for_multiple_plz
+from src.load_data.load_buildings import import_buildings_for_multiple_plz
 from src.grid_generator import GridGenerator
 
 # start timing the script

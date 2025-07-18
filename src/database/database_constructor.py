@@ -9,7 +9,7 @@ import sqlparse
 import src.database.database_client as dbc
 from config.config_table_structure import *
 from src.config_loader import *
-from src.data_import.import_transformers import (
+from src.load_data.load_transformers import (
     EPSG, RELATION_ID, fetch_trafos, get_trafos_processed_3035_geojson_path,
     get_trafos_processed_geojson_path, process_trafos)
 

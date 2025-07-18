@@ -9,7 +9,7 @@ import time
 from src.classification.clustering.filter_grids import apply_filter_to_grids
 from src.classification.sampling.sample import (create_sample_set,
                                                 get_sample_set)
-from src.data_import.import_buildings import import_buildings_for_multiple_plz
+from src.load_data.load_buildings import import_buildings_for_multiple_plz
 from src.grid_generator import GridGenerator
 from src.parameter_calculator import ParameterCalculator
 

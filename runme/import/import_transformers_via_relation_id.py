@@ -6,7 +6,7 @@ from subprocess import CalledProcessError
 import requests
 
 import src.database.database_constructor
-from src.data_import.import_transformers import (
+from src.load_data.load_transformers import (
     EPSG, OVERPASS_URL, RELATION_ID, fetch_trafos,
     get_trafos_processed_3035_geojson_path, get_trafos_processed_geojson_path,
     process_trafos)
