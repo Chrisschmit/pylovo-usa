@@ -1,5 +1,6 @@
 ### Chosen directories/files to ignore
 /raw_data/buildings/*
+/raw_data/imports/*
 /raw_data/ways/*.sql
 /raw_data/postcode.csv
 /raw_data/transformer_data/fetched_trafos/*
