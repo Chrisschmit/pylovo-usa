@@ -31,6 +31,7 @@ venv.bak/
 
 # Documentation
 docs/_build/
+docs/build/
 docs/meta/
 
 # Distribution / packaging
