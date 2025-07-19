@@ -3,8 +3,9 @@ This script creates a src database and fills with raw data from referenced files
 Do not use DatabaseConstructor class unless you want to create a new database.
 """
 
+
 from src import utils
-from src.config_loader import LOG_FILE, LOG_LEVEL
+from src.config_loader import CSV_FILE_LIST, LOG_FILE, LOG_LEVEL
 from src.database.database_constructor import DatabaseConstructor
 
 logger = utils.create_logger(
@@ -28,7 +29,11 @@ def main():
 
     # Add defined csv raw data from CSV_FILE_LIST to the database
     logger.info("### POPULATE DB WITH CSV RAW DATA ###")
-    sgc.csv_to_db()
+    # Load equipment data, consumer categories & postcode data
+    for file_dict in CSV_FILE_LIST:
+        # Use overwrite=True for fresh database setup
+        # Change to overwrite=False if you want to append to existing data
+        sgc.csv_to_db(file_dict, overwrite=True)
 
     # Add transformer data from geojson to the database
     logger.info(

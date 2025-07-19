@@ -4,6 +4,7 @@ import time
 import warnings
 from pathlib import Path
 
+import pandas as pd
 import psycopg2 as psy
 import sqlparse
 
@@ -196,34 +197,43 @@ class DatabaseConstructor:
         ]
         self.ogr_to_db(trafo_dict)
 
-    def csv_to_db(self):
+    def csv_to_db(self, file_dict, overwrite=False):
+        """
+        Import a single CSV file to database.
 
-        for file_dict in CSV_FILE_LIST:
-            st = time.time()
-            file_path = Path(file_dict["path"])
-            assert file_path.exists(), file_path
-            file_name = file_path.stem
-            table_name = file_dict.get("table_name", file_name)
+        Args:
+            file_dict: Dict with 'path' and optional 'table_name'
+            overwrite: If True, delete existing data first. If False, just append.
+        """
+        st = time.time()
+        file_path = Path(file_dict["path"])
+        assert file_path.exists(), file_path
+        file_name = file_path.stem
+        table_name = file_dict.get("table_name", file_name)
 
-            if self.table_exists(table_name=table_name):
-                with self.dbc.conn.cursor() as cur:
-                    cur.execute(f"DELETE FROM {table_name}")
-                    self.dbc.conn.commit()
-            # read and write
-            df = pd.read_csv(file_path, index_col=False)
-            df = df.rename(
-                columns={
-                    "subdivision_name": "subdivision_name",
-                    "fipscode": "plz"})
-            df.to_sql(
-                name=table_name,
-                con=self.dbc.sqla_engine,
-                if_exists="append",
-                index=False,
-            )
+        # Read CSV data
+        df = pd.read_csv(file_path, index_col=False)
+        df = df.rename(
+            columns={
+                "subdivision_name": "subdivision_name",
+                "fipscode": "plz"})
 
-            et = time.time()
-            print(f"{file_name} is successfully imported to db in {int(et - st)} s")
+        if overwrite and self.table_exists(table_name=table_name):
+            # Delete all existing data if overwrite is True
+            with self.dbc.conn.cursor() as cur:
+                cur.execute(f"DELETE FROM {table_name}")
+                self.dbc.conn.commit()
+            print(f"Cleared existing data from {table_name}")
+
+        df.to_sql(
+            name=table_name,
+            con=self.dbc.sqla_engine,
+            if_exists="append",
+            index=False,
+        )
+
+        et = time.time()
+        print(f"{file_name}: {len(df)} records processed in {int(et - st)}s")
 
     def create_public_2po_table(self):
         """
