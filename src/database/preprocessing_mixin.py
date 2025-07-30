@@ -381,19 +381,18 @@ class PreprocessingMixin(BaseMixin, ABC):
         # self.cur.execute(setup_query)
         
         # # Deduplicate ways_tem before running home connections
-        self._deduplicate_ways_table()
+        # self._deduplicate_ways_table()
 
-        # connection_query = """ SELECT draw_home_connections(); """
-        connection_query = """ SELECT draw_home_connections_set_based(); """
+        connection_query = """ SELECT draw_home_connections(); """
+        # connection_query = """ SELECT draw_home_connections_set_based(); """
         self.cur.execute(connection_query)
 
         topology_query = """select pgr_createTopology('ways_tem', 0.01, id:='way_id', the_geom:='geom', clean:=true) """
         self.cur.execute(topology_query)
 
         analyze_query = """SELECT pgr_analyzeGraph('ways_tem', 0.01, the_geom:='geom', id:='way_id');"""
-        self.cur.execute(analyze_query)
 
-        print("done")
+        self.cur.execute(analyze_query)
 
     def _deduplicate_ways_table(self) -> None:
         """
