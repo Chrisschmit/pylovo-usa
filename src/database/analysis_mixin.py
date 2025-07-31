@@ -15,51 +15,55 @@ class AnalysisMixin(BaseMixin, ABC):
     def __init__(self):
         super().__init__()
 
-    def insert_plz_parameters(
-            self, plz: int, trafo_string: str, load_count_string: str, bus_count_string: str):
-        update_query = """INSERT INTO plz_parameters (version_id, plz, trafo_num, load_count_per_trafo, bus_count_per_trafo)
+    def insert_regional_identifier_parameters(
+            self, regional_identifier: int, trafo_string: str, load_count_string: str, bus_count_string: str):
+        update_query = """INSERT INTO regional_identifier_parameters (version_id, regional_identifier, trafo_num, load_count_per_trafo, bus_count_per_trafo)
                           VALUES (%s, %s, %s, %s,
-                                  %s);"""  # TODO: check - should values be updated for same plz and version if analysis is started? And Add a column
+                                  %s);"""  # TODO: check - should values be updated for same regional_identifier and version if analysis is started? And Add a column
         self.cur.execute(
             update_query,
             vars=(
                 VERSION_ID,
-                plz,
+                regional_identifier,
                 trafo_string,
                 load_count_string,
                 bus_count_string),
         )
         self.logger.debug("basic parameter count finished")
 
-    def insert_cable_length(self, plz: int, cable_length_string: str):
-        update_query = """UPDATE plz_parameters
+    def insert_cable_length(self, regional_identifier: int,
+                            cable_length_string: str):
+        update_query = """UPDATE regional_identifier_parameters
                           SET cable_length = %(c)s
                           WHERE version_id = %(v)s
-                            AND plz = %(p)s;"""
+                            AND regional_identifier = %(p)s;"""
         self.cur.execute(update_query, {"v": VERSION_ID, "c": cable_length_string,
-                                        "p": plz})  # TODO: change to cable_length_per_type, add cable_length_per_trafo
+                                        # TODO: change to
+                                        # cable_length_per_type, add
+                                        # cable_length_per_trafo
+                                        "p": regional_identifier})
         self.logger.debug("cable count finished")
 
-    def insert_trafo_parameters(self, plz: int, trafo_load_string: str, trafo_max_distance_string: str,
+    def insert_trafo_parameters(self, regional_identifier: int, trafo_load_string: str, trafo_max_distance_string: str,
                                 trafo_avg_distance_string: str):
-        update_query = """UPDATE plz_parameters
+        update_query = """UPDATE regional_identifier_parameters
                           SET sim_peak_load_per_trafo = %(l)s,
                               max_distance_per_trafo  = %(m)s,
                               avg_distance_per_trafo  = %(a)s
                           WHERE version_id = %(v)s
-                            AND plz = %(p)s; \
+                            AND regional_identifier = %(p)s; \
                        """
         self.cur.execute(update_query,
-                         {"v": VERSION_ID, "p": plz, "l": trafo_load_string, "m": trafo_max_distance_string,
+                         {"v": VERSION_ID, "p": regional_identifier, "l": trafo_load_string, "m": trafo_max_distance_string,
                           "a": trafo_avg_distance_string, }, )
         self.logger.debug("per trafo analysis finished")
 
     def save_pp_net_with_json(
-            self, plz: int, kcid: int, bcid: int, json_string: str) -> None:
+            self, regional_identifier: int, kcid: int, bcid: int, json_string: str) -> None:
         insert_query = ("""UPDATE grid_result
                            SET grid = %s
                            WHERE version_id = %s
-                             AND plz = %s
+                             AND regional_identifier = %s
                              AND kcid = %s
                              AND bcid = %s;""")
         self.cur.execute(
@@ -67,34 +71,36 @@ class AnalysisMixin(BaseMixin, ABC):
             vars=(
                 json_string,
                 VERSION_ID,
-                plz,
+                regional_identifier,
                 kcid,
                 bcid))
 
-    def count_clustering_parameters(self, plz: int) -> int:
+    def count_clustering_parameters(self, regional_identifier: int) -> int:
         """
-        :param plz:
+        :param regional_identifier:
         :return:
         """
         query = """SELECT COUNT(cp.grid_result_id)
                    FROM clustering_parameters cp
                             JOIN grid_result gr ON gr.grid_result_id = cp.grid_result_id
                    WHERE version_id = %(v)s
-                     AND plz = %(p)s"""
-        self.cur.execute(query, {"v": VERSION_ID, "p": plz})
+                     AND regional_identifier = %(p)s"""
+        self.cur.execute(query, {"v": VERSION_ID, "p": regional_identifier})
         return int(self.cur.fetchone()[0])
 
     def read_per_trafo_dict(
-            self, plz: int) -> tuple[list[dict], list[str], dict]:
+            self, regional_identifier: int) -> tuple[list[dict], list[str], dict]:
         read_query = """SELECT load_count_per_trafo,
                                bus_count_per_trafo,
                                sim_peak_load_per_trafo,
                                max_distance_per_trafo,
                                avg_distance_per_trafo
-                        FROM plz_parameters
+                        FROM regional_identifier_parameters
                         WHERE version_id = %(v)s
-                          AND plz = %(p)s;"""
-        self.cur.execute(read_query, {"v": VERSION_ID, "p": plz})
+                          AND regional_identifier = %(p)s;"""
+        self.cur.execute(
+            read_query, {
+                "v": VERSION_ID, "p": regional_identifier})
         result = self.cur.fetchall()
 
         # Sort all parameters according to transformer size
@@ -106,7 +112,7 @@ class AnalysisMixin(BaseMixin, ABC):
 
         trafo_dict = dict(
             sorted(
-                self.read_trafo_dict(plz).items(),
+                self.read_trafo_dict(regional_identifier).items(),
                 key=lambda x: int(
                     x[0]),
                 reverse=True))
@@ -117,12 +123,13 @@ class AnalysisMixin(BaseMixin, ABC):
 
         return data_list, data_labels, trafo_dict
 
-    def read_net(self, plz: int, kcid: int, bcid: int) -> pp.pandapowerNet:
+    def read_net(self, regional_identifier: int, kcid: int,
+                 bcid: int) -> pp.pandapowerNet:
         """
         Reads a pandapower network from the database for the specified grid.
 
         Args:
-            plz: Postal code ID
+            regional_identifier: Postal code ID
             kcid: Kmeans cluster ID
             bcid: Building cluster ID
 
@@ -132,15 +139,21 @@ class AnalysisMixin(BaseMixin, ABC):
         Raises:
             ValueError: If the requested grid does not exist in the database
         """
-        read_query = "SELECT grid FROM grid_result WHERE version_id = %s AND plz = %s AND kcid = %s AND bcid = %s LIMIT 1"
-        self.cur.execute(read_query, vars=(VERSION_ID, plz, kcid, bcid))
+        read_query = "SELECT grid FROM grid_result WHERE version_id = %s AND regional_identifier = %s AND kcid = %s AND bcid = %s LIMIT 1"
+        self.cur.execute(
+            read_query,
+            vars=(
+                VERSION_ID,
+                regional_identifier,
+                kcid,
+                bcid))
 
         result = self.cur.fetchall()
         if not result:
             self.logger.error(
-                f"Grid not found for plz={plz}, kcid={kcid}, bcid={bcid}, version_id={VERSION_ID}")
+                f"Grid not found for regional_identifier={regional_identifier}, kcid={kcid}, bcid={bcid}, version_id={VERSION_ID}")
             raise ValueError(
-                f"Grid not found for plz={plz}, kcid={kcid}, bcid={bcid}")
+                f"Grid not found for regional_identifier={regional_identifier}, kcid={kcid}, bcid={bcid}")
 
         grid_tuple = result[0]
         grid_dict = grid_tuple[0]
@@ -178,7 +191,7 @@ class AnalysisMixin(BaseMixin, ABC):
                    max_vsw_of_a_branch
                   )
                   VALUES (
-                  (SELECT grid_result_id FROM grid_result WHERE version_id = %(version_id)s AND plz = %(plz)s AND bcid = %(bcid)s AND kcid = %(kcid)s),
+                  (SELECT grid_result_id FROM grid_result WHERE version_id = %(version_id)s AND regional_identifier = %(regional_identifier)s AND bcid = %(bcid)s AND kcid = %(kcid)s),
                   %(no_connection_buses)s,
                   %(no_branches)s,
                   %(no_house_connections)s,
@@ -268,12 +281,13 @@ class AnalysisMixin(BaseMixin, ABC):
 
         return gdf
 
-    def get_municipal_register_for_plz(self, plz: str) -> pd.DataFrame:
-        """get entry of table municipal register for given PLZ"""
+    def get_municipal_register_for_regional_identifier(
+            self, regional_identifier: str) -> pd.DataFrame:
+        """get entry of table municipal register for given regional_identifier"""
         query = """SELECT *
                    FROM municipal_register
-                   WHERE plz = %(p)s;"""
-        self.cur.execute(query, {"p": plz})
+                   WHERE regional_identifier = %(p)s;"""
+        self.cur.execute(query, {"p": regional_identifier})
         register = self.cur.fetchall()
         df_register = pd.DataFrame(register, columns=MUNICIPAL_REGISTER)
         return df_register
@@ -287,43 +301,49 @@ class AnalysisMixin(BaseMixin, ABC):
         df_register = pd.DataFrame(register, columns=MUNICIPAL_REGISTER)
         return df_register
 
-    def read_trafo_dict(self, plz: int) -> dict:
+    def read_trafo_dict(self, regional_identifier: int) -> dict:
         read_query = """SELECT trafo_num
-                        FROM plz_parameters
+                        FROM regional_identifier_parameters
                         WHERE version_id = %(v)s
-                          AND plz = %(p)s;"""
-        self.cur.execute(read_query, {"v": VERSION_ID, "p": plz})
+                          AND regional_identifier = %(p)s;"""
+        self.cur.execute(
+            read_query, {
+                "v": VERSION_ID, "p": regional_identifier})
         trafo_num_dict = self.cur.fetchall()[0][0]
 
         return trafo_num_dict
 
-    def read_cable_dict(self, plz: int) -> dict:
+    def read_cable_dict(self, regional_identifier: int) -> dict:
         read_query = """SELECT cable_length
-                        FROM plz_parameters
+                        FROM regional_identifier_parameters
                         WHERE version_id = %(v)s
-                          AND plz = %(p)s;"""
-        self.cur.execute(read_query, {"v": VERSION_ID, "p": plz})
+                          AND regional_identifier = %(p)s;"""
+        self.cur.execute(
+            read_query, {
+                "v": VERSION_ID, "p": regional_identifier})
         cable_length = self.cur.fetchall()[0][0]
 
         return cable_length
 
-    def is_grid_analyzed(self, plz: int):
+    def is_grid_analyzed(self, regional_identifier: int):
         """
         Check if grid has been analyzed.
 
         Args:
-            plz: Postal code to be checked
+            regional_identifier: Postal code to be checked
 
         Returns:
             bool: True if record exists, False otherwise
         """
         query = f"""
             SELECT 1
-            FROM plz_parameters
-            WHERE version_id = %(version_id)s AND plz = %(plz)s
+            FROM regional_identifier_parameters
+            WHERE version_id = %(version_id)s AND regional_identifier = %(regional_identifier)s
             LIMIT 1;
         """
 
-        self.cur.execute(query, {"version_id": VERSION_ID, "plz": plz})
+        self.cur.execute(
+            query, {
+                "version_id": VERSION_ID, "regional_identifier": regional_identifier})
         result = self.cur.fetchone()
         return result is not None

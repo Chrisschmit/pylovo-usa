@@ -1,4 +1,4 @@
-# select one specific grid within a PLZ
+# select one specific grid within a regional_identifier
 # the geodata of the grid selected below is exported as two csv-files to be used for visualisation in QGIS
 # one file contains the line and the other the bus data
 import os
@@ -8,7 +8,7 @@ from plotting.export_net import get_bus_line_geo_for_network
 from src.grid_generator import GridGenerator
 
 # enter the grid data for the grid you want to export
-plz = '91207'
+regional_identifier = '91207'
 kcid = 4
 bcid = 30
 
@@ -25,12 +25,13 @@ bus_datapath = os.path.join(
 sys.path.append(bus_datapath)
 
 # read grid from DB
-gg = GridGenerator(plz)
+gg = GridGenerator(regional_identifier)
 dbc_client = gg.dbc
-net = dbc_client.read_net(plz, kcid, bcid)
+net = dbc_client.read_net(regional_identifier, kcid, bcid)
 
 # get geodata
-line_geo, bus_geo = get_bus_line_geo_for_network(pandapower_net=net, plz=plz)
+line_geo, bus_geo = get_bus_line_geo_for_network(
+    pandapower_net=net, regional_identifier=regional_identifier)
 
 # save geodata to csv
 line_geo.to_csv(line_datapath)

@@ -1,7 +1,7 @@
 from src.grid_generator import GridGenerator
 
-# select plz and version you want to delete the networks for
-classification_version = "1"
+# select regional_identifier and version you want to delete the networks for
+classification_version = 1
 
 # delete networks
 gg = GridGenerator()  # initialization of the class

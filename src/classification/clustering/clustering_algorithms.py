@@ -156,7 +156,7 @@ def kmeans_clustering(df_parameters_of_grids: pd.DataFrame, list_of_clustering_p
     centroids = kmeans.cluster_centers_
     closest, distances = vq(centroids, X)
     representative_networks = df_parameters_of_grids.iloc[closest]
-    # print(representative_networks[['clusters', 'plz']])
+    # print(representative_networks[['clusters', 'regional_identifier']])
     df_parameters_of_grids, representative_networks = reindex_cluster_indices(
         df_parameters_of_grids=df_parameters_of_grids, representative_networks=representative_networks)
 

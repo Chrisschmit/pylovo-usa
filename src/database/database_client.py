@@ -74,18 +74,19 @@ class DatabaseClient(
     def get_sqla_engine(self):
         return self.sqla_engine
 
-    def save_tables(self, plz: int):
+    def save_tables(self, regional_identifier: int):
 
         # finding duplicates that violate the buildings_result_pkey constraint
-        # the key of building result is (version_id, osm_id, plz)
+        # the key of building result is (version_id, osm_id,
+        # regional_identifier)
         query = """
                 DELETE
-                FROM buildings_tem a USING (SELECT MIN(ctid) as ctid, osm_id, plz
+                FROM buildings_tem a USING (SELECT MIN(ctid) as ctid, osm_id, regional_identifier
                                             FROM buildings_tem
-                                            GROUP BY (osm_id, plz)
+                                            GROUP BY (osm_id, regional_identifier)
                                             HAVING COUNT(*) > 1) b
                 WHERE a.osm_id = b.osm_id
-                  AND a.plz = b.plz
+                  AND a.regional_identifier = b.regional_identifier
                   AND a.ctid <> b.ctid;"""
         self.cur.execute(query)
 
@@ -98,16 +99,16 @@ class DatabaseClient(
                     center, peak_load_in_kw, vertice_id, floors, bt.connection_point
                     FROM buildings_tem bt
                     JOIN grid_result gr
-                    ON bt.plz = gr.plz AND bt.kcid = gr.kcid AND bt.bcid = gr.bcid and gr.version_id = '{VERSION_ID}'
+                    ON bt.regional_identifier = gr.regional_identifier AND bt.kcid = gr.kcid AND bt.bcid = gr.bcid and gr.version_id = '{VERSION_ID}'
                     WHERE peak_load_in_kw != 0 AND peak_load_in_kw != -1;"""
         self.cur.execute(query)
 
         # Save ways results
         query = f"""INSERT INTO ways_result
                         SELECT '{VERSION_ID}' as version_id, clazz, source, target, cost, reverse_cost, geom, way_id,
-                        %(p)s as plz FROM ways_tem;"""
+                        %(p)s as regional_identifier FROM ways_tem;"""
 
-        self.cur.execute(query, vars={"p": plz})
+        self.cur.execute(query, vars={"p": regional_identifier})
 
     def reset_tables(self):
         """
@@ -118,20 +119,23 @@ class DatabaseClient(
         self.cur.execute("TRUNCATE TABLE ways_tem_vertices_pgr")
         self.conn.commit()
 
-    def delete_plz_from_all_tables(self, plz: int, version_id: str) -> None:
+    def delete_regional_identifier_from_all_tables(
+            self, regional_identifier: int, version_id: str) -> None:
         """
-        Deletes all entries of corresponding networks in all tables for the given Version ID and plz.
-        :param plz: Postal code
+        Deletes all entries of corresponding networks in all tables for the given Version ID and regional_identifier.
+        :param regional_identifier: Postal code
         :param version_id: Version ID
         """
         query = """DELETE
                    FROM postcode_result
                    WHERE version_id = %(v)s
-                     AND postcode_result_plz = %(p)s;"""
-        self.cur.execute(query, {"v": version_id, "p": int(plz)})
+                     AND postcode_result_regional_identifier = %(p)s;"""
+        self.cur.execute(
+            query, {
+                "v": version_id, "p": int(regional_identifier)})
         self.conn.commit()
         self.logger.info(
-            f"All data for PLZ {plz} and version {version_id} deleted")
+            f"All data for regional_identifier {regional_identifier} and version {version_id} deleted")
 
     def delete_version_from_all_tables(self, version_id: str) -> None:
         """Delete all entries of the given version ID from all tables."""
@@ -155,25 +159,27 @@ class DatabaseClient(
 
         self.logger.info(f"Deleted classification ID {classification_id}.")
 
-    def delete_plz_from_sample_set_table(
-        self, classification_id: str, plz: int
+    def delete_regional_identifier_from_sample_set_table(
+        self, classification_id: str, regional_identifier: int
     ) -> None:
         """
-        Deletes the row corresponding to the given classification ID and PLZ from the sample_set table.
+        Deletes the row corresponding to the given classification ID and regional_identifier from the sample_set table.
 
         :param classification_id: ID of the classification version
-        :param plz: Postal code to be removed
+        :param regional_identifier: Postal code to be removed
         """
         query = """
                 DELETE
                 FROM sample_set
                 WHERE classification_id = %(cid)s
-                  AND plz = %(p)s; \
+                  AND regional_identifier = %(p)s; \
                 """
-        self.cur.execute(query, {"cid": classification_id, "p": plz})
+        self.cur.execute(
+            query, {
+                "cid": classification_id, "p": regional_identifier})
         self.conn.commit()
         self.logger.info(
-            f"Deleted PLZ {plz} for classification ID {classification_id} from sample_set table."
+            f"Deleted regional_identifier {regional_identifier} for classification ID {classification_id} from sample_set table."
         )
 
     def delete_transformers(self) -> None:

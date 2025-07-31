@@ -6,7 +6,7 @@ PORT: 5432
 PASSWORD: postgres
 TARGET_SCHEMA: public
 
-# Toggles whether the results per plz are analyzed after grid generation (basic parameters, trafo analysis, cable counting)
+# Toggles whether the results per regional_identifier are analyzed after grid generation (basic parameters, trafo analysis, cable counting)
 ANALYZE_GRIDS: True
 # Toggles whether the grid json files will be saved in a folder or just in the db
 SAVE_GRID_FOLDER: False
@@ -48,7 +48,7 @@ INPUT_DATA:
 
 CLUSTERING_PARAMETERS:
   - version_id
-  - plz
+  - regional_identifier
   - bcid
   - kcid
   - no_connection_buses
@@ -75,7 +75,7 @@ CLUSTERING_PARAMETERS:
   - max_vsw_of_a_branch
 
 MUNICIPAL_REGISTER:
-  - plz
+  - regional_identifier
   - pop
   - area
   - lat

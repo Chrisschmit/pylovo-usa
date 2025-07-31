@@ -15,16 +15,16 @@ from src.parameter_calculator import ParameterCalculator
 
 
 class ResultExistsError(Exception):
-    "Raised when the PLZ has already been created."
+    "Raised when the regional_identifier has already been created."
 
 
 class GridGenerator:
     """
-    Generates the grid for the given plz area
+    Generates the grid for the given regional_identifier area
     """
 
-    def __init__(self, plz=999999, **kwargs):
-        self.plz = plz
+    def __init__(self, regional_identifier=999999, **kwargs):
+        self.regional_identifier = regional_identifier
         self.dbc = dbc.DatabaseClient()
         self.dbc.insert_version_if_not_exists()
         self.dbc.insert_parameter_tables(
@@ -38,20 +38,20 @@ class GridGenerator:
     def __del__(self):
         self.dbc.__del__()
 
-    def generate_grid_for_single_plz(
-            self, plz: str, analyze_grids: bool = False) -> None:
+    def generate_grid_for_single_regional_identifier(
+            self, regional_identifier: str, analyze_grids: bool = False) -> None:
         """
-        Generates the grid for a single PLZ.
+        Generates the grid for a single regional_identifier.
 
-        :param plz: Postal code for which the grid should be generated.
-        :type plz: str
+        :param regional_identifier: Postal code for which the grid should be generated.
+        :type regional_identifier: str
         :param analyze_grids: Option to analyze the results after grid generation, defaults to False.
         :type analyze_grids: bool
         """
-        self.plz = plz
+        self.regional_identifier = regional_identifier
         print(
             '-------------------- start',
-            self.plz,
+            self.regional_identifier,
             '---------------------------')
 
         self.dbc.create_temp_tables()  # create temp tables for the grid generation
@@ -59,22 +59,23 @@ class GridGenerator:
         try:
             self.generate_grid()
             # Save data from temporary tables to result tables
-            self.dbc.save_tables(plz=self.plz)
+            self.dbc.save_tables(regional_identifier=self.regional_identifier)
             if analyze_grids:
                 pc = ParameterCalculator()
-                pc.calc_parameters_per_plz(plz=self.plz)
+                pc.calc_parameters_per_regional_identifier(
+                    regional_identifier=self.regional_identifier)
         except ResultExistsError:
             self.dbc.logger.info(
-                f"Grid for the postcode area {plz} has already been generated.")
+                f"Grid for the postcode area {regional_identifier} has already been generated.")
         except Exception as e:
             self.logger.error(
-                f"Error during grid generation for PLZ {self.plz}: {e}")
+                f"Error during grid generation for regional_identifier {self.regional_identifier}: {e}")
             self.logger.info(
-                f"Skipped PLZ {self.plz} due to generation error.")
+                f"Skipped regional_identifier {self.regional_identifier} due to generation error.")
             self.dbc.conn.rollback()  # rollback the transaction
-            self.dbc.delete_plz_from_sample_set_table(
+            self.dbc.delete_regional_identifier_from_sample_set_table(
                 # delete from sample set
-                str(CLASSIFICATION_VERSION), self.plz)
+                str(CLASSIFICATION_VERSION), self.regional_identifier)
             traceback.print_exc()
             return
 
@@ -83,59 +84,61 @@ class GridGenerator:
 
         print(
             '-------------------- end',
-            self.plz,
+            self.regional_identifier,
             '-----------------------------')
 
-    def generate_grid_for_multiple_plz(
-            self, df_plz: pd.DataFrame, analyze_grids: bool = False) -> None:
-        """generates grid for all plz contained in the column 'plz' of df_samples
+    def generate_grid_for_multiple_regional_identifier(
+            self, df_regional_identifier: pd.DataFrame, analyze_grids: bool = False) -> None:
+        """generates grid for all regional_identifier contained in the column 'regional_identifier' of df_samples
 
-        :param df_plz: table that contains PLZ for grid generation
-        :type df_plz: pd.DataFrame
+        :param df_regional_identifier: table that contains regional_identifier for grid generation
+        :type df_regional_identifier: pd.DataFrame
         :param analyze_grids: option to analyse the results after grid generation, defaults to False
         :type analyze_grids: bool
         """
         self.dbc.create_temp_tables()  # create temp tables for the grid generation
 
-        for _, row in df_plz.iterrows():
-            self.plz = str(row['plz'])
+        for _, row in df_regional_identifier.iterrows():
+            self.regional_identifier = str(row['regional_identifier'])
             print(
                 '-------------------- start',
-                self.plz,
+                self.regional_identifier,
                 '---------------------------')
             try:
                 self.generate_grid()
                 # Save data from temporary tables to result tables
-                self.dbc.save_tables(plz=self.plz)
+                self.dbc.save_tables(
+                    regional_identifier=self.regional_identifier)
                 self.dbc.reset_tables()  # Reset temporary tables
                 if analyze_grids:
                     pc = ParameterCalculator()
-                    pc.calc_parameters_per_plz(plz=self.plz)
+                    pc.calc_parameters_per_regional_identifier(
+                        regional_identifier=self.regional_identifier)
             except ResultExistsError:
                 self.dbc.logger.info(
-                    f"Grid for the postcode area {self.plz} has already been generated.")
+                    f"Grid for the postcode area {self.regional_identifier} has already been generated.")
             except Exception as e:
                 self.logger.error(
-                    f"Error during grid generation for PLZ {self.plz}: {e}")
+                    f"Error during grid generation for regional_identifier {self.regional_identifier}: {e}")
                 self.logger.info(
-                    f"Skipped PLZ {self.plz} due to generation error.")
+                    f"Skipped regional_identifier {self.regional_identifier} due to generation error.")
                 self.dbc.conn.rollback()  # rollback the transaction
-                self.dbc.delete_plz_from_sample_set_table(str(CLASSIFICATION_VERSION),
-                                                          self.plz)  # delete from sample set
+                self.dbc.delete_regional_identifier_from_sample_set_table(str(CLASSIFICATION_VERSION),
+                                                                          self.regional_identifier)  # delete from sample set
                 continue
             print(
                 '-------------------- end',
-                self.plz,
+                self.regional_identifier,
                 '-----------------------------')
 
         self.dbc.drop_temp_tables()  # drop temp tables
         self.dbc.commit_changes()  # commit the changes to the database
 
     def generate_grid(self):
-        if self.dbc.is_grid_generated(self.plz):
+        if self.dbc.is_grid_generated(self.regional_identifier):
             raise ResultExistsError(
                 f"The grids for the postcode area {
-                    self.plz} is already generated "
+                    self.regional_identifier} is already generated "
                 f"for the version {VERSION_ID}."
             )
         self.prepare_postcodes()
@@ -155,8 +158,10 @@ class GridGenerator:
         FROM: postcode
         INTO: postcode_result
         """
-        self.dbc.copy_postcode_result_table(self.plz)
-        self.logger.info(f"Working on plz {self.plz}")
+        self.dbc.copy_postcode_result_table(self.regional_identifier)
+        self.logger.info(
+            f"Working on regional_identifier {
+                self.regional_identifier}")
 
     def prepare_buildings(self):
         """
@@ -164,13 +169,14 @@ class GridGenerator:
         FROM: res, oth
         INTO: buildings_tem
         """
-        self.dbc.set_residential_buildings_table(self.plz)
-        self.dbc.set_other_buildings_table(self.plz)
+        self.dbc.set_residential_buildings_table(self.regional_identifier)
+        self.dbc.set_other_buildings_table(self.regional_identifier)
         self.logger.info("Buildings_tem table prepared")
         self.dbc.remove_duplicate_buildings()
         self.logger.info("Duplicate buildings removed from buildings_tem")
 
-        self.dbc.set_plz_settlement_type(self.plz)
+        self.dbc.set_regional_identifier_settlement_type(
+            self.regional_identifier)
         self.logger.info(
             "House_distance and settlement_type in postcode_result")
 
@@ -193,7 +199,7 @@ class GridGenerator:
         FROM: transformers
         INTO: buildings_tem
         """
-        self.dbc.insert_transformers(self.plz)
+        self.dbc.insert_transformers(self.regional_identifier)
         self.logger.info("Transformers inserted in to the buildings_tem table")
         self.dbc.count_indoor_transformers()
         self.dbc.drop_indoor_transformers()
@@ -206,7 +212,7 @@ class GridGenerator:
         FROM: ways, buildings_tem
         INTO: ways_tem, buildings_tem, ways_tem_vertices_pgr, ways_tem_
         """
-        ways_count = self.dbc.set_ways_tem_table(self.plz)
+        ways_count = self.dbc.set_ways_tem_table(self.regional_identifier)
         self.logger.info(f"The ways_tem table filled with {ways_count} ways")
         # self.dbc.connect_unconnected_ways()
         self.logger.info("Ways connection finished in ways_tem")
@@ -284,7 +290,7 @@ class GridGenerator:
         kcid_length = self.dbc.get_kcid_length()
 
         for _ in range(kcid_length):
-            kcid = self.dbc.get_next_unfinished_kcid(self.plz)
+            kcid = self.dbc.get_next_unfinished_kcid(self.regional_identifier)
             self.logger.debug(f"working on kcid {kcid}")
             # Building clustering
             # 0. Check for existing transformers from OSM
@@ -294,7 +300,7 @@ class GridGenerator:
             if not transformers:
                 self.logger.debug(f"kcid{kcid} has no included transformer")
                 # Create greenfield building clusters
-                self.create_bcid_for_kcid(self.plz, kcid)
+                self.create_bcid_for_kcid(self.regional_identifier, kcid)
                 self.logger.debug(f"kcid{kcid} building clusters finished")
 
             # Case 2: Transformers present
@@ -304,40 +310,45 @@ class GridGenerator:
                 # Create brownfield building clusters with existing
                 # transformers
                 self.position_brownfield_transformers(
-                    self.plz, kcid, transformers)
+                    self.regional_identifier, kcid, transformers)
 
                 # Check buildings and manage clusters
                 if self.dbc.count_kmean_cluster_consumers(kcid) > 1:
                     # TODO: name should include transformer_size allocation
-                    self.create_bcid_for_kcid(self.plz, kcid)
+                    self.create_bcid_for_kcid(self.regional_identifier, kcid)
                 else:
                     # TODO: check approach with isolated buildings
-                    self.dbc.delete_isolated_building(self.plz, kcid)
+                    self.dbc.delete_isolated_building(
+                        self.regional_identifier, kcid)
                 self.logger.debug("rest building cluster finished")
 
             # Process unfinished clusters
-            for bcid in self.dbc.get_greenfield_bcids(self.plz, kcid):
+            for bcid in self.dbc.get_greenfield_bcids(
+                    self.regional_identifier, kcid):
                 # Transformer positioning for greenfield clusters
                 if bcid >= 0:
-                    self.position_greenfield_transformers(self.plz, kcid, bcid)
+                    self.position_greenfield_transformers(
+                        self.regional_identifier, kcid, bcid)
                     self.logger.debug(
                         f"Transformer positioning for kcid{kcid}, bcid{bcid} finished")
                     self.dbc.update_transformer_rated_power(
-                        self.plz, kcid, bcid, 1)
+                        self.regional_identifier, kcid, bcid, 1)
                     self.logger.debug(
                         "transformer_rated_power in grid_result is updated.")
 
-    def create_bcid_for_kcid(self, plz: int, kcid: int) -> None:
+    def create_bcid_for_kcid(
+            self, regional_identifier: int, kcid: int) -> None:
         """
         Create building clusters (bcids) with average linkage method for a given kcid.
-        :param plz: Postal code
+        :param regional_identifier: Postal code
         :param kcid: K-means cluster ID
         :return: None
         """
         # Get data needed for clustering
         buildings = self.dbc.get_buildings_from_kcid(kcid)
         consumer_cat_df = self.dbc.get_consumer_categories()
-        settlement_type = self.dbc.get_settlement_type_from_plz(plz)
+        settlement_type = self.dbc.get_settlement_type_from_regional_identifier(
+            regional_identifier)
         transformer_capacities, _ = self.dbc.get_transformer_data(
             settlement_type)
         double_trans = np.multiply(transformer_capacities[2:4], 2)
@@ -384,12 +395,12 @@ class GridGenerator:
             # Check if clustering is complete
             if not invalid_trans_cluster_dict:
                 self.logger.info(
-                    f"Found {len(valid_cluster_dict)} single transformer clusters for PLZ: {plz}, KCID: {kcid}")
+                    f"Found {len(valid_cluster_dict)} single transformer clusters for regional_identifier: {regional_identifier}, KCID: {kcid}")
                 break
             else:
                 # Process too large clusters by re-clustering them
                 self.logger.info(
-                    f"Found {len(invalid_trans_cluster_dict)} too_large clusters for PLZ: {plz}, KCID: {kcid}")
+                    f"Found {len(invalid_trans_cluster_dict)} too_large clusters for regional_identifier: {regional_identifier}, KCID: {kcid}")
 
                 # Get buildings from the first too-large cluster for
                 # re-clustering
@@ -421,18 +432,19 @@ class GridGenerator:
         # total_transformer_cost = sum([transformer2cost[v[1]] for v in valid_cluster_dict.values()])
 
         # Save results to database
-        self.dbc.clear_grid_result_in_kmean_cluster(plz, kcid)
+        self.dbc.clear_grid_result_in_kmean_cluster(regional_identifier, kcid)
         for bcid, cluster_data in valid_cluster_dict.items():
-            self.dbc.upsert_bcid(plz, kcid, bcid, vertices=cluster_data[0],
+            self.dbc.upsert_bcid(regional_identifier, kcid, bcid, vertices=cluster_data[0],
                                  transformer_rated_power=cluster_data[1])
-        self.logger.debug(f"bcids for plz {plz} kcid {kcid} found...")
+        self.logger.debug(
+            f"bcids for regional_identifier {regional_identifier} kcid {kcid} found...")
 
     def position_brownfield_transformers(
-            self, plz: int, kcid: int, transformer_list: list) -> None:
+            self, regional_identifier: int, kcid: int, transformer_list: list) -> None:
         """
         Assign buildings to the existing transformers and store them as bcid in buildings_tem.
         Args:
-            plz: Postal code
+            regional_identifier: Postal code
             kcid: K-means cluster ID
             transformer_list: List of transformer IDs
         """
@@ -513,18 +525,19 @@ class GridGenerator:
 
             # Update database with new building cluster
             self.dbc.update_building_cluster(transformer_id, pre_result_dict[transformer_id], building_cluster_count, kcid,
-                                             plz, transformer_rated_power)
+                                             regional_identifier, transformer_rated_power)
 
         self.logger.debug("Brownfield clusters completed")
 
-    def position_greenfield_transformers(self, plz, kcid, bcid):
+    def position_greenfield_transformers(
+            self, regional_identifier, kcid, bcid):
         """
         Positions a transformer at the optimal location for a greenfield building cluster.
 
         The optimal location minimizes the sum of distance*load from each vertex to others.
 
         Args:
-            plz: Postcode
+            regional_identifier: Postcode
             kcid: Kmeans cluster ID
             bcid: Building cluster ID
         """
@@ -535,7 +548,7 @@ class GridGenerator:
         # If there's only one connection point, use it
         if len(connection_points) == 1:
             self.dbc.upsert_transformer_selection(
-                plz, kcid, bcid, connection_points[0])
+                regional_identifier, kcid, bcid, connection_points[0])
             return
 
         # Get distance matrix between all connection points
@@ -557,17 +570,18 @@ class GridGenerator:
 
         # Update the database with the selected transformer position
         self.dbc.upsert_transformer_selection(
-            plz, kcid, bcid, transformer_connection_id)
+            regional_identifier, kcid, bcid, transformer_connection_id)
 
-    def prepare_vertices_list(self, plz: int, kcid: int, bcid: int) -> tuple[
+    def prepare_vertices_list(self, regional_identifier: int, kcid: int, bcid: int) -> tuple[
             dict, int, list, pd.DataFrame, pd.DataFrame, list, list]:
         vertices_dict, transformer_vertice = self.dbc.get_vertices_from_bcid(
-            plz, kcid, bcid)
+            regional_identifier, kcid, bcid)
         #  All vertices needed for this buidling cluster to reach from
         # transformer to the consumer
         vertices_list = list(vertices_dict.keys())
 
-        buildings_df = self.dbc.get_buildings_from_bcid(plz, kcid, bcid)
+        buildings_df = self.dbc.get_buildings_from_bcid(
+            regional_identifier, kcid, bcid)
         consumer_df = self.dbc.get_consumer_categories()
         # Vertices of the buildingcentroids in the building cluster
         consumer_list = buildings_df.vertice_id.to_list()
@@ -602,11 +616,12 @@ class GridGenerator:
 
         return Pd, load_units, load_type
 
-    def create_lvmv_bus(self, plz: int, kcid: int, bcid: int,
+    def create_lvmv_bus(self, regional_identifier: int, kcid: int, bcid: int,
                         net: pp.pandapowerNet) -> None:
 
         #  Get the geometry of the transformer
-        geodata = self.dbc.get_transformer_geom_from_bcid(plz, kcid, bcid)
+        geodata = self.dbc.get_transformer_geom_from_bcid(
+            regional_identifier, kcid, bcid)
         # VN = 400V defined  config_version , min_vm_pu and max_vm_pu defined
         # in represent acceptable VOLTAE levels 1.05 and 0.95
         pp.create_bus(net, name="LVbus 1", vn_kv=VN * 1e-3, geodata=geodata, max_vm_pu=V_BAND_HIGH,
@@ -621,12 +636,12 @@ class GridGenerator:
 
         return None
 
-    def create_transformer(self, plz: int, kcid: int,
+    def create_transformer(self, regional_identifier: int, kcid: int,
                            bcid: int, net: pp.pandapowerNet) -> None:
 
         # transformer_rated_power is the rated power of the transformer in kVA
         transformer_rated_power = self.dbc.get_transformer_rated_power_from_bcid(
-            plz, kcid, bcid)
+            regional_identifier, kcid, bcid)
         # TODO remove hardcoded transformer sizes
         if transformer_rated_power in (250, 400, 630):
             trafo_name = f"{str(transformer_rated_power)} transformer"
@@ -691,7 +706,7 @@ class GridGenerator:
                 pp.create_load(net=net, bus=pp.get_element_index(net, "bus", f"Consumer Nodebus {consumer_list[i]}"),
                                p_mw=0, name=f"Load {consumer_list[i]} household {j}", max_p_mw=peak_load * 1e-3, )
 
-    def install_consumer_cables(self, plz: int, bcid: int, kcid: int, branch_deviation: float, branch_node_list: list,
+    def install_consumer_cables(self, regional_identifier: int, bcid: int, kcid: int, branch_deviation: float, branch_node_list: list,
                                 transformer_vertice: int, vertices_dict: dict, Pd: dict, net: pp.pandapowerNet,
                                 connection_available_cables: list[str], local_length_dict: dict, ) -> dict:
         # lines
@@ -768,7 +783,7 @@ class GridGenerator:
                            to_bus=pp.get_element_index(net, "bus", f"Consumer Nodebus {end_vid}"), length_km=cost_km,
                            std_type=cable, name=f"Line to {end_vid}", geodata=line_geodata, parallel=count, )
 
-            self.dbc.insert_lines(geom=line_geodata, plz=plz, bcid=bcid, kcid=kcid, line_name=f"Line to {end_vid}",
+            self.dbc.insert_lines(geom=line_geodata, regional_identifier=regional_identifier, bcid=bcid, kcid=kcid, line_name=f"Line to {end_vid}",
                                   std_type=cable,
                                   from_bus=pp.get_element_index(
                                       net, "bus", f"Connection Nodebus {start_vid}"),
@@ -809,7 +824,7 @@ class GridGenerator:
 
         return cable, count
 
-    def create_line_transformer_to_lv_bus(self, plz: int, bcid: int, kcid: int, branch_start_node: int, branch_deviation: float,
+    def create_line_transformer_to_lv_bus(self, regional_identifier: int, bcid: int, kcid: int, branch_start_node: int, branch_deviation: float,
                                           net: pp.pandapowerNet, cable: str, count: int):  # TODO: check if this line is required
         end_vid = branch_start_node
         node_geodata = self.dbc.get_node_geom(end_vid)
@@ -826,12 +841,12 @@ class GridGenerator:
                        to_bus=pp.get_element_index(net, "bus", f"Connection Nodebus {end_vid}"), length_km=cost_km, std_type=cable,
                        name=f"Line to {end_vid}", geodata=line_geodata, parallel=count, )
 
-        self.dbc.insert_lines(geom=line_geodata, plz=plz, bcid=bcid, kcid=kcid, line_name=f"Line to {end_vid}",
+        self.dbc.insert_lines(geom=line_geodata, regional_identifier=regional_identifier, bcid=bcid, kcid=kcid, line_name=f"Line to {end_vid}",
                               std_type=cable, from_bus=pp.get_element_index(
                                   net, "bus", "LVbus 1"),
                               to_bus=pp.get_element_index(net, "bus", f"Connection Nodebus {end_vid}"), length_km=cost_km)
 
-    def create_line_start_to_lv_bus(self, plz: int, bcid: int, kcid: int, branch_start_node: int,
+    def create_line_start_to_lv_bus(self, regional_identifier: int, bcid: int, kcid: int, branch_start_node: int,
                                     branch_deviation: float, net: pp.pandapowerNet, vertices_dict: dict, cable: str, count: int,
                                     transformer_vertice: int, ) -> int:
 
@@ -857,7 +872,7 @@ class GridGenerator:
                        to_bus=pp.get_element_index(net, "bus", f"Connection Nodebus {branch_start_node}"), length_km=cost_km,
                        std_type=cable, name=f"Line to {branch_start_node}", geodata=line_geodata, parallel=count, )
 
-        self.dbc.insert_lines(geom=line_geodata, plz=plz, bcid=bcid, kcid=kcid, line_name=f"Line to {branch_start_node}",
+        self.dbc.insert_lines(geom=line_geodata, regional_identifier=regional_identifier, bcid=bcid, kcid=kcid, line_name=f"Line to {branch_start_node}",
                               std_type=cable, from_bus=pp.get_element_index(
                                   net, "bus", "LVbus 1"),
                               to_bus=pp.get_element_index(
@@ -925,7 +940,7 @@ class GridGenerator:
 
         return branch_node_list, Imax
 
-    def create_line_node_to_node(self, plz: int, kcid: int, bcid: int, branch_node_list: list, branch_deviation: float,
+    def create_line_node_to_node(self, regional_identifier: int, kcid: int, bcid: int, branch_node_list: list, branch_deviation: float,
                                  vertices_dict: dict, local_length_dict: dict, cable: str, transformer_vertice: int, count: float,
                                  net: pp.pandapowerNet) -> dict:
         """creates the lines / cables from one Connection Nodebus to the next. Adds them to the pandapower network
@@ -972,7 +987,7 @@ class GridGenerator:
                            to_bus=pp.get_element_index(net, "bus", f"Connection Nodebus {end_vid}"), length_km=cost_km,
                            std_type=cable, name=f"Line to {end_vid}", geodata=line_geodata, parallel=count, )
 
-            self.dbc.insert_lines(geom=line_geodata, plz=plz, bcid=bcid, kcid=kcid, line_name=f"Line to {end_vid}",
+            self.dbc.insert_lines(geom=line_geodata, regional_identifier=regional_identifier, bcid=bcid, kcid=kcid, line_name=f"Line to {end_vid}",
                                   std_type=cable, from_bus=pp.get_element_index(
                                       net, "bus", f"Connection Nodebus {start_vid}"),
                                   to_bus=pp.get_element_index(net, "bus", f"Connection Nodebus {end_vid}"), length_km=cost_km)
@@ -987,7 +1002,7 @@ class GridGenerator:
                 RESULT_DIR,
                 "grids",
                 f"version_{VERSION_ID}",
-                self.plz)
+                self.regional_identifier)
             savepath_folder.mkdir(parents=True, exist_ok=True)
             filename = f"kcid{kcid}bcid{bcid}.json"
             savepath_file = Path(savepath_folder, filename)
@@ -995,7 +1010,8 @@ class GridGenerator:
 
         json_string = pp.to_json(net, filename=None)
 
-        self.dbc.save_pp_net_with_json(self.plz, kcid, bcid, json_string)
+        self.dbc.save_pp_net_with_json(
+            self.regional_identifier, kcid, bcid, json_string)
 
         self.logger.info(f"Grid with kcid:{kcid} bcid:{bcid} is stored. ")
 
@@ -1033,9 +1049,12 @@ class GridGenerator:
         """
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
-        cluster_list = self.dbc.get_list_from_plz(self.plz)
+        cluster_list = self.dbc.get_list_from_regional_identifier(
+            self.regional_identifier)
         if not cluster_list:
-            self.logger.warning(f"No clusters to process for PLZ {self.plz}")
+            self.logger.warning(
+                f"No clusters to process for regional_identifier {
+                    self.regional_identifier}")
             return
 
         self.logger.info(
@@ -1050,7 +1069,7 @@ class GridGenerator:
         batch_size = max(1, len(cluster_list) // max_workers)
         cluster_batches = list(create_batches(cluster_list, batch_size))
 
-        with ProcessPoolExecutor(max_workers=max_workers, initializer=GridGenerator._init_worker, initargs=(self.plz,)) as executor:
+        with ProcessPoolExecutor(max_workers=max_workers, initializer=GridGenerator._init_worker, initargs=(self.regional_identifier,)) as executor:
             future_to_batch = {
                 executor.submit(GridGenerator._process_cluster_batch, batch): batch
                 for batch in cluster_batches
@@ -1069,13 +1088,14 @@ class GridGenerator:
                         exc_info=True)
 
         self.logger.info(
-            f"Parallel cable installation completed for PLZ {self.plz}")
+            f"Parallel cable installation completed for regional_identifier {self.regional_identifier}")
 
     @staticmethod
-    def _init_worker(plz):
+    def _init_worker(regional_identifier):
         """Initialize worker process with one GridGenerator per worker."""
         global _worker_grid_generator
-        _worker_grid_generator = GridGenerator(plz=plz)
+        _worker_grid_generator = GridGenerator(
+            regional_identifier=regional_identifier)
 
     @staticmethod
     def _process_cluster_batch(cluster_batch):
@@ -1096,7 +1116,7 @@ class GridGenerator:
 
         # Get data for this cluster
         vertices_dict, transformer_vertice, vertices_list, buildings_df, consumer_df, consumer_list, connection_nodes = (
-            self.prepare_vertices_list(self.plz, kcid, bcid)
+            self.prepare_vertices_list(self.regional_identifier, kcid, bcid)
         )
         # PD is the simultaneous load of the consumer list
         # load_units is the number of units of the consumer list: units per building
@@ -1112,10 +1132,10 @@ class GridGenerator:
         # pandapoewer objects
         self.dbc.create_cable_std_type(net)
         # Creates two buses LV and MV  and also defines external grid
-        self.create_lvmv_bus(self.plz, kcid, bcid, net)
+        self.create_lvmv_bus(self.regional_identifier, kcid, bcid, net)
 
         # Defines the transformer between MV,LV
-        self.create_transformer(self.plz, kcid, bcid, net)
+        self.create_transformer(self.regional_identifier, kcid, bcid, net)
 
         # Creates buses for all the conenction nodes
         self.create_connection_bus(connection_nodes, net)
@@ -1140,7 +1160,7 @@ class GridGenerator:
 
                 # Install consumer cables
                 local_length_dict = self.install_consumer_cables(
-                    self.plz, bcid, kcid, branch_deviation, connection_node_list,
+                    self.regional_identifier, bcid, kcid, branch_deviation, connection_node_list,
                     transformer_vertice, vertices_dict, Pd, net, CONNECTION_AVAILABLE_CABLES, local_length_dict,
                 )
 
@@ -1149,14 +1169,16 @@ class GridGenerator:
                     cable, count = self.find_minimal_available_cable(
                         Imax, net, main_street_available_cables)
                     self.create_line_transformer_to_lv_bus(
-                        self.plz, bcid, kcid, connection_node_list[0], branch_deviation, net, cable, count
+                        self.regional_identifier, bcid, kcid, connection_node_list[
+                            0], branch_deviation, net, cable, count
                     )
                 else:
                     cable, count = self.find_minimal_available_cable(
                         Imax, net, main_street_available_cables, vertices_dict[connection_nodes[0]]
                     )
                     length = self.create_line_start_to_lv_bus(
-                        self.plz, bcid, kcid, connection_node_list[0], branch_deviation,
+                        self.regional_identifier, bcid, kcid, connection_node_list[
+                            0], branch_deviation,
                         net, vertices_dict, cable, count, transformer_vertice
                     )
                     local_length_dict[cable] += length
@@ -1180,7 +1202,7 @@ class GridGenerator:
             # Install cables for this branch --> this is the main trunk of the
             # cable installation
             local_length_dict = self.install_consumer_cables(
-                self.plz, bcid, kcid, branch_deviation, branch_node_list,
+                self.regional_identifier, bcid, kcid, branch_deviation, branch_node_list,
                 transformer_vertice, vertices_dict, Pd, net, CONNECTION_AVAILABLE_CABLES, local_length_dict
             )
 
@@ -1191,7 +1213,7 @@ class GridGenerator:
 
             if len(branch_node_list) >= 2:
                 local_length_dict = self.create_line_node_to_node(
-                    self.plz, kcid, bcid, branch_node_list, branch_deviation,
+                    self.regional_identifier, kcid, bcid, branch_node_list, branch_deviation,
                     vertices_dict, local_length_dict, cable, transformer_vertice, count, net
                 )
 
@@ -1199,11 +1221,11 @@ class GridGenerator:
             branch_start_node = branch_node_list[-1]
             if branch_start_node == transformer_vertice:
                 self.create_line_transformer_to_lv_bus(
-                    self.plz, bcid, kcid, branch_start_node, branch_deviation, net, cable, count
+                    self.regional_identifier, bcid, kcid, branch_start_node, branch_deviation, net, cable, count
                 )
             else:
                 length = self.create_line_start_to_lv_bus(
-                    self.plz, bcid, kcid, branch_start_node, branch_deviation,
+                    self.regional_identifier, bcid, kcid, branch_start_node, branch_deviation,
                     net, vertices_dict, cable, count, transformer_vertice
                 )
                 local_length_dict[cable] += length

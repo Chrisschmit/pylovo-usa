@@ -49,13 +49,13 @@ def get_clustering_parameters_for_kmeans_cluster_0() -> pd.DataFrame:
             SELECT cp.*
             FROM clustering_parameters cp
             JOIN (
-                SELECT version_id, plz, kcid, bcid
+                SELECT version_id, regional_identifier, kcid, bcid
                 FROM transformer_classified
                 WHERE kmeans_clusters = 0
-                GROUP BY version_id, plz, kcid, bcid
+                GROUP BY version_id, regional_identifier, kcid, bcid
             ) tc
             ON cp.version_id = tc.version_id
-            AND cp.plz = tc.plz
+            AND cp.regional_identifier = tc.regional_identifier
             AND cp.kcid = tc.kcid
             AND cp.bcid = tc.bcid;
         """

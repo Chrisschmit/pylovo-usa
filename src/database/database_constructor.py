@@ -213,10 +213,6 @@ class DatabaseConstructor:
 
         # Read CSV data
         df = pd.read_csv(file_path, index_col=False)
-        df = df.rename(
-            columns={
-                "subdivision_name": "subdivision_name",
-                "fipscode": "plz"})
 
         if overwrite and self.table_exists(table_name=table_name):
             # Delete all existing data if overwrite is True

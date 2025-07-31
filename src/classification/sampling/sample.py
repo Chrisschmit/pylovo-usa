@@ -35,7 +35,7 @@ def check_if_classification_version_exists():
     if version_exists:
         raise Exception(
             f"Classification version:  {CLASSIFICATION_VERSION} already exists. Create a new one.")
-    # df_plz.to_sql('sample_set', con=sqlalchemy_engine, if_exists='replace', index=False)
+    # df_regional_identifier.to_sql('sample_set', con=sqlalchemy_engine, if_exists='replace', index=False)
     # print(cur.statusmessage)
     # conn.commit()
     else:
@@ -54,28 +54,30 @@ def get_municipal_register_as_dataframe() -> pd.DataFrame:
     :return: municipal register
     :rtype: pd.DataFrame
     """
-    regiostar_plz = db_client.get_municipal_register()
-    return regiostar_plz
+    regiostar_regional_identifier = db_client.get_municipal_register()
+    return regiostar_regional_identifier
 
 
-def perc_of_pop_per_class(regiostar_plz: pd.DataFrame) -> dict:
+def perc_of_pop_per_class(regiostar_regional_identifier: pd.DataFrame) -> dict:
     """calculates the percentage of population for each regiostar class
     returns a dict"""
-    total_pop = regiostar_plz["pop"].sum()
-    pop_per_class = regiostar_plz.groupby("regio7")["pop"].sum()
+    total_pop = regiostar_regional_identifier["pop"].sum()
+    pop_per_class = regiostar_regional_identifier.groupby("regio7")[
+        "pop"].sum()
     samples_dyn = round(pop_per_class / total_pop * N_SAMPLES)
     samples_dyn.to_dict()
     samples_dyn = dict((k, int(v)) for k, v in samples_dyn.items())
     return samples_dyn
 
 
-def get_samples_within_regiostar_class(reg_class, no_samples, regiostar_plz):
+def get_samples_within_regiostar_class(
+        reg_class, no_samples, regiostar_regional_identifier):
     """
     for a given regiostar7 class and the number of samples, samples are representatively picked
     according to the population density distribution
     """
 
-    regiostar_i = regiostar_plz[regiostar_plz['regio7'] == reg_class]
+    regiostar_i = regiostar_regional_identifier[regiostar_regional_identifier['regio7'] == reg_class]
     len_i = len(regiostar_i)
     if len_i < 100:
         no_bins = 5
@@ -96,18 +98,22 @@ def get_samples_within_regiostar_class(reg_class, no_samples, regiostar_plz):
     regiostar_i_bins["perc"] = regiostar_i_bins["perc_bin"] / \
         regiostar_i_bins["count"]
     # Sampling:
-    selected = np.random.choice(regiostar_i_bins["plz"], no_samples, p=regiostar_i_bins["perc"],
+    selected = np.random.choice(regiostar_i_bins["regional_identifier"], no_samples, p=regiostar_i_bins["perc"],
                                 replace=False)
-    plz_selected = pd.DataFrame()
-    plz_selected["plz"] = pd.Series(selected)
-    reg_i_selected = pd.merge(plz_selected, regiostar_i_bins, on="plz")
+    regional_identifier_selected = pd.DataFrame()
+    regional_identifier_selected["regional_identifier"] = pd.Series(selected)
+    reg_i_selected = pd.merge(
+        regional_identifier_selected,
+        regiostar_i_bins,
+        on="regional_identifier")
 
     return reg_i_selected
 
 
-def get_samples_with_regiostar(samples_per_class, regiostar_plz):
+def get_samples_with_regiostar(
+        samples_per_class, regiostar_regional_identifier):
     """
-    From regiostar7 - PLZ dataset (regiostar_plz) samples are extracted
+    From regiostar7 - regional_identifier dataset (regiostar_regional_identifier) samples are extracted
     samples_per_class defines how many samples should be extracted per regiostar7 class
     The samples are choosen representatively based on the population density distribution of each class
     returns
@@ -116,7 +122,7 @@ def get_samples_with_regiostar(samples_per_class, regiostar_plz):
     reg_selected = pd.DataFrame()
     for i in samples_per_class:
         reg_i_selected = get_samples_within_regiostar_class(
-            i, samples_per_class[i], regiostar_plz)
+            i, samples_per_class[i], regiostar_regional_identifier)
         reg_selected = pd.concat([reg_selected, reg_i_selected])
     # Drop columns before returning
     reg_selected = reg_selected.drop(columns=[
@@ -128,7 +134,7 @@ def get_samples_with_regiostar(samples_per_class, regiostar_plz):
 def sample_set_to_db(regiostar_samples_result: pd.DataFrame):
     """writes sample set to database in table sample set
 
-    :param regiostar_samples_result: table with the selected PLZ and their information
+    :param regiostar_samples_result: table with the selected regional_identifier and their information
     :type regiostar_samples_result: pd.DataFrame
 
     """
@@ -155,30 +161,31 @@ def get_federal_state_id() -> int:
 
 
 def create_sample_set():
-    """complete process of creating a sample set of representative PLZ for a Region
+    """complete process of creating a sample set of representative regional_identifier for a Region
     that is either Germany or a federal state
-    All subprocesses of sampling the PLZ are executed in this function.
+    All subprocesses of sampling the regional_identifier are executed in this function.
     The result is written to database table 'sample set' with the classification version set in
     config_classification
     """
 
     check_if_classification_version_exists()
-    regiostar_plz = get_municipal_register_as_dataframe()
+    regiostar_regional_identifier = get_municipal_register_as_dataframe()
 
-    # some PLZ might appear multiple times for small municipalities that share
-    # PLZ
-    regiostar_plz = regiostar_plz.drop_duplicates(subset="plz")
+    # some regional_identifier might appear multiple times for small municipalities that share
+    # regional_identifier
+    regiostar_regional_identifier = regiostar_regional_identifier.drop_duplicates(
+        subset="regional_identifier")
 
     # restrict to federal state if indicated in config classification
     if CLASSIFICATION_REGION != 'Germany':
         federal_state_id = get_federal_state_id()
-        regiostar_plz = regiostar_plz[regiostar_plz['fed_state']
-                                      == federal_state_id]
+        regiostar_regional_identifier = regiostar_regional_identifier[regiostar_regional_identifier['fed_state']
+                                                                      == federal_state_id]
 
     # create sample dataset
-    samples = perc_of_pop_per_class(regiostar_plz)
+    samples = perc_of_pop_per_class(regiostar_regional_identifier)
     regiostar_samples_result = get_samples_with_regiostar(
-        samples, regiostar_plz)
+        samples, regiostar_regional_identifier)
     regiostar_samples_result = regiostar_samples_result.reset_index()
     regiostar_samples_result = regiostar_samples_result.rename(
         columns={'index': 'classification_id'})
@@ -193,9 +200,9 @@ def get_sample_set() -> pd.DataFrame:
     :rtype: pd.DataFrame
     """
     cur = db_client.cur
-    query = f"""SELECT ss.plz, mr.pop, mr.area, mr.lat, mr.lon, ss.ags, mr.name_city, mr.fed_state, mr.regio7, mr.regio5, mr.pop_den
+    query = f"""SELECT ss.regional_identifier, mr.pop, mr.area, mr.lat, mr.lon, ss.ags, mr.name_city, mr.fed_state, mr.regio7, mr.regio5, mr.pop_den
     FROM sample_set ss
-    JOIN municipal_register mr ON ss.plz = mr.plz AND ss.ags = mr.ags
+    JOIN municipal_register mr ON ss.regional_identifier = mr.regional_identifier AND ss.ags = mr.ags
     WHERE ss.classification_id = {CLASSIFICATION_VERSION};"""
     cur.execute(query)
     sample_set = cur.fetchall()

@@ -5,31 +5,33 @@ from src.database.database_constructor import DatabaseConstructor
 from src.grid_generator import GridGenerator
 
 
-def import_buildings_for_single_plz(gg: GridGenerator):
+def import_buildings_for_single_regional_identifier(gg: GridGenerator):
     """
     Imports building data to the database for a given FIPS code specified in the GridGenerator object.
     FIPS code is added to fips_log table to avoid importing the same building data again.
 
     :param gg: Grid generator object for querying relevant FIPS code data
     """
-    # Retrieve plz from GridGenerator object
+    # Retrieve regional_identifier from GridGenerator object
     dbc_client = gg.dbc
-    plz = gg.plz
+    regional_identifier = gg.regional_identifier
 
     # Check wether building data for this FIPS code is already in the database
-    postcode_entry = dbc_client.get_postcode_table_for_plz(plz)
+    postcode_entry = dbc_client.get_postcode_table_for_regional_identifier(
+        regional_identifier)
     gg.logger.info(
-        f"LV grids will be generated for {postcode_entry.iloc[0]['plz']} "
+        f"LV grids will be generated for {
+            postcode_entry.iloc[0]['regional_identifier']} "
         f"{postcode_entry.iloc[0]['county_name']}")
 
     logs = dbc_client.get_fips_log()
-    if plz in logs['fips_code'].values:
+    if regional_identifier in logs['fips_code'].values:
         gg.logger.info(
-            f"Buildings for FIPS code {plz} have already been added to the database.")
+            f"Buildings for FIPS code {regional_identifier} have already been added to the database.")
         return
     else:
         gg.logger.info(
-            f"Buildings for FIPS code {plz} will be added to the database.")
+            f"Buildings for FIPS code {regional_identifier} will be added to the database.")
 
     # Define the path for building shapefiles
     data_path = os.path.abspath(
@@ -55,7 +57,7 @@ def import_buildings_for_single_plz(gg: GridGenerator):
     # Handle cases where no matching files are found
     if not files_to_add:
         raise FileNotFoundError(
-            f"No shapefiles found for PLZ {plz} in {data_path}")
+            f"No shapefiles found for regional_identifier {regional_identifier} in {data_path}")
 
     # Create a list of dictionaries for ogr_to_db()
     ogr_ls_dict = create_list_of_shp_files(files_to_add)
@@ -65,15 +67,16 @@ def import_buildings_for_single_plz(gg: GridGenerator):
     sgc.ogr_to_db(ogr_ls_dict, skip_failures=True)
 
     # adding the added fips_code to the log file
-    dbc_client.write_fips_log(int(plz))
+    dbc_client.write_fips_log(int(regional_identifier))
 
     gg.logger.info(
-        f"Buildings for FIPS code {plz} have been successfully added to the database.")
+        f"Buildings for FIPS code {regional_identifier} have been successfully added to the database.")
 
 
-def import_buildings_for_multiple_plz(plz_list: list[int]):
+def import_buildings_for_multiple_regional_identifier(
+        regional_identifier_list: list[int]):
     """
-    imports building data to db for multiple plz
+    imports building data to db for multiple regional_identifier
     """
     # Define the path for building shapefiles
     data_path = os.path.abspath(
@@ -87,23 +90,25 @@ def import_buildings_for_multiple_plz(plz_list: list[int]):
     # retrieving all shape files
     files_list = glob.glob(shapefiles_pattern, recursive=True)
 
-    # get all PLZs that need to be imported for the classification
-    plz_to_add = list(set(plz_list))  # dropping duplicates
+    # get all regional_identifiers that need to be imported for the
+    # classification
+    regional_identifier_to_add = list(
+        set(regional_identifier_list))  # dropping duplicates
 
-    # check in fips_log if any plz are already on the database
-    gg = GridGenerator(plz=999999)
+    # check in fips_log if any regional_identifier are already on the database
+    gg = GridGenerator(regional_identifier=999999)
     dbc_client = gg.dbc
     df_log = dbc_client.get_fips_log()
-    log_plz_list = df_log['fips_code'].values.tolist()
-    plz_to_add = list(set(plz_to_add).difference(
-        log_plz_list))  # dropping already imported plz
-    plz_to_add = list(map(str, plz_to_add))
+    log_regional_identifier_list = df_log['fips_code'].values.tolist()
+    regional_identifier_to_add = list(set(regional_identifier_to_add).difference(
+        log_regional_identifier_list))  # dropping already imported regional_identifier
+    regional_identifier_to_add = list(map(str, regional_identifier_to_add))
 
     # creating a list that only contains the files to add
     files_to_add = []
     for file in files_list:
-        for plz in plz_to_add:
-            if plz in file:
+        for regional_identifier in regional_identifier_to_add:
+            if regional_identifier in file:
                 files_to_add.append(file)
     files_to_add = list(set(files_to_add))  # dropping duplicates
 
@@ -117,8 +122,8 @@ def import_buildings_for_multiple_plz(plz_list: list[int]):
         sgc.ogr_to_db(ogr_ls_dict)
 
         # adding the added ags to the log file
-        for plz in plz_to_add:
-            dbc_client.write_fips_log(int(plz))
+        for regional_identifier in regional_identifier_to_add:
+            dbc_client.write_fips_log(int(regional_identifier))
 
 
 def create_list_of_shp_files(files_to_add):
@@ -147,4 +152,5 @@ def create_list_of_shp_files(files_to_add):
     if ogr_ls_dict:
         return ogr_ls_dict
     else:
-        raise Exception("No valid shapefiles found for the requested PLZ.")
+        raise Exception(
+            "No valid shapefiles found for the requested regional_identifier.")

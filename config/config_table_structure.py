@@ -68,7 +68,7 @@ CREATE_QUERIES = {
         subdivision_fips varchar,
         subdivision_name varchar,
         funcstat varchar,
-        plz bigint UNIQUE NOT NULL,
+        regional_identifier bigint UNIQUE NOT NULL,
         qkm double precision,
         population integer,
         geom geometry(MultiPolygon,%(epsg)s)
@@ -77,18 +77,18 @@ CREATE_QUERIES = {
     "postcode_result": """
     CREATE TABLE IF NOT EXISTS postcode_result (   
         version_id varchar(10) NOT NULL,
-        postcode_result_plz bigint NOT NULL,
+        postcode_result_regional_identifier bigint NOT NULL,
         settlement_type integer,
         geom geometry(MultiPolygon,%(epsg)s),
         house_distance numeric,
-        CONSTRAINT "postcode_result_pkey" PRIMARY KEY (version_id, postcode_result_plz),
+        CONSTRAINT "postcode_result_pkey" PRIMARY KEY (version_id, postcode_result_regional_identifier),
         CONSTRAINT fk_postcode_result_version_id
             FOREIGN KEY (version_id)
             REFERENCES version (version_id)
             ON DELETE CASCADE,
-        CONSTRAINT fk_postcode_result_plz
-            FOREIGN KEY (postcode_result_plz)
-            REFERENCES postcode (plz)
+        CONSTRAINT fk_postcode_result_regional_identifier
+            FOREIGN KEY (postcode_result_regional_identifier)
+            REFERENCES postcode (regional_identifier)
             ON DELETE CASCADE
     )
     """,
@@ -99,20 +99,20 @@ CREATE_QUERIES = {
         version_id varchar(10) NOT NULL,
         kcid integer NOT NULL,
         bcid integer NOT NULL,
-        plz bigint NOT NULL,
+        regional_identifier bigint NOT NULL,
         transformer_rated_power bigint,
         model_status integer,
         transformer_vertice_id bigint,
         grid json,
-        CONSTRAINT cluster_identifier UNIQUE (version_id, kcid, bcid, plz),
+        CONSTRAINT cluster_identifier UNIQUE (version_id, kcid, bcid, regional_identifier),
         CONSTRAINT unique_grid_result_id_version_id UNIQUE (version_id, grid_result_id),
-        CONSTRAINT fk_grid_result_version_id_plz
-            FOREIGN KEY (version_id, plz)
-            REFERENCES postcode_result (version_id, postcode_result_plz)
+        CONSTRAINT fk_grid_result_version_id_regional_identifier
+            FOREIGN KEY (version_id, regional_identifier)
+            REFERENCES postcode_result (version_id, postcode_result_regional_identifier)
             ON DELETE CASCADE
     );
-    CREATE INDEX idx_grid_result_version_id_plz_bcid_kcid
-    ON grid_result (version_id, plz, bcid, kcid)
+    CREATE INDEX idx_grid_result_version_id_regional_identifier_bcid_kcid
+    ON grid_result (version_id, regional_identifier, bcid, kcid)
     """,
     "lines_result": """
     CREATE TABLE IF NOT EXISTS lines_result (
@@ -169,7 +169,7 @@ CREATE_QUERIES = {
     ON buildings_result (grid_result_id);
     """,
     "municipal_register": """CREATE TABLE IF NOT EXISTS municipal_register (
-        plz bigint,
+        regional_identifier bigint,
         pop bigint,
         area double precision,
         lat double precision,
@@ -180,26 +180,26 @@ CREATE_QUERIES = {
         regio7 integer,
         regio5 integer,
         pop_den double precision,
-        CONSTRAINT municipal_register_pkey PRIMARY KEY (plz, ags)
+        CONSTRAINT municipal_register_pkey PRIMARY KEY (regional_identifier, ags)
     )
     """,
     "sample_set": """CREATE TABLE IF NOT EXISTS sample_set (
         classification_id integer NOT NULL,
-        plz bigint NOT NULL,
+        regional_identifier bigint NOT NULL,
         ags bigint,
         bin_no int,
         bins numeric,
         perc_bin numeric,
         count numeric,
         perc numeric,
-        CONSTRAINT sample_set_pkey PRIMARY KEY (classification_id, plz),
+        CONSTRAINT sample_set_pkey PRIMARY KEY (classification_id, regional_identifier),
         CONSTRAINT fk_sample_set_classification_id
             FOREIGN KEY (classification_id)
             REFERENCES classification_version (classification_id)
             ON DELETE CASCADE,
-        CONSTRAINT fk_sample_set_plz
-            FOREIGN KEY (plz, ags)
-            REFERENCES municipal_register (plz, ags)
+        CONSTRAINT fk_sample_set_regional_identifier
+            FOREIGN KEY (regional_identifier, ags)
+            REFERENCES municipal_register (regional_identifier, ags)
             ON DELETE CASCADE
     )
     """,
@@ -323,20 +323,20 @@ CREATE_QUERIES = {
         reverse_cost double precision,
         geom geometry(LineString,%(epsg)s),
         way_id integer NOT NULL,
-        plz bigint,
-        CONSTRAINT pk_ways_result PRIMARY KEY (version_id, way_id, plz),
-        CONSTRAINT fk_ways_result_version_id_plz
-            FOREIGN KEY (version_id, plz)
-            REFERENCES postcode_result (version_id, postcode_result_plz)
+        regional_identifier bigint,
+        CONSTRAINT pk_ways_result PRIMARY KEY (version_id, way_id, regional_identifier),
+        CONSTRAINT fk_ways_result_version_id_regional_identifier
+            FOREIGN KEY (version_id, regional_identifier)
+            REFERENCES postcode_result (version_id, postcode_result_regional_identifier)
             ON DELETE CASCADE
     )
     """,
     # old name: grid_parameters
-    # saves grid parameters for a whole plz for visualization
-    "plz_parameters": """
-    CREATE TABLE IF NOT EXISTS plz_parameters (
+    # saves grid parameters for a whole regional_identifier for visualization
+    "regional_identifier_parameters": """
+    CREATE TABLE IF NOT EXISTS regional_identifier_parameters (
         version_id varchar(10) NOT NULL,
-        plz bigint NOT NULL,
+        regional_identifier bigint NOT NULL,
         trafo_num json,
         cable_length json,
         load_count_per_trafo json,
@@ -344,23 +344,23 @@ CREATE_QUERIES = {
         sim_peak_load_per_trafo json,
         max_distance_per_trafo json,
         avg_distance_per_trafo json,
-        CONSTRAINT parameters_pkey PRIMARY KEY (version_id, plz),
-        CONSTRAINT fk_plz_parameters_version_id_plz
-            FOREIGN KEY (version_id, plz)
-            REFERENCES postcode_result (version_id, postcode_result_plz)
+        CONSTRAINT parameters_pkey PRIMARY KEY (version_id, regional_identifier),
+        CONSTRAINT fk_regional_identifier_parameters_version_id_regional_identifier
+            FOREIGN KEY (version_id, regional_identifier)
+            REFERENCES postcode_result (version_id, postcode_result_regional_identifier)
             ON DELETE CASCADE
     )
     """,
     "transformer_positions_with_grid": """
     CREATE OR REPLACE VIEW transformer_positions_with_grid AS (
-        SELECT tp.*, gr.kcid, gr.bcid, gr.plz
+        SELECT tp.*, gr.kcid, gr.bcid, gr.regional_identifier
         FROM transformer_positions tp
         JOIN grid_result gr ON tp.grid_result_id = gr.grid_result_id
     )
     """,
     "transformer_classified_with_grid": """
     CREATE OR REPLACE VIEW transformer_classified_with_grid AS (
-        SELECT tc.*, gr.version_id, gr.kcid, gr.bcid, gr.plz
+        SELECT tc.*, gr.version_id, gr.kcid, gr.bcid, gr.regional_identifier
         FROM transformer_classified tc
         JOIN grid_result gr ON tc.grid_result_id = gr.grid_result_id
     )
@@ -370,7 +370,7 @@ CREATE_QUERIES = {
         SELECT
             (br.version_id || '_' || br.osm_id) AS id,
             br.*,
-            gr.kcid, gr.bcid, gr.plz
+            gr.kcid, gr.bcid, gr.regional_identifier
         FROM buildings_result br
         JOIN grid_result gr ON br.grid_result_id = gr.grid_result_id
     )
@@ -386,7 +386,7 @@ CREATE_QUERIES = {
             lr.from_bus,
             lr.to_bus,
             lr.length_km,
-            gr.version_id, gr.kcid, gr.bcid, gr.plz
+            gr.version_id, gr.kcid, gr.bcid, gr.regional_identifier
         FROM lines_result lr
         JOIN grid_result gr ON lr.grid_result_id = gr.grid_result_id
     )
@@ -403,7 +403,7 @@ TEMP_CREATE_QUERIES = {
         houses_per_building integer,
         center geometry(Point,%(epsg)s),
         peak_load_in_kw numeric,
-        plz bigint,
+        regional_identifier bigint,
         vertice_id bigint,
         bcid integer,
         kcid integer,
@@ -419,6 +419,6 @@ TEMP_CREATE_QUERIES = {
         reverse_cost double precision,
         geom geometry(LineString,%(epsg)s),
         way_id integer,
-        plz bigint
+        regional_identifier bigint
     )""",
 }

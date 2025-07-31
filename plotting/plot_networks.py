@@ -17,17 +17,22 @@ from src.grid_generator import GridGenerator
 
 def get_network_info_for_plotting(
         df_network_info: pd.DataFrame) -> (str, int, int):
-    """extracts network metadata plz, kcid, bcid of a pandas series if columns exist"""
-    plz = df_network_info['plz']
+    """extracts network metadata regional_identifier, kcid, bcid of a pandas series if columns exist"""
+    regional_identifier = df_network_info['regional_identifier']
     kcid = int(df_network_info['kcid'])
     bcid = int(df_network_info['bcid'])
-    return plz, kcid, bcid
+    return regional_identifier, kcid, bcid
 
 
-def read_net_with_grid_generator(plz: str, kcid: int, bcid: int):
-    gg = GridGenerator(plz=plz)
+def read_net_with_grid_generator(
+        regional_identifier: str, kcid: int, bcid: int):
+    gg = GridGenerator(regional_identifier=regional_identifier)
     dbc_client = gg.dbc
-    net = dbc_client.read_net(plz=str(int(plz)), kcid=kcid, bcid=bcid)
+    net = dbc_client.read_net(
+        regional_identifier=str(
+            int(regional_identifier)),
+        kcid=kcid,
+        bcid=bcid)
     return net
 
 
@@ -44,12 +49,12 @@ def get_colormap_for_treegraph(networkx_graph):
     return color_map
 
 
-def plot_contextily(plz: str, kcid: int, bcid: int,
+def plot_contextily(regional_identifier: str, kcid: int, bcid: int,
                     zoomfactor: int = 19) -> None:
     """plots a network with all its features (cables, houses and load, trafo) on a contextily basemap
 
-    :param plz: PLZ of grid
-    :type plz: string
+    :param regional_identifier: regional_identifier of grid
+    :type regional_identifier: string
     :param kcid: kmeans cluster id of grid
     :type kcid: int
     :param bcid: buildings cluster id of grid
@@ -57,18 +62,22 @@ def plot_contextily(plz: str, kcid: int, bcid: int,
     :param zoomfactor: zoom factor for basemap, defaults to 17
     :type zoomfactor: int
     """
-    gg = GridGenerator(plz=plz)
-    net = gg.dbc.read_net(plz=str(int(plz)), kcid=kcid, bcid=bcid)
+    gg = GridGenerator(regional_identifier=regional_identifier)
+    net = gg.dbc.read_net(
+        regional_identifier=str(
+            int(regional_identifier)),
+        kcid=kcid,
+        bcid=bcid)
     dbc_client = gg.dbc
     fig, ax = plt.subplots(figsize=(8, 8))
     ax.set_xticks([])
     ax.set_yticks([])
     # Buildings
     buildings_gdf = dbc_client.get_geo_df_join(
-        ["gr.version_id", "plz", "kcid", "bcid", "br.*"],
+        ["gr.version_id", "regional_identifier", "kcid", "bcid", "br.*"],
         "buildings_result br", "grid_result gr",
         ("br.grid_result_id", "gr.grid_result_id"),
-        plz=int(plz))
+        regional_identifier=int(regional_identifier))
     buildings_8_gdf = buildings_gdf[buildings_gdf.bcid == bcid]
     buildings_8_gdf = buildings_8_gdf[buildings_8_gdf.kcid == kcid]
     # cables / lines
@@ -86,7 +95,7 @@ def plot_contextily(plz: str, kcid: int, bcid: int,
         ["geom"],
         "transformer_positions tp", "grid_result gr",
         ("tp.grid_result_id", "gr.grid_result_id"),
-        plz=int(plz), bcid=bcid
+        regional_identifier=int(regional_identifier), bcid=bcid
     )
     ax.scatter(
         trafo_gdf.loc[0].geom.x,
@@ -109,8 +118,9 @@ def plot_contextily(plz: str, kcid: int, bcid: int,
     fig
 
 
-def plot_with_generic_coordinates(plz: str, kcid: int, bcid: int) -> None:
-    net = read_net_with_grid_generator(plz, kcid, bcid)
+def plot_with_generic_coordinates(
+        regional_identifier: str, kcid: int, bcid: int) -> None:
+    net = read_net_with_grid_generator(regional_identifier, kcid, bcid)
     net.bus_geodata.drop(net.bus_geodata.index, inplace=True)
     net.line_geodata.drop(net.line_geodata.index, inplace=True)
     generic_net = create_generic_coordinates(net, library='igraph', respect_switches=False,
@@ -118,19 +128,21 @@ def plot_with_generic_coordinates(plz: str, kcid: int, bcid: int) -> None:
     simple_plotly(generic_net, aspectratio=(1, 1))
 
 
-def plot_simple_grid(plz: str, kcid: int, bcid: int) -> None:
+def plot_simple_grid(regional_identifier: str, kcid: int, bcid: int) -> None:
     """
     plots network on a plank base
     """
-    net = read_net_with_grid_generator(plz=plz, kcid=kcid, bcid=bcid)
+    net = read_net_with_grid_generator(
+        regional_identifier=regional_identifier, kcid=kcid, bcid=bcid)
     simple_plotly(net)
 
 
-def plot_grid_on_map(plz: str, kcid: int, bcid: int) -> None:
+def plot_grid_on_map(regional_identifier: str, kcid: int, bcid: int) -> None:
     """
     plots network on a basemap provided by plotly
     """
-    net = read_net_with_grid_generator(plz=plz, kcid=kcid, bcid=bcid)
+    net = read_net_with_grid_generator(
+        regional_identifier=regional_identifier, kcid=kcid, bcid=bcid)
     fig = simple_plotly(net, on_map=True, map_style="open-street-map")
     # fig = fig.update_layout(mapbox={'zoom': 15, }) # TODO: fix double plotting in notebooks through zooming
     # fig.show()
@@ -272,10 +284,11 @@ def draw_tree_network(G, width=1.):
 
 
 def draw_tree_network_with_improved_spacing_from_grid_id(
-        plz: str, kcid: int, bcid: int):
+        regional_identifier: str, kcid: int, bcid: int):
     """draws a tree graph of a networkx graph with improved spacing for large networks#
     from grid id"""
-    net = read_net_with_grid_generator(plz=plz, kcid=kcid, bcid=bcid)
+    net = read_net_with_grid_generator(
+        regional_identifier=regional_identifier, kcid=kcid, bcid=bcid)
     G = create_nxgraph(net)
     draw_tree_network_improved_spacing(G)
 

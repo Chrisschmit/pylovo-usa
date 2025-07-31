@@ -1,5 +1,5 @@
 from src.parameter_calculator import ParameterCalculator
 
-plz = 80803
+regional_identifier = 80803
 pc = ParameterCalculator()
-pc.calc_parameters_per_plz(plz)
+pc.calc_parameters_per_regional_identifier(regional_identifier)

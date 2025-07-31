@@ -48,38 +48,39 @@ class PreprocessingMixin(BaseMixin, ABC):
             self.logger.info(
                 f"Version: {VERSION_ID} (created for the first time)")
 
-    def get_postcode_table_for_plz(self, plz: int) -> pd.DataFrame:
-        """get postcode table for given PLZ"""
+    def get_postcode_table_for_regional_identifier(
+            self, regional_identifier: int) -> pd.DataFrame:
+        """get postcode table for given regional_identifier"""
         query = """SELECT *
                    FROM postcode
-                   WHERE plz = %(p)s;"""
+                   WHERE regional_identifier = %(p)s;"""
         df_postcode = pd.read_sql_query(
             query, con=self.conn, params={
-                "p": plz})
+                "p": regional_identifier})
         if len(df_postcode) == 0:
             raise ValueError(
-                f"No entry in postcode table found for PLZ: {plz}")
+                f"No entry in postcode table found for regional_identifier: {regional_identifier}")
         return df_postcode
 
-    def copy_postcode_result_table(self, plz: int) -> None:
+    def copy_postcode_result_table(self, regional_identifier: int) -> None:
         """
-        Copies the given plz entry from postcode to the postcode_result table
-        :param plz:
+        Copies the given regional_identifier entry from postcode to the postcode_result table
+        :param regional_identifier:
         :return:
         """
-        query = """INSERT INTO postcode_result (version_id, postcode_result_plz, geom)
-                   SELECT %(v)s as version_id, plz, geom
+        query = """INSERT INTO postcode_result (version_id, postcode_result_regional_identifier, geom)
+                   SELECT %(v)s as version_id, regional_identifier, geom
                    FROM postcode
-                   WHERE plz = %(p)s
+                   WHERE regional_identifier = %(p)s
                    LIMIT 1
-                   ON CONFLICT (version_id,postcode_result_plz) DO NOTHING;"""
+                   ON CONFLICT (version_id,postcode_result_regional_identifier) DO NOTHING;"""
 
-        self.cur.execute(query, {"v": VERSION_ID, "p": plz})
+        self.cur.execute(query, {"v": VERSION_ID, "p": regional_identifier})
 
-    def set_residential_buildings_table(self, plz: int):
+    def set_residential_buildings_table(self, regional_identifier: int):
         """
-        * Fills buildings_tem with residential buildings which are inside the plz area
-        :param plz:
+        * Fills buildings_tem with residential buildings which are inside the regional_identifier area
+        :param regional_identifier:
         :return:
         """
 
@@ -90,18 +91,20 @@ class PreprocessingMixin(BaseMixin, ABC):
                    WHERE ST_Contains((SELECT post.geom
                                       FROM postcode_result as post
                                       WHERE version_id = %(v)s
-                                        AND postcode_result_plz = %(plz)s
+                                        AND postcode_result_regional_identifier = %(regional_identifier)s
                                       LIMIT 1), ST_Centroid(res.geom));
         UPDATE buildings_tem
-        SET plz = %(plz)s
-        WHERE plz ISNULL;"""
-        self.cur.execute(query, {"v": VERSION_ID, "plz": plz})
+        SET regional_identifier = %(regional_identifier)s
+        WHERE regional_identifier ISNULL;"""
+        self.cur.execute(
+            query, {
+                "v": VERSION_ID, "regional_identifier": regional_identifier})
 
-    def set_other_buildings_table(self, plz: int):
+    def set_other_buildings_table(self, regional_identifier: int):
         """
-        * Fills buildings_tem with other buildings which are inside the plz area
+        * Fills buildings_tem with other buildings which are inside the regional_identifier area
         * Sets all floors to 1
-        :param plz:
+        :param regional_identifier:
         :return:
         """
 
@@ -113,14 +116,16 @@ class PreprocessingMixin(BaseMixin, ABC):
                      AND ST_Contains((SELECT post.geom
                                       FROM postcode_result as post
                                       WHERE version_id = %(v)s
-                                        AND postcode_result_plz = %(plz)s), ST_Centroid(o.geom));;
+                                        AND postcode_result_regional_identifier = %(regional_identifier)s), ST_Centroid(o.geom));;
         UPDATE buildings_tem
-        SET plz = %(plz)s
-        WHERE plz ISNULL;
+        SET regional_identifier = %(regional_identifier)s
+        WHERE regional_identifier ISNULL;
         UPDATE buildings_tem
         SET floors = 1
         WHERE floors ISNULL;"""
-        self.cur.execute(query, {"v": VERSION_ID, "plz": plz})
+        self.cur.execute(
+            query, {
+                "v": VERSION_ID, "regional_identifier": regional_identifier})
 
     def remove_duplicate_buildings(self):
         """
@@ -145,10 +150,11 @@ class PreprocessingMixin(BaseMixin, ABC):
                      AND osm_id LIKE '%copy%';"""
         self.cur.execute(query)
 
-    def set_plz_settlement_type(self, plz: int) -> None:
+    def set_regional_identifier_settlement_type(
+            self, regional_identifier: int) -> None:
         """
-        Determine settlement_type in postcode_result table based on the house_distance metric for a given plz
-        :param plz: Postleitzahl (postal code)
+        Determine settlement_type in postcode_result table based on the house_distance metric for a given regional_identifier
+        :param regional_identifier: Postleitzahl (postal code)
         :return: None
         """
         # Get average distance between buildings by sampling 50 random buildings
@@ -188,9 +194,11 @@ class PreprocessingMixin(BaseMixin, ABC):
                                           ELSE 1
                         END
                 WHERE version_id = %(v)s
-                  AND postcode_result_plz = %(p)s;"""
+                  AND postcode_result_regional_identifier = %(p)s;"""
 
-        self.cur.execute(query, {"v": VERSION_ID, "avg": avg_dis, "p": plz})
+        self.cur.execute(
+            query, {
+                "v": VERSION_ID, "avg": avg_dis, "p": regional_identifier})
 
     def set_building_peak_load(self) -> int:
         """
@@ -286,10 +294,10 @@ class PreprocessingMixin(BaseMixin, ABC):
 
         return None
 
-    def insert_transformers(self, plz: int) -> None:
+    def insert_transformers(self, regional_identifier: int) -> None:
         """
         Add up the existing transformers from transformers table to the buildings_tem table
-        :param plz:
+        :param regional_identifier:
         :return:
         """
         insert_query = """
@@ -300,11 +308,11 @@ class PreprocessingMixin(BaseMixin, ABC):
                        FROM transformers as t
                        WHERE ST_Within(t.geom, (SELECT geom
                                                 FROM postcode_result
-                                                WHERE postcode_result_plz = %(p)s
+                                                WHERE postcode_result_regional_identifier = %(p)s
                                                   AND version_id = %(v)s)); --IS FALSE;
                        UPDATE buildings_tem
-                       SET plz = %(p)s
-                       WHERE plz ISNULL;
+                       SET regional_identifier = %(p)s
+                       WHERE regional_identifier ISNULL;
                        UPDATE buildings_tem
                        SET center = ST_Centroid(geom)
                        WHERE center ISNULL;
@@ -314,7 +322,9 @@ class PreprocessingMixin(BaseMixin, ABC):
                        UPDATE buildings_tem
                        SET peak_load_in_kw = -1
                        WHERE peak_load_in_kw ISNULL;"""
-        self.cur.execute(insert_query, {"p": plz, "v": VERSION_ID})
+        self.cur.execute(
+            insert_query, {
+                "p": regional_identifier, "v": VERSION_ID})
 
     def count_indoor_transformers(self) -> None:
         """counts indoor transformers before deleting them"""
@@ -341,10 +351,10 @@ class PreprocessingMixin(BaseMixin, ABC):
                      AND type = 'Transformer';"""
         self.cur.execute(query)
 
-    def set_ways_tem_table(self, plz: int) -> int:
+    def set_ways_tem_table(self, regional_identifier: int) -> int:
         """
-        * Inserts ways inside the plz area (with buffer) to the ways_tem table
-        :param plz:
+        * Inserts ways inside the regional_identifier area (with buffer) to the ways_tem table
+        :param regional_identifier:
         :return: number of ways in ways_tem
         """
         query = """INSERT INTO ways_tem
@@ -353,14 +363,15 @@ class PreprocessingMixin(BaseMixin, ABC):
                    WHERE ST_Intersects(w.geom, (SELECT ST_Buffer(geom, 50)
                                                 FROM postcode_result
                                                 WHERE version_id = %(v)s
-                                                  AND postcode_result_plz = %(p)s));
+                                                  AND postcode_result_regional_identifier = %(p)s));
         SELECT COUNT(*)
         FROM ways_tem;"""
-        self.cur.execute(query, {"v": VERSION_ID, "p": plz})
+        self.cur.execute(query, {"v": VERSION_ID, "p": regional_identifier})
         count = self.cur.fetchone()[0]
 
         if count == 0:
-            raise ValueError(f"Ways table is empty for the given plz: {plz}")
+            raise ValueError(
+                f"Ways table is empty for the given regional_identifier: {regional_identifier}")
 
         return count
 

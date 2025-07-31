@@ -5,7 +5,8 @@ from shapely.geometry import LineString
 from src.grid_generator import GridGenerator
 
 
-def get_bus_line_geo_for_network(pandapower_net, plz, net_index=0):
+def get_bus_line_geo_for_network(
+        pandapower_net, regional_identifier, net_index=0):
     """get bus and line data for a single pandapower net,
     export lines (cables) and buses (trafo position, consumers, connections) as geometric elements in csv table
     to be used in qgis"""
@@ -18,7 +19,7 @@ def get_bus_line_geo_for_network(pandapower_net, plz, net_index=0):
     line_geo['net'] = net_index
     line = pandapower_net.line
     line_geo = line_geo.merge(line, left_index=True, right_index=True)
-    line_geo['plz'] = plz
+    line_geo['regional_identifier'] = regional_identifier
 
     # bus data
     bus_geo = pandapower_net.bus_geodata
@@ -29,21 +30,22 @@ def get_bus_line_geo_for_network(pandapower_net, plz, net_index=0):
     bus = pandapower_net.bus
     bus_geo = bus_geo.merge(bus, left_index=True, right_index=True)
     bus_geo['consumer_bus'] = bus_geo['name'].str.contains("Consumer Nodebus")
-    bus_geo['plz'] = plz
+    bus_geo['regional_identifier'] = regional_identifier
     return line_geo, bus_geo
 
 
-def get_bus_line_geo_for_plz(plz):
+def get_bus_line_geo_for_regional_identifier(regional_identifier):
     """
-    input: plz
+    input: regional_identifier
     returns two dataframes: one with bus geometry (Nodebuses) and one with line geometry (cables)
     """
     # connect to database
-    gg = GridGenerator(plz=plz)
+    gg = GridGenerator(regional_identifier=regional_identifier)
     dbc_client = gg.dbc
 
     # find all networks
-    cluster_list = dbc_client.get_list_from_plz(plz)
+    cluster_list = dbc_client.get_list_from_regional_identifier(
+        regional_identifier)
 
     # initialise geo dataframes
     gdf_line = gpd.GeoDataFrame()
@@ -54,9 +56,9 @@ def get_bus_line_geo_for_plz(plz):
 
     # loop over all networks and extract line and bus data
     for kcid, bcid in cluster_list:
-        net = dbc_client.read_net(plz, kcid, bcid)
+        net = dbc_client.read_net(regional_identifier, kcid, bcid)
         line_geo, bus_geo = get_bus_line_geo_for_network(
-            pandapower_net=net, net_index=net_index, plz=plz)
+            pandapower_net=net, net_index=net_index, regional_identifier=regional_identifier)
 
         gdf_line = pd.concat([gdf_line, line_geo])
         gdf_bus = pd.concat([gdf_bus, bus_geo])
@@ -66,16 +68,18 @@ def get_bus_line_geo_for_plz(plz):
     return gdf_line, gdf_bus
 
 
-def save_geodata_as_csv(df_plz: pd.DataFrame,
+def save_geodata_as_csv(df_regional_identifier: pd.DataFrame,
                         data_path_lines: str, data_path_bus: str) -> None:
     """saves the geodata to csv"""
     gdf_line = gpd.GeoDataFrame()
     gdf_bus = gpd.GeoDataFrame()
 
-    for plz in df_plz['plz']:
-        print("Saving geodata of plz:", str(plz), "to csv.")
-        # get_bus_line_geo(str(plz))
-        gdf_line_tmp, gdf_bus_tmp = get_bus_line_geo_for_plz(str(plz))
+    for regional_identifier in df_regional_identifier['regional_identifier']:
+        print("Saving geodata of regional_identifier:",
+              str(regional_identifier), "to csv.")
+        # get_bus_line_geo(str(regional_identifier))
+        gdf_line_tmp, gdf_bus_tmp = get_bus_line_geo_for_regional_identifier(
+            str(regional_identifier))
         gdf_line = pd.concat([gdf_line, gdf_line_tmp])
         gdf_bus = pd.concat([gdf_bus, gdf_bus_tmp])
 

@@ -47,25 +47,29 @@ class GridMixin(BaseMixin, ABC):
         return None
 
     def get_vertices_from_bcid(
-            self, plz: int, kcid: int, bcid: int) -> tuple[dict, int]:
+            self, regional_identifier: int, kcid: int, bcid: int) -> tuple[dict, int]:
         # get Transformer_vertice_ids from grid_result table
         transformer = self.get_transformer_info_from_bc(
-            plz, kcid, bcid)["transformer_vertice_id"]
+            regional_identifier, kcid, bcid)["transformer_vertice_id"]
 
         consumer_query = """SELECT vertice_id
                             FROM buildings_tem
-                            WHERE plz = %(p)s
+                            WHERE regional_identifier = %(p)s
                               AND kcid = %(k)s
                               AND bcid = %(b)s;"""
-        self.cur.execute(consumer_query, {"p": plz, "k": kcid, "b": bcid})
+        self.cur.execute(
+            consumer_query, {
+                "p": regional_identifier, "k": kcid, "b": bcid})
         consumer = [t[0] for t in self.cur.fetchall()]
 
         connection_query = """SELECT DISTINCT connection_point
                               FROM buildings_tem
-                              WHERE plz = %(p)s
+                              WHERE regional_identifier = %(p)s
                                 AND kcid = %(k)s
                                 AND bcid = %(b)s;"""
-        self.cur.execute(connection_query, {"p": plz, "k": kcid, "b": bcid})
+        self.cur.execute(
+            connection_query, {
+                "p": regional_identifier, "k": kcid, "b": bcid})
         connection = [t[0] for t in self.cur.fetchall()]
 
         vertices_query = """ SELECT DISTINCT node, agg_cost
@@ -83,7 +87,7 @@ class GridMixin(BaseMixin, ABC):
 
         return vertice_cost_dict, transformer
 
-    def get_transformer_info_from_bc(self, plz: int, kcid: int,
+    def get_transformer_info_from_bc(self, regional_identifier: int, kcid: int,
                                      bcid: int) -> dict | None:
         """
         get transformer information from grid_result table
@@ -94,8 +98,12 @@ class GridMixin(BaseMixin, ABC):
                    WHERE version_id = %(v)s
                      AND kcid = %(k)s
                      AND bcid = %(b)s
-                     AND plz = %(p)s; """
-        params = {"v": VERSION_ID, "p": plz, "k": kcid, "b": bcid}
+                     AND regional_identifier = %(p)s; """
+        params = {
+            "v": VERSION_ID,
+            "p": regional_identifier,
+            "k": kcid,
+            "b": bcid}
         self.cur.execute(query, params)
         info = self.cur.fetchall()
         if not info:
@@ -106,33 +114,34 @@ class GridMixin(BaseMixin, ABC):
         return {"transformer_vertice_id": info[0][0],
                 "transformer_rated_power": info[0][1]}
 
-    def get_transformer_geom_from_bcid(self, plz: int, kcid: int, bcid: int):
+    def get_transformer_geom_from_bcid(
+            self, regional_identifier: int, kcid: int, bcid: int):
         query = """SELECT ST_X(ST_Transform(geom, 4326)), ST_Y(ST_Transform(geom, 4326))
                    FROM transformer_positions tp
                             JOIN grid_result gr
                                  ON tp.grid_result_id = gr.grid_result_id
                    WHERE gr.version_id = %(v)s
-                     AND plz = %(p)s
+                     AND regional_identifier = %(p)s
                      AND kcid = %(k)s
                      AND bcid = %(b)s;"""
         self.cur.execute(
             query, {
-                "v": VERSION_ID, "p": plz, "k": kcid, "b": bcid})
+                "v": VERSION_ID, "p": regional_identifier, "k": kcid, "b": bcid})
         geo = self.cur.fetchone()
 
         return geo
 
     def get_transformer_rated_power_from_bcid(
-            self, plz: int, kcid: int, bcid: int) -> int:
+            self, regional_identifier: int, kcid: int, bcid: int) -> int:
         query = """SELECT transformer_rated_power
                    FROM grid_result
                    WHERE version_id = %(v)s
-                     AND plz = %(p)s
+                     AND regional_identifier = %(p)s
                      AND kcid = %(k)s
                      AND bcid = %(b)s;"""
         self.cur.execute(
             query, {
-                "v": VERSION_ID, "p": plz, "k": kcid, "b": bcid})
+                "v": VERSION_ID, "p": regional_identifier, "k": kcid, "b": bcid})
         transformer_rated_power = self.cur.fetchone()[0]
 
         return transformer_rated_power
@@ -188,7 +197,7 @@ class GridMixin(BaseMixin, ABC):
 
         return way_list
 
-    def insert_lines(self, geom: list, plz: int, bcid: int, kcid: int, line_name: str, std_type: str, from_bus: int,
+    def insert_lines(self, geom: list, regional_identifier: int, bcid: int, kcid: int, line_name: str, std_type: str, from_bus: int,
                      to_bus: int, length_km: float) -> None:
         """writes lines / cables that belong to a network into the database"""
         line_insertion_query = """INSERT INTO lines_result (grid_result_id,
@@ -201,7 +210,7 @@ class GridMixin(BaseMixin, ABC):
                                   VALUES ((SELECT grid_result_id
                                            FROM grid_result
                                            WHERE version_id = %(v)s
-                                             AND plz = %(plz)s
+                                             AND regional_identifier = %(regional_identifier)s
                                              AND kcid = %(kcid)s
                                              AND bcid = %(bcid)s),
                                           ST_SetSRID(%(geom)s::geometry, %(epsg)s),
@@ -211,16 +220,16 @@ class GridMixin(BaseMixin, ABC):
                                           %(to_bus)s,
                                           %(length_km)s); """
         self.cur.execute(line_insertion_query,
-                         {"v": VERSION_ID, "geom": LineString(geom).wkb_hex, "plz": int(plz), "bcid": int(bcid),
+                         {"v": VERSION_ID, "geom": LineString(geom).wkb_hex, "regional_identifier": int(regional_identifier), "bcid": int(bcid),
                              "kcid": int(kcid), "line_name": line_name, "std_type": std_type, "from_bus": int(from_bus),
                              "to_bus": int(to_bus), "length_km": length_km, "epsg": EPSG})
 
-    def is_grid_generated(self, plz: int):
+    def is_grid_generated(self, regional_identifier: int):
         """
         Check if grid exists.
 
         Args:
-            plz: Postal code to be checked
+            regional_identifier: Postal code to be checked
 
         Returns:
             bool: True if record exists, False otherwise
@@ -228,10 +237,12 @@ class GridMixin(BaseMixin, ABC):
         query = f"""
             SELECT 1
             FROM postcode_result
-            WHERE version_id = %(version_id)s AND postcode_result_plz = %(plz)s
+            WHERE version_id = %(version_id)s AND postcode_result_regional_identifier = %(regional_identifier)s
             LIMIT 1;
         """
 
-        self.cur.execute(query, {"version_id": VERSION_ID, "plz": plz})
+        self.cur.execute(
+            query, {
+                "version_id": VERSION_ID, "regional_identifier": regional_identifier})
         result = self.cur.fetchone()
         return result is not None

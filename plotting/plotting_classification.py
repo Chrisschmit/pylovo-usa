@@ -130,7 +130,7 @@ def plot_radar_graph(representative_networks: pd.DataFrame,
 
 
 def plot_samples_on_map(df_samples: pd.DataFrame) -> None:
-    """plot the PLZ in the sample set on a plotly map
+    """plot the regional_identifier in the sample set on a plotly map
     """
     df_samples['regio7_str'] = df_samples['regio7'].astype("str")
     fig = px.scatter_mapbox(df_samples, lat="lat", lon="lon", color="regio7_str", size="regio7", size_max=10,
@@ -148,17 +148,17 @@ def plot_samples_on_map(df_samples: pd.DataFrame) -> None:
     fig.show()
 
 
-def plot_factor_analysis(df_plz_parameters: pd.DataFrame,
+def plot_factor_analysis(df_regional_identifier_parameters: pd.DataFrame,
                          n_comps: int) -> None:
     """plot factor analysis for dataset
 
-    :param df_plz_parameters: set of parameters for grids
-    :type df_plz_parameters: pd.DataFrame
+    :param df_regional_identifier_parameters: set of parameters for grids
+    :type df_regional_identifier_parameters: pd.DataFrame
     :param n_comps: number of components for factor analysis
     :type n_comps: int
     """
     # scale data and save parameter names
-    data = df_plz_parameters
+    data = df_regional_identifier_parameters
     X = StandardScaler().fit_transform(data)
     feature_names = data.columns
 
@@ -193,17 +193,17 @@ def plot_factor_analysis(df_plz_parameters: pd.DataFrame,
 
 
 def get_parameters_for_clustering(
-        df_plz_parameters: pd.DataFrame, n_comps: int) -> list:
+        df_regional_identifier_parameters: pd.DataFrame, n_comps: int) -> list:
     """calculate the mathematically ideal set of parameters
     with the varimax rotated factor analysis
 
-    :param df_plz_parameters: set of parameters for grids
-    :type df_plz_parameters: pd.DataFrame
+    :param df_regional_identifier_parameters: set of parameters for grids
+    :type df_regional_identifier_parameters: pd.DataFrame
     :param n_comps: number of components for factor analysis
     :type n_comps: int
     """
 
-    data = df_plz_parameters
+    data = df_regional_identifier_parameters
     X = StandardScaler().fit_transform(data)
     feature_names = data.columns
     fa = FactorAnalysis(rotation="varimax")
@@ -220,13 +220,14 @@ def get_parameters_for_clustering(
     return parameters
 
 
-def plot_eigendecomposition(df_plz_parameters: pd.DataFrame) -> None:
+def plot_eigendecomposition(
+        df_regional_identifier_parameters: pd.DataFrame) -> None:
     """plot the explained variance of the principal components
 
-    :param df_plz_parameters: set of parameters for grids
-    :type df_plz_parameters: pd.DataFrame
+    :param df_regional_identifier_parameters: set of parameters for grids
+    :type df_regional_identifier_parameters: pd.DataFrame
     """
-    X_train = df_plz_parameters
+    X_train = df_regional_identifier_parameters
     #
     # Scale the dataset; This is very important before you apply PCA
     #
@@ -269,19 +270,19 @@ def plot_eigendecomposition(df_plz_parameters: pd.DataFrame) -> None:
     plt.show()
 
 
-def plot_ch_index_for_clustering_algos(df_plz_parameters: pd.DataFrame,
+def plot_ch_index_for_clustering_algos(df_regional_identifier_parameters: pd.DataFrame,
                                        no_of_clusters_allowed: range = range(3, 8)) -> pd.DataFrame:
     """plot the calinski harabasz index for the indicated range of clusters and the clusterin algorithms kmeans,
     kmedoids, gmm
 
-    :param df_plz_parameters: set of parameters for grids
-    :type df_plz_parameters: pd.DataFrame
+    :param df_regional_identifier_parameters: set of parameters for grids
+    :type df_regional_identifier_parameters: pd.DataFrame
 
     :param no_of_clusters_allowed: the range the number of clusters allowed to have, , defaults range(3, 8)
     :type no_of_clusters_allowed: range
     """
     # define dataset for ch index analysis
-    X = df_plz_parameters[LIST_OF_CLUSTERING_PARAMETERS]
+    X = df_regional_identifier_parameters[LIST_OF_CLUSTERING_PARAMETERS]
     X = preprocessing.scale(X)
 
     # initialise table for comparison
@@ -432,19 +433,19 @@ def plot_ch_index_for_clustering_algos(df_plz_parameters: pd.DataFrame,
     return df_ch_comparison
 
 
-def plot_db_index_for_clustering_algos(df_plz_parameters: pd.DataFrame,
+def plot_db_index_for_clustering_algos(df_regional_identifier_parameters: pd.DataFrame,
                                        no_of_clusters_allowed: range = range(3, 8)) -> None:
     """plot the davies bouldin index for the indicated range of clusters and the clusterin algorithms kmeans,
     kmedoids, gmm
 
-    :param df_plz_parameters: set of parameters for grids
-    :type df_plz_parameters: pd.DataFrame
+    :param df_regional_identifier_parameters: set of parameters for grids
+    :type df_regional_identifier_parameters: pd.DataFrame
 
     :param no_of_clusters_allowed: the range the number of clusters allowed to have, defaults range(3, 8)
     :type no_of_clusters_allowed: range
     """
     # define dataset for ch index analysis
-    X = df_plz_parameters[LIST_OF_CLUSTERING_PARAMETERS]
+    X = df_regional_identifier_parameters[LIST_OF_CLUSTERING_PARAMETERS]
     X = preprocessing.scale(X)
 
     # initialise table for comparison
@@ -588,14 +589,16 @@ def plot_db_index_for_clustering_algos(df_plz_parameters: pd.DataFrame,
     print(df_db_comparison)
 
 
-def plot_percentage_of_clusters(df_plz_parameters: pd.DataFrame) -> None:
+def plot_percentage_of_clusters(
+        df_regional_identifier_parameters: pd.DataFrame) -> None:
     """plot the distribution of clusters as a bar chart
 
-    :param df_plz_parameters: set of parameters for grids that are clustered and thus have a column named 'clusters'
-    :type df_plz_parameters: pd.DataFrame
+    :param df_regional_identifier_parameters: set of parameters for grids that are clustered and thus have a column named 'clusters'
+    :type df_regional_identifier_parameters: pd.DataFrame
     """
-    len_grids = len(df_plz_parameters)
-    clusters_perc = df_plz_parameters['clusters'].value_counts() / len_grids
+    len_grids = len(df_regional_identifier_parameters)
+    clusters_perc = df_regional_identifier_parameters['clusters'].value_counts(
+    ) / len_grids
     clusters_perc = pd.DataFrame(clusters_perc)
     clusters_perc['count'] = clusters_perc['count'] * 100
     # clusters_perc['clusters'] = clusters_perc['clusters'] * 100
@@ -609,15 +612,15 @@ def plot_percentage_of_clusters(df_plz_parameters: pd.DataFrame) -> None:
 
 
 def plot_stacked_distribution_of_clusters_per_regio_5(
-        df_plz_parameters: pd.DataFrame) -> None:
+        df_regional_identifier_parameters: pd.DataFrame) -> None:
     """plot stacked bar chart of distribution of clusters for each regio 5 class
 
-    :param df_plz_parameters: set of parameters for grids that are clustered and thus have a column named 'clusters'
-    :type df_plz_parameters: pd.DataFrame
+    :param df_regional_identifier_parameters: set of parameters for grids that are clustered and thus have a column named 'clusters'
+    :type df_regional_identifier_parameters: pd.DataFrame
     """
-    df_plz_parameters['regio7'] = df_plz_parameters['regio7'].map(
+    df_regional_identifier_parameters['regio7'] = df_regional_identifier_parameters['regio7'].map(
         REGIO7_REGIO5_GEM_DICT)
-    df_matrix = df_plz_parameters.pivot_table(
+    df_matrix = df_regional_identifier_parameters.pivot_table(
         index='regio7', columns='clusters', aggfunc='size')
     df_matrix = df_matrix.div(df_matrix.sum(axis=1), axis=0)
     df_matrix = df_matrix.reset_index()
@@ -636,17 +639,17 @@ def plot_stacked_distribution_of_clusters_per_regio_5(
 
 
 def plot_bar_distribution_of_clusters_per_regio_5(
-        df_plz_parameters: pd.DataFrame) -> None:
+        df_regional_identifier_parameters: pd.DataFrame) -> None:
     """plot bar chart of distribution of clusters for each regio 5 class
 
-    :param df_plz_parameters: set of parameters for grids that are clustered and thus have a column named 'clusters'
-    :type df_plz_parameters: pd.DataFrame
+    :param df_regional_identifier_parameters: set of parameters for grids that are clustered and thus have a column named 'clusters'
+    :type df_regional_identifier_parameters: pd.DataFrame
     """
-    # df_plz_parameters['regio7'] = df_plz_parameters['regio7'].map(REGIO7_REGIO5_GEM_DICT)
-    # print(df_plz_parameters['regio7'].head())
+    # df_regional_identifier_parameters['regio7'] = df_regional_identifier_parameters['regio7'].map(REGIO7_REGIO5_GEM_DICT)
+    # print(df_regional_identifier_parameters['regio7'].head())
     x, y = 'regio7', 'clusters'
 
-    (df_plz_parameters
+    (df_regional_identifier_parameters
      .groupby(x)[y]
      .value_counts(normalize=True)
      .mul(100)

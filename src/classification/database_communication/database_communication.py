@@ -28,25 +28,25 @@ class DatabaseCommunication:
             self) -> pd.DataFrame:
         """get clustering parameter for a specific classification version indicated in config classification
 
-        :return: a table with all grid parameters for all grids for PLZ included in the classification version
+        :return: a table with all grid parameters for all grids for regional_identifier included in the classification version
         :rtype: pd.DataFrame
         """
         query = """
-                WITH plz_table(plz) AS (
-                    SELECT plz
+                WITH regional_identifier_table(regional_identifier) AS (
+                    SELECT regional_identifier
                     FROM sample_set
                     WHERE classification_id= %(c)s
                 ),
                 clustering AS (
-                    SELECT version_id, plz, kcid, bcid, cp.*
+                    SELECT version_id, regional_identifier, kcid, bcid, cp.*
                     FROM clustering_parameters cp
                     JOIN grid_result gr ON cp.grid_result_id = gr.grid_result_id
                     WHERE gr.version_id = %(v)s AND cp.filtered = false
                 )
                 SELECT c.*
                 FROM clustering c
-                JOIN plz_table p
-                ON c.plz = p.plz;"""
+                JOIN regional_identifier_table p
+                ON c.regional_identifier = p.regional_identifier;"""
         params = {"v": VERSION_ID, "c": CLASSIFICATION_VERSION}
         df_query = pd.read_sql_query(query, con=self.dbc.conn, params=params, )
         columns = CLUSTERING_PARAMETERS
@@ -62,26 +62,26 @@ class DatabaseCommunication:
         - population, area, population density
 
         ...
-        :return: a table with all grid parameters for all grids for PLZ included in the classification version
+        :return: a table with all grid parameters for all grids for regional_identifier included in the classification version
         :rtype: pd.DataFrame
         """
         query = """
-                WITH plz_table(plz) AS (
-                    SELECT ss.plz, mr.pop, mr.area, mr.lat, mr.lon, ss.ags, mr.name_city, mr.regio7, mr.regio5, mr.pop_den
+                WITH regional_identifier_table(regional_identifier) AS (
+                    SELECT ss.regional_identifier, mr.pop, mr.area, mr.lat, mr.lon, ss.ags, mr.name_city, mr.regio7, mr.regio5, mr.pop_den
                     FROM sample_set ss
-                    JOIN municipal_register mr ON ss.plz = mr.plz AND ss.ags = mr.ags
+                    JOIN municipal_register mr ON ss.regional_identifier = mr.regional_identifier AND ss.ags = mr.ags
                     WHERE ss.classification_id = %(c)s
                 ),
                 clustering AS (
-                    SELECT version_id, plz, kcid, bcid, cp.*
+                    SELECT version_id, regional_identifier, kcid, bcid, cp.*
                     FROM clustering_parameters cp
                     JOIN grid_result gr ON cp.grid_result_id = gr.grid_result_id
                     WHERE gr.version_id = %(v)s AND cp.filtered = false
                 )
                 SELECT c.*, p.pop, p.area, p.lat, p.lon, p.ags, p.name_city, p.regio7, p.regio5, p.pop_den
                 FROM clustering c
-                JOIN plz_table p
-                ON c.plz = p.plz;"""
+                JOIN regional_identifier_table p
+                ON c.regional_identifier = p.regional_identifier;"""
         params = {"v": VERSION_ID, "c": CLASSIFICATION_VERSION}
         df_query = pd.read_sql_query(query, con=self.dbc.conn, params=params, )
         return df_query
@@ -99,7 +99,7 @@ class DatabaseCommunication:
         # load transformer positions from database, preserve geo-datatype of
         # geom column
         query = """
-                SELECT version_id, plz, kcid, bcid, geom
+                SELECT version_id, regional_identifier, kcid, bcid, geom
                 FROM transformer_positions tp
                 JOIN grid_result gr
                   ON tp.grid_result_id = gr.grid_result_id
@@ -160,23 +160,23 @@ class DatabaseCommunication:
             'gmm_clusters'].astype('int')
 
         # reduce columns and convert datatypes
-        df_parameters_of_grids = df_parameters_of_grids[['version_id', 'plz', 'kcid', 'bcid',
+        df_parameters_of_grids = df_parameters_of_grids[['version_id', 'regional_identifier', 'kcid', 'bcid',
                                                          'kmedoid_clusters', 'kmedoid_representative_grid',
                                                          'kmeans_clusters', 'kmeans_representative_grid',
                                                          'gmm_clusters', 'gmm_representative_grid']]
         df_parameters_of_grids['version_id'] = df_parameters_of_grids['version_id'].astype(
             'string')
-        df_parameters_of_grids['plz'] = df_parameters_of_grids['plz'].astype(
+        df_parameters_of_grids['regional_identifier'] = df_parameters_of_grids['regional_identifier'].astype(
             'int')
 
         # merge transformer positions with cluster information
         df_transformers_classified = pd.merge(df_transformer_positions, df_parameters_of_grids, how='right',
                                               left_on=[
-                                                  'version_id', 'plz', 'kcid', 'bcid'],
-                                              right_on=['version_id', 'plz', 'kcid', 'bcid'])
+                                                  'version_id', 'regional_identifier', 'kcid', 'bcid'],
+                                              right_on=['version_id', 'regional_identifier', 'kcid', 'bcid'])
 
         query = """
-                SELECT grid_result_id, version_id, plz, kcid, bcid
+                SELECT grid_result_id, version_id, regional_identifier, kcid, bcid
                 FROM grid_result
                 WHERE version_id=%(v)s;"""
         params = {"v": VERSION_ID}
@@ -185,13 +185,13 @@ class DatabaseCommunication:
 
         df_transformers_classified = pd.merge(df_grid_result, df_transformers_classified, how='right',
                                               left_on=[
-                                                  'version_id', 'plz', 'kcid', 'bcid'],
-                                              right_on=['version_id', 'plz', 'kcid', 'bcid'])
+                                                  'version_id', 'regional_identifier', 'kcid', 'bcid'],
+                                              right_on=['version_id', 'regional_identifier', 'kcid', 'bcid'])
 
         df_transformers_classified.drop(
             columns=[
                 'version_id',
-                'plz',
+                'regional_identifier',
                 'kcid',
                 'bcid'],
             inplace=True)
@@ -270,11 +270,12 @@ class DatabaseCommunication:
         print(self.dbc.cur.statusmessage)
         self.dbc.conn.commit()
 
-    def get_ags_for_plz(df_plz: pd.DataFrame) -> pd.DataFrame:
-        """get the AGS for the PLZ in a dataframe
+    def get_ags_for_regional_identifier(
+            df_regional_identifier: pd.DataFrame) -> pd.DataFrame:
+        """get the AGS for the regional_identifier in a dataframe
 
-        :param df_plz: table with plz column,
-        :type df_plz: pd.DataFrame
+        :param df_regional_identifier: table with regional_identifier column,
+        :type df_regional_identifier: pd.DataFrame
 
-        :return: table with plz and ags column
+        :return: table with regional_identifier and ags column
         :rtype: pd.DataFrame"""

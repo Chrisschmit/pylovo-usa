@@ -1,7 +1,7 @@
 from src.grid_generator import GridGenerator
 
-plz = "91301"  # forchheim
+regional_identifier = 1
 
-gg = GridGenerator(plz=plz)
+gg = GridGenerator(regional_identifier=regional_identifier)
 dbc_client = gg.dbc
 dbc_client.delete_transformers()

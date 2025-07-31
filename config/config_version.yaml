@@ -55,6 +55,7 @@ LARGE_COMPONENT_LOWER_BOUND: 2000
 LARGE_COMPONENT_DIVIDER: 1000
 
 # Voltage properties
+# TODO: for the US we need differnt VN for single, split and three phase
 VN: 400  # V
 V_BAND_LOW: 0.95  # +-5%
 V_BAND_HIGH: 1.05

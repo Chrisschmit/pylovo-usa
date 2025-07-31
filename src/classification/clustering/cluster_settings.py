@@ -16,7 +16,7 @@ def print_parameters_for_clustering_for_classification_version() -> list:
     df = dc.get_clustering_parameters_for_classification_version()
 
     # Dropping unnecessary columns
-    df.drop(['version_id', 'plz', 'bcid', 'kcid', 'ratio', 'osm_trafo', 'house_distance_km', 'no_connection_buses',
+    df.drop(['version_id', 'regional_identifier', 'bcid', 'kcid', 'ratio', 'osm_trafo', 'house_distance_km', 'no_connection_buses',
              'resistance', 'reactance', 'simultaneous_peak_load_mw',
              'no_household_equ', 'max_power_mw'], axis=1, inplace=True)
 
@@ -33,7 +33,7 @@ def print_parameters_for_clustering_for_classification_version() -> list:
 
     # print parameters
     parameters = get_parameters_for_clustering(
-        df_plz_parameters=df, n_comps=no_of_factors)
+        df_regional_identifier_parameters=df, n_comps=no_of_factors)
     return parameters
 
 
@@ -43,7 +43,7 @@ def get_best_no_of_clusters_ch_index_for_classification_version() -> pd.DataFram
     dc = DatabaseCommunication()
     df_parameters_of_grids = dc.get_clustering_parameters_for_classification_version()
 
-    df_ch_comparison = plot_ch_index_for_clustering_algos(df_plz_parameters=df_parameters_of_grids,
+    df_ch_comparison = plot_ch_index_for_clustering_algos(df_regional_identifier_parameters=df_parameters_of_grids,
                                                           no_of_clusters_allowed=NO_OF_CLUSTERS_ALLOWED)
 
     return df_ch_comparison

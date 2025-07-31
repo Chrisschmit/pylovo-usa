@@ -22,7 +22,7 @@ class ParameterCalculator:
     def __init__(self):
         self.dbc = dbc.DatabaseClient()
         self.version_id = VERSION_ID
-        self.plz = None
+        self.regional_identifier = None
         self.bcid = None
         self.kcid = None
         self.no_connection_buses = None
@@ -48,64 +48,72 @@ class ParameterCalculator:
         self.vsw_per_branch = None
         self.max_vsw_of_a_branch = None
 
-    def calc_parameters_per_plz(self, plz):
-        grid_generated = self.dbc.is_grid_generated(plz)
+    def calc_parameters_per_regional_identifier(self, regional_identifier):
+        grid_generated = self.dbc.is_grid_generated(regional_identifier)
         if not grid_generated:
             self.dbc.logger.info(
-                f"Grid for the postcode area {plz} is not generated, yet. Generate it first.")
+                f"Grid for the postcode area {regional_identifier} is not generated, yet. Generate it first.")
             return
-        grid_analysed = self.dbc.is_grid_analyzed(plz)
+        grid_analysed = self.dbc.is_grid_analyzed(regional_identifier)
         if grid_analysed:
             self.dbc.logger.info(
-                f"Grid for the postcode area {plz} has already been analyzed.")
+                f"Grid for the postcode area {regional_identifier} has already been analyzed.")
             return
 
         try:
             self.dbc.logger.info("Start basic result analysis")
-            self.analyse_basic_parameters_per_plz(plz)
+            self.analyse_basic_parameters_per_regional_identifier(
+                regional_identifier)
             self.dbc.logger.info("Start cable counting")
-            self.analyse_cables_per_plz(plz)
+            self.analyse_cables_per_regional_identifier(regional_identifier)
             self.dbc.logger.info("Start per trafo analysis")
-            self.analyse_trafo_parameters_per_plz(plz)
+            self.analyse_trafo_parameters_per_regional_identifier(
+                regional_identifier)
             self.dbc.logger.info("Result analysis finished")
             self.dbc.conn.commit()
         except Exception as e:
-            self.dbc.logger.error(f"Error during analysis for PLZ {plz}: {e}")
-            self.dbc.logger.info(f"Skipped PLZ {plz} due to analysis error.")
-            self.dbc.delete_plz_from_sample_set_table(
-                str(CLASSIFICATION_VERSION), plz)  # delete from sample set
+            self.dbc.logger.error(
+                f"Error during analysis for regional_identifier {regional_identifier}: {e}")
+            self.dbc.logger.info(
+                f"Skipped regional_identifier {regional_identifier} due to analysis error.")
+            self.dbc.delete_regional_identifier_from_sample_set_table(
+                # delete from sample set
+                str(CLASSIFICATION_VERSION), regional_identifier)
 
-    def calc_parameters_per_grid(self, plz: int) -> None:
-        """Calculate parameters for all grids of a PLZ."""
-        grid_analysed = self.dbc.is_grid_analyzed(plz)
+    def calc_parameters_per_grid(self, regional_identifier: int) -> None:
+        """Calculate parameters for all grids of a regional_identifier."""
+        grid_analysed = self.dbc.is_grid_analyzed(regional_identifier)
         if not grid_analysed:
             self.dbc.logger.info(
-                f"PLZ parameters for the postcode area {plz} missing. Please run calc_parameters_per_plz() first.")
+                f"regional_identifier parameters for the postcode area {regional_identifier} missing. Please run calc_parameters_per_regional_identifier() first.")
             return
-        plz = str(plz)
-        parameter_count = self.dbc.count_clustering_parameters(plz=plz)
+        regional_identifier = str(regional_identifier)
+        parameter_count = self.dbc.count_clustering_parameters(
+            regional_identifier=regional_identifier)
         if parameter_count > 0:
-            print(f"The parameters for the grids of postcode area {plz} and version {VERSION_ID} "
+            print(f"The parameters for the grids of postcode area {regional_identifier} and version {VERSION_ID} "
                   f"have already been calculated.")
             return
 
-        cluster_list = self.dbc.get_list_from_plz(plz)
+        cluster_list = self.dbc.get_list_from_regional_identifier(
+            regional_identifier)
         for kcid, bcid in cluster_list:
             print(bcid, kcid)
-            self.calc_grid_parameters(plz, bcid, kcid)
+            self.calc_grid_parameters(regional_identifier, bcid, kcid)
 
-    def calc_grid_parameters(self, plz: int, bcid: int, kcid: int) -> None:
+    def calc_grid_parameters(
+            self, regional_identifier: int, bcid: int, kcid: int) -> None:
         """Calculate parameters for a single grid and save them."""
 
-        self.plz = plz
+        self.regional_identifier = regional_identifier
         self.bcid = bcid
         self.kcid = kcid
         self.osm_trafo = self.has_osm_trafo()
 
-        net = self.dbc.read_net(self.plz, self.kcid, self.bcid)
+        net = self.dbc.read_net(self.regional_identifier, self.kcid, self.bcid)
         self.compute_parameters(net)
 
-        params = {"version_id": self.version_id, "plz": self.plz, "bcid": self.bcid, "kcid": self.kcid,
+        params = {"version_id": self.version_id, "regional_identifier": self.regional_identifier, "bcid": self.bcid, "kcid": self.kcid,
                   "no_connection_buses": int(self.no_connection_buses), "no_branches": int(self.no_branches),
                   "no_house_connections": int(self.no_house_connections),
                   "no_house_connections_per_branch": float(self.no_house_connections_per_branch),
@@ -159,7 +167,8 @@ class ParameterCalculator:
         return df_parameters
 
     def get_simultaneous_peak_load(self) -> float:
-        data_list, _, _ = self.dbc.read_per_trafo_dict(self.plz)
+        data_list, _, _ = self.dbc.read_per_trafo_dict(
+            self.regional_identifier)
         transformer_type_str = str(int(self.transformer_mva * 1000))
         max_trafo_distance_list = data_list[3][transformer_type_str]
         if self.max_trafo_dis * 1000 in max_trafo_distance_list:
@@ -508,14 +517,16 @@ class ParameterCalculator:
 
         return net_line_with_sim_factor
 
-    def _run_analysis_in_parallel(self, plz: int, worker_function):
+    def _run_analysis_in_parallel(
+            self, regional_identifier: int, worker_function):
         """
-        Run analysis for all grids of a PLZ in parallel.
-        :param plz: Postcal code
+        Run analysis for all grids of a regional_identifier in parallel.
+        :param regional_identifier: Postcal code
         :param worker_function: The function to execute for each grid.
         :return: A list of results from the worker function.
         """
-        cluster_list = self.dbc.get_list_from_plz(plz)
+        cluster_list = self.dbc.get_list_from_regional_identifier(
+            regional_identifier)
         results = []
         count = len(cluster_list)
         finished_count = 0
@@ -525,7 +536,7 @@ class ParameterCalculator:
             futures = {
                 executor.submit(
                     worker_function,
-                    plz,
+                    regional_identifier,
                     kcid,
                     bcid): (
                     kcid,
@@ -550,10 +561,11 @@ class ParameterCalculator:
         return results
 
     @staticmethod
-    def _process_basic_parameters(plz: int, kcid: int, bcid: int) -> list:
+    def _process_basic_parameters(
+            regional_identifier: int, kcid: int, bcid: int) -> list:
         """Worker function for basic parameter analysis of a single grid."""
         dbc_worker = dbc.DatabaseClient()
-        net = dbc_worker.read_net(plz, kcid, bcid)
+        net = dbc_worker.read_net(regional_identifier, kcid, bcid)
 
         load_count = len(net.load)
         bus_count = len(set(net.load["bus"]))
@@ -570,10 +582,11 @@ class ParameterCalculator:
             })
         return results
 
-    def analyse_basic_parameters_per_plz(self, plz: int):
+    def analyse_basic_parameters_per_regional_identifier(
+            self, regional_identifier: int):
         self.dbc.logger.debug("start basic parameter counting")
         results = self._run_analysis_in_parallel(
-            plz, self._process_basic_parameters)
+            regional_identifier, self._process_basic_parameters)
 
         load_count_dict = defaultdict(list)
         bus_count_dict = defaultdict(list)
@@ -593,14 +606,15 @@ class ParameterCalculator:
         load_count_string = json.dumps(load_count_dict)
         bus_count_string = json.dumps(bus_count_dict)
 
-        self.dbc.insert_plz_parameters(
-            plz, trafo_string, load_count_string, bus_count_string)
+        self.dbc.insert_regional_identifier_parameters(
+            regional_identifier, trafo_string, load_count_string, bus_count_string)
 
     @staticmethod
-    def _process_cables(plz: int, kcid: int, bcid: int) -> dict:
+    def _process_cables(regional_identifier: int,
+                        kcid: int, bcid: int) -> dict:
         """Worker function for cable analysis of a single grid."""
         dbc_worker = dbc.DatabaseClient()
-        net = dbc_worker.read_net(plz, kcid, bcid)
+        net = dbc_worker.read_net(regional_identifier, kcid, bcid)
 
         cable_length_dict = {}
         cable_df = net.line[net.line["in_service"]]
@@ -613,9 +627,10 @@ class ParameterCalculator:
 
         return cable_length_dict
 
-    def analyse_cables_per_plz(self, plz: int):
+    def analyse_cables_per_regional_identifier(self, regional_identifier: int):
         self.dbc.logger.debug("start cable analysis")
-        results = self._run_analysis_in_parallel(plz, self._process_cables)
+        results = self._run_analysis_in_parallel(
+            regional_identifier, self._process_cables)
 
         cable_length_dict = defaultdict(float)
         for grid_cable_lengths in results:
@@ -624,13 +639,14 @@ class ParameterCalculator:
 
         self.dbc.logger.info("analyse_cables finished.")
         cable_length_string = json.dumps(cable_length_dict)
-        self.dbc.insert_cable_length(plz, cable_length_string)
+        self.dbc.insert_cable_length(regional_identifier, cable_length_string)
 
     @staticmethod
-    def _process_trafo_parameters(plz: int, kcid: int, bcid: int) -> dict:
+    def _process_trafo_parameters(
+            regional_identifier: int, kcid: int, bcid: int) -> dict:
         """Worker for transformer parameter analysis of a single grid."""
         dbc_worker = dbc.DatabaseClient()
-        net = dbc_worker.read_net(plz, kcid, bcid)
+        net = dbc_worker.read_net(regional_identifier, kcid, bcid)
 
         trafo_size_mva = net.trafo["sn_mva"].iloc[0]
         trafo_size_kva = round(trafo_size_mva * 1e3)
@@ -673,10 +689,11 @@ class ParameterCalculator:
             "avg_distance": avg_distance,
         }
 
-    def analyse_trafo_parameters_per_plz(self, plz: int):
+    def analyse_trafo_parameters_per_regional_identifier(
+            self, regional_identifier: int):
         self.dbc.logger.debug("start per trafo analysis")
         results = self._run_analysis_in_parallel(
-            plz, self._process_trafo_parameters)
+            regional_identifier, self._process_trafo_parameters)
 
         trafo_load_dict = defaultdict(list)
         trafo_max_distance_dict = defaultdict(list)
@@ -694,7 +711,7 @@ class ParameterCalculator:
         trafo_max_distance_string = json.dumps(trafo_max_distance_dict)
         trafo_avg_distance_string = json.dumps(trafo_avg_distance_dict)
         self.dbc.insert_trafo_parameters(
-            plz,
+            regional_identifier,
             trafo_load_string,
             trafo_max_distance_string,
             trafo_avg_distance_string)

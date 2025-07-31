@@ -238,20 +238,22 @@ class ClusteringMixin(BaseMixin, ABC):
         kcid_length = self.cur.fetchone()[0]
         return kcid_length
 
-    def get_next_unfinished_kcid(self, plz: int) -> int:
+    def get_next_unfinished_kcid(self, regional_identifier: int) -> int:
         """
-        :return: one unmodeled k mean cluster ID - plz
+        :return: one unmodeled k mean cluster ID - regional_identifier
         """
         query = """SELECT kcid
                    FROM buildings_tem
                    WHERE kcid NOT IN (SELECT DISTINCT kcid
                                       FROM grid_result
                                       WHERE version_id = %(v)s
-                                        AND grid_result.plz = %(plz)s)
+                                        AND grid_result.regional_identifier = %(regional_identifier)s)
                      AND kcid IS NOT NULL
                    ORDER BY kcid
                    LIMIT 1;"""
-        self.cur.execute(query, {"v": VERSION_ID, "plz": plz})
+        self.cur.execute(
+            query, {
+                "v": VERSION_ID, "regional_identifier": regional_identifier})
         kcid = self.cur.fetchone()[0]
         return kcid
 
@@ -270,26 +272,27 @@ class ClusteringMixin(BaseMixin, ABC):
             data := self.cur.fetchall()) else [])
         return transformers_list
 
-    def clear_grid_result_in_kmean_cluster(self, plz: int, kcid: int):
+    def clear_grid_result_in_kmean_cluster(
+            self, regional_identifier: int, kcid: int):
         # Remove old clustering at same postcode cluster
         clear_query = """DELETE
                          FROM grid_result
                          WHERE version_id = %(v)s
-                           AND plz = %(pc)s
+                           AND regional_identifier = %(pc)s
                            AND kcid = %(kc)s
                            AND bcid >= 0; """
 
-        params = {"v": VERSION_ID, "pc": plz, "kc": kcid}
+        params = {"v": VERSION_ID, "pc": regional_identifier, "kc": kcid}
         self.cur.execute(clear_query, params)
         self.logger.debug(
-            f"Building clusters with plz = {plz}, k_mean cluster = {kcid} area cleared.")
+            f"Building clusters with regional_identifier = {regional_identifier}, k_mean cluster = {kcid} area cleared.")
 
-    def upsert_bcid(self, plz: int, kcid: int, bcid: int,
+    def upsert_bcid(self, regional_identifier: int, kcid: int, bcid: int,
                     vertices: list, transformer_rated_power: int):
         """
         Assign buildings in buildings_tem the bcid and stores the cluster in grid_result
         Args:
-            plz: postcode cluster ID - plz
+            regional_identifier: postcode cluster ID - regional_identifier
             kcid: kmeans cluster ID
             bcid: building cluster ID
             vertices: List of vertice_id of selected buildings
@@ -298,21 +301,21 @@ class ClusteringMixin(BaseMixin, ABC):
         # Insert references to building elements in which cluster they are.
         building_query = """UPDATE buildings_tem
                             SET bcid = %(bc)s
-                            WHERE plz = %(pc)s
+                            WHERE regional_identifier = %(pc)s
                               AND kcid = %(kc)s
                               AND bcid ISNULL
                               AND connection_point IN %(vid)s
                               AND type != 'Transformer'; """
 
-        params = {"v": VERSION_ID, "pc": plz, "bc": bcid,
+        params = {"v": VERSION_ID, "pc": regional_identifier, "bc": bcid,
                   "kc": kcid, "vid": tuple(map(int, vertices)), }
         self.cur.execute(building_query, params)
 
         # Insert new clustering
-        cluster_query = """INSERT INTO grid_result (version_id, plz, kcid, bcid, transformer_rated_power)
+        cluster_query = """INSERT INTO grid_result (version_id, regional_identifier, kcid, bcid, transformer_rated_power)
                            VALUES (%(v)s, %(pc)s, %(kc)s, %(bc)s, %(s)s); """
 
-        params = {"v": VERSION_ID, "pc": plz, "bc": bcid,
+        params = {"v": VERSION_ID, "pc": regional_identifier, "bc": bcid,
                   "kc": kcid, "s": int(transformer_rated_power)}
         self.cur.execute(cluster_query, params)
 
@@ -346,29 +349,30 @@ class ClusteringMixin(BaseMixin, ABC):
 
         return count
 
-    def delete_isolated_building(self, plz: int, kcid):
+    def delete_isolated_building(self, regional_identifier: int, kcid):
         query = """DELETE
                    FROM buildings_tem
-                   WHERE plz = %(p)s
+                   WHERE regional_identifier = %(p)s
                      AND kcid = %(k)s
                      AND bcid ISNULL;"""
-        self.cur.execute(query, {"p": plz, "k": kcid})
+        self.cur.execute(query, {"p": regional_identifier, "k": kcid})
 
-    def get_greenfield_bcids(self, plz: int, kcid: int) -> list:
+    def get_greenfield_bcids(
+            self, regional_identifier: int, kcid: int) -> list:
         """
         Args:
-            plz: loadarea cluster ID
+            regional_identifier: loadarea cluster ID
             kcid: kmeans cluster ID
-        Returns: A list of greenfield building clusters for a given plz
+        Returns: A list of greenfield building clusters for a given regional_identifier
         """
         query = """SELECT DISTINCT bcid
                    FROM grid_result
                    WHERE version_id = %(v)s
                      AND kcid = %(kc)s
-                     AND plz = %(pc)s
+                     AND regional_identifier = %(pc)s
                      AND model_status ISNULL
                    ORDER BY bcid; """
-        params = {"v": VERSION_ID, "pc": plz, "kc": kcid}
+        params = {"v": VERSION_ID, "pc": regional_identifier, "kc": kcid}
         self.cur.execute(query, params)
         bcid_list = [t[0] for t in data] if (
             data := self.cur.fetchall()) else []
@@ -398,15 +402,15 @@ class ClusteringMixin(BaseMixin, ABC):
         return buildings_df
 
     def get_buildings_from_bcid(
-            self, plz: int, kcid: int, bcid: int) -> pd.DataFrame:
+            self, regional_identifier: int, kcid: int, bcid: int) -> pd.DataFrame:
 
         buildings_query = """SELECT *
                              FROM buildings_tem
                              WHERE type != 'Transformer'
-                               AND plz = %(p)s
+                               AND regional_identifier = %(p)s
                                AND bcid = %(b)s
                                AND kcid = %(k)s;"""
-        params = {"p": plz, "b": bcid, "k": kcid}
+        params = {"p": regional_identifier, "b": bcid, "k": kcid}
 
         buildings_df = pd.read_sql_query(
             buildings_query, con=self.conn, params=params)
@@ -420,28 +424,29 @@ class ClusteringMixin(BaseMixin, ABC):
         return buildings_df
 
     def update_transformer_rated_power(
-            self, plz: int, kcid: int, bcid: int, note: int):
+            self, regional_identifier: int, kcid: int, bcid: int, note: int):
         """
         Updates transformer_rated_power in grid_result
-        :param plz:
+        :param regional_identifier:
         :param kcid:
         :param bcid:
         :param note:
         :return:
         """
-        sdl = self.get_settlement_type_from_plz(plz)
+        sdl = self.get_settlement_type_from_regional_identifier(
+            regional_identifier)
         transformer_capacities, _ = self.get_transformer_data(sdl)
 
         if note == 0:
             old_query = """SELECT transformer_rated_power
                            FROM grid_result
                            WHERE version_id = %(v)s
-                             AND plz = %(p)s
+                             AND regional_identifier = %(p)s
                              AND kcid = %(k)s
                              AND bcid = %(b)s;"""
             self.cur.execute(
                 old_query, {
-                    "v": VERSION_ID, "p": plz, "k": kcid, "b": bcid})
+                    "v": VERSION_ID, "p": regional_identifier, "k": kcid, "b": bcid})
             transformer_rated_power = self.cur.fetchone()[0]
 
             new_transformer_rated_power = transformer_capacities[transformer_capacities > transformer_rated_power][
@@ -449,11 +454,11 @@ class ClusteringMixin(BaseMixin, ABC):
             update_query = """UPDATE grid_result
                               SET transformer_rated_power = %(n)s
                               WHERE version_id = %(v)s
-                                AND plz = %(p)s
+                                AND regional_identifier = %(p)s
                                 AND kcid = %(k)s
                                 AND bcid = %(b)s;"""
             self.cur.execute(update_query,
-                             {"v": VERSION_ID, "p": plz, "k": kcid, "b": bcid, "n": new_transformer_rated_power}, )
+                             {"v": VERSION_ID, "p": regional_identifier, "k": kcid, "b": bcid, "n": new_transformer_rated_power}, )
         else:
             double_trans = np.multiply(transformer_capacities[2:4], 2)
             combined = np.concatenate(
@@ -462,12 +467,12 @@ class ClusteringMixin(BaseMixin, ABC):
             old_query = """SELECT transformer_rated_power
                            FROM grid_result
                            WHERE version_id = %(v)s
-                             AND plz = %(p)s
+                             AND regional_identifier = %(p)s
                              AND kcid = %(k)s
                              AND bcid = %(b)s;"""
             self.cur.execute(
                 old_query, {
-                    "v": VERSION_ID, "p": plz, "k": kcid, "b": bcid})
+                    "v": VERSION_ID, "p": regional_identifier, "k": kcid, "b": bcid})
             transformer_rated_power = self.cur.fetchone()[0]
             if transformer_rated_power in combined.tolist():
                 return None
@@ -476,11 +481,11 @@ class ClusteringMixin(BaseMixin, ABC):
             update_query = """UPDATE grid_result
                               SET transformer_rated_power = %(n)s
                               WHERE version_id = %(v)s
-                                AND plz = %(p)s
+                                AND regional_identifier = %(p)s
                                 AND kcid = %(k)s
                                 AND bcid = %(b)s;"""
             self.cur.execute(update_query,
-                             {"v": VERSION_ID, "p": plz, "k": kcid, "b": bcid, "n": new_transformer_rated_power}, )
+                             {"v": VERSION_ID, "p": regional_identifier, "k": kcid, "b": bcid, "n": new_transformer_rated_power}, )
             self.logger.debug(
                 "double or multiple transformer group transformer_rated_power assigned")
 
@@ -516,7 +521,7 @@ class ClusteringMixin(BaseMixin, ABC):
         return np.array(capacities), transformer2cost
 
     def update_building_cluster(self, transformer_id: int, conn_id_list: Union[list, tuple], count: int, kcid: int,
-                                plz: int, transformer_rated_power: int) -> None:
+                                regional_identifier: int, transformer_rated_power: int) -> None:
         """
         Update building cluster information by performing multiple operations:
           - Update the 'bcid' in 'buildings_tem' where 'vertice_id' matches the transformer_id.
@@ -528,7 +533,7 @@ class ClusteringMixin(BaseMixin, ABC):
             conn_id_list (Union[list, tuple]): A list or tuple of connection point IDs.
             count (int): The new building cluster identifier.
             kcid (int): The KCID value.
-            plz (int): The postcode value.
+            regional_identifier (int): The postcode value.
             transformer_rated_power (int): The selected transformer size for the building cluster.
         """
         query = """
@@ -541,7 +546,7 @@ class ClusteringMixin(BaseMixin, ABC):
                 WHERE connection_point IN %(c)s
                   AND type != 'Transformer';
 
-                INSERT INTO grid_result (version_id, plz, kcid, bcid, transformer_vertice_id, transformer_rated_power)
+                INSERT INTO grid_result (version_id, regional_identifier, kcid, bcid, transformer_vertice_id, transformer_rated_power)
                 VALUES (%(v)s, %(pc)s, %(k)s, %(count)s, %(t)s, %(l)s);
 
                 INSERT INTO transformer_positions (version_id, grid_result_id, geom, osm_id, comment)
@@ -549,12 +554,12 @@ class ClusteringMixin(BaseMixin, ABC):
                         %(v)s,
                         (SELECT grid_result_id
                          FROM grid_result
-                         WHERE version_id = %(v)s AND plz = %(pc)s AND kcid = %(k)s AND bcid = %(count)s),
+                         WHERE version_id = %(v)s AND regional_identifier = %(pc)s AND kcid = %(k)s AND bcid = %(count)s),
                         (SELECT center FROM buildings_tem WHERE vertice_id = %(t)s),
                         (SELECT osm_id FROM buildings_tem WHERE vertice_id = %(t)s),
                         'Normal'); \
                 """
-        params = {"v": VERSION_ID, "count": count, "c": tuple(conn_id_list), "t": transformer_id, "k": kcid, "pc": plz,
+        params = {"v": VERSION_ID, "count": count, "c": tuple(conn_id_list), "t": transformer_id, "k": kcid, "pc": regional_identifier,
                   "l": transformer_rated_power, }
         self.cur.execute(query, params)
 
@@ -681,20 +686,20 @@ class ClusteringMixin(BaseMixin, ABC):
         return cp
 
     def upsert_transformer_selection(
-            self, plz: int, kcid: int, bcid: int, connection_id: int):
+            self, regional_identifier: int, kcid: int, bcid: int, connection_id: int):
         """Writes the vertice_id of chosen building as Transformer location in the grid_result table"""
 
         query = """UPDATE grid_result
                    SET transformer_vertice_id = %(c)s
                    WHERE version_id = %(v)s
-                     AND plz = %(p)s
+                     AND regional_identifier = %(p)s
                      AND kcid = %(k)s
                      AND bcid = %(b)s;
 
         UPDATE grid_result
         SET model_status = 1
         WHERE version_id = %(v)s
-          AND plz = %(p)s
+          AND regional_identifier = %(p)s
           AND kcid = %(k)s
           AND bcid = %(b)s;
 
@@ -704,7 +709,7 @@ class ClusteringMixin(BaseMixin, ABC):
                 (SELECT grid_result_id
                  FROM grid_result
                  WHERE version_id = %(v)s \
-                   AND plz = %(p)s \
+                   AND regional_identifier = %(p)s \
                    AND kcid = %(k)s \
                    AND bcid = %(b)s),
                 (SELECT the_geom FROM ways_tem_vertices_pgr WHERE id = %(c)s),
@@ -714,7 +719,7 @@ class ClusteringMixin(BaseMixin, ABC):
             "c": connection_id,
             "b": bcid,
             "k": kcid,
-            "p": plz}
+            "p": regional_identifier}
 
         self.cur.execute(query, params)
 
@@ -743,17 +748,18 @@ class ClusteringMixin(BaseMixin, ABC):
 
         return localid2vid, dist_mat, _
 
-    def get_settlement_type_from_plz(self, plz) -> int:
+    def get_settlement_type_from_regional_identifier(
+            self, regional_identifier) -> int:
         """
         Args:
-            plz:
+            regional_identifier:
         Returns: Settlement type: 1=City, 2=Village, 3=Rural
         """
         settlement_query = """SELECT settlement_type
                               FROM postcode_result
-                              WHERE postcode_result_plz = %(p)s
+                              WHERE postcode_result_regional_identifier = %(p)s
                               LIMIT 1; """
-        self.cur.execute(settlement_query, {"p": plz})
+        self.cur.execute(settlement_query, {"p": regional_identifier})
         settlement_type = self.cur.fetchone()[0]
 
         return settlement_type

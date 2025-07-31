@@ -239,7 +239,7 @@ class CountySegmentationHandler(DataHandler):
                     county_blocks_gdf, subdivision_geom_df)
 
                 # --- Augment Data ---
-                fipscode = (
+                regional_identifier = (
                     f"{row['state_fips']}{row['county_fips']}"
                     f"{row['subdivision_fips']}"
                 )
@@ -260,7 +260,7 @@ class CountySegmentationHandler(DataHandler):
                 results.append(
                     {
                         **row.to_dict(),
-                        "fipscode": fipscode,
+                        "regional_identifier": regional_identifier,
                         "population": population,
                         "qkm": area_sq_km,
                         "geom": geom_wkb_hex,

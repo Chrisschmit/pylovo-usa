@@ -29,19 +29,21 @@ class UtilsMixin(BaseMixin, ABC):
     def commit_changes(self):
         self.conn.commit()
 
-    def get_list_from_plz(self, plz: int) -> list:
+    def get_list_from_regional_identifier(
+            self, regional_identifier: int) -> list:
         query = """SELECT DISTINCT kcid, bcid
                    FROM grid_result
                    WHERE version_id = %(v)s
-                     AND plz = %(p)s
+                     AND regional_identifier = %(p)s
                    ORDER BY kcid, bcid;"""
-        self.cur.execute(query, {"p": plz, "v": VERSION_ID})
+        self.cur.execute(query, {"p": regional_identifier, "v": VERSION_ID})
         cluster_list = self.cur.fetchall()
 
         return cluster_list
 
-    def get_plz_from_region(self, region: Dict[str, str]) -> int:
-        query = """SELECT plz
+    def get_regional_identifier_from_region(
+            self, region: Dict[str, str]) -> int:
+        query = """SELECT regional_identifier
                    FROM postcode
                    WHERE state_abbr = %(st)s
                     AND county_name = %(c)s
@@ -50,8 +52,8 @@ class UtilsMixin(BaseMixin, ABC):
                          {"st": region['STATE'],
                           "c": region['COUNTY'],
                              "s": region['COUNTY_SUBDIVISION']})
-        plz = self.cur.fetchone()[0]
-        return plz
+        regional_identifier = self.cur.fetchone()[0]
+        return regional_identifier
 
     def delete_transformers_from_buildings_tem(self, vertices: list) -> None:
         """
