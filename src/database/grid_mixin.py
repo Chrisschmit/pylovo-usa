@@ -15,6 +15,7 @@ class GridMixin(BaseMixin, ABC):
         super().__init__()
 
     def create_cable_std_type(self, net: pp.pandapowerNet) -> None:
+        # TODO Refactor
         """Create standard pandapower cable types from equipment_data table."""
         query = """
                 SELECT name,
@@ -47,7 +48,9 @@ class GridMixin(BaseMixin, ABC):
 
     def get_vertices_from_bcid(
             self, plz: int, kcid: int, bcid: int) -> tuple[dict, int]:
-        ont = self.get_ont_info_from_bc(plz, kcid, bcid)["ont_vertice_id"]
+        # get Transformer_vertice_ids from grid_result table
+        transformer = self.get_transformer_info_from_bc(
+            plz, kcid, bcid)["transformer_vertice_id"]
 
         consumer_query = """SELECT vertice_id
                             FROM buildings_tem
@@ -70,17 +73,23 @@ class GridMixin(BaseMixin, ABC):
                                      'SELECT way_id as id, source, target, cost, reverse_cost FROM ways_tem'::text,
                                      %(o)s, %(c)s::integer[], false)
                              ORDER BY agg_cost;"""
-        self.cur.execute(vertices_query, {"o": ont, "c": consumer})
+
+        self.cur.execute(vertices_query, {"o": transformer, "c": consumer})
         data = self.cur.fetchall()
+        # data contains tuples of (vertex_id, routing_cost) from the Dijkstra query
+        # t[0] = vertex ID, t[1] = routing cost
         vertice_cost_dict = {t[0]: t[1]
                              for t in data if t[0] in consumer or t[0] in connection}
 
-        return vertice_cost_dict, ont
+        return vertice_cost_dict, transformer
 
-    def get_ont_info_from_bc(self, plz: int, kcid: int,
-                             bcid: int) -> dict | None:
+    def get_transformer_info_from_bc(self, plz: int, kcid: int,
+                                     bcid: int) -> dict | None:
+        """
+        get transformer information from grid_result table
+        """
 
-        query = """SELECT ont_vertice_id, transformer_rated_power
+        query = """SELECT transformer_vertice_id, transformer_rated_power
                    FROM grid_result
                    WHERE version_id = %(v)s
                      AND kcid = %(k)s
@@ -91,13 +100,13 @@ class GridMixin(BaseMixin, ABC):
         info = self.cur.fetchall()
         if not info:
             self.logger.debug(
-                f"found no ont information for kcid {kcid}, bcid {bcid}")
+                f"found no transformer information for kcid {kcid}, bcid {bcid}")
             return None
 
-        return {"ont_vertice_id": info[0][0],
+        return {"transformer_vertice_id": info[0][0],
                 "transformer_rated_power": info[0][1]}
 
-    def get_ont_geom_from_bcid(self, plz: int, kcid: int, bcid: int):
+    def get_transformer_geom_from_bcid(self, plz: int, kcid: int, bcid: int):
         query = """SELECT ST_X(ST_Transform(geom, 4326)), ST_Y(ST_Transform(geom, 4326))
                    FROM transformer_positions tp
                             JOIN grid_result gr
@@ -138,6 +147,7 @@ class GridMixin(BaseMixin, ABC):
         return geo
 
     def get_vertices_from_connection_points(self, connection: list) -> list:
+
         query = """SELECT vertice_id
                    FROM buildings_tem
                    WHERE connection_point IN %(c)s
@@ -146,8 +156,8 @@ class GridMixin(BaseMixin, ABC):
         data = self.cur.fetchall()
         return [t[0] for t in data]
 
-    def get_path_to_bus(self, vertice: int, ont: int) -> list:
-        """routing problem: find the shortest path from vertice to the ont (ortsnetztrafo)"""
+    def get_path_to_bus(self, vertice: int, transformer: int) -> list:
+        """routing problem: find the shortest path from vertice to the transformer of the cluster"""
         query = """SELECT node
                    FROM pgr_Dijkstra(
                            'SELECT way_id as id, source, target, cost, reverse_cost FROM ways_tem', %(v)s, %(o)s,
@@ -172,7 +182,7 @@ class GridMixin(BaseMixin, ABC):
                         route_geom
                     FROM get_geom
                     ORDER BY seq;"""
-        self.cur.execute(query, {"o": ont, "v": vertice})
+        self.cur.execute(query, {"o": transformer, "v": vertice})
         data = self.cur.fetchall()
         way_list = [t[0] for t in data]
 

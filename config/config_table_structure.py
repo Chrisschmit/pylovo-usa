@@ -102,7 +102,7 @@ CREATE_QUERIES = {
         plz bigint NOT NULL,
         transformer_rated_power bigint,
         model_status integer,
-        ont_vertice_id bigint,
+        transformer_vertice_id bigint,
         grid json,
         CONSTRAINT cluster_identifier UNIQUE (version_id, kcid, bcid, plz),
         CONSTRAINT unique_grid_result_id_version_id UNIQUE (version_id, grid_result_id),

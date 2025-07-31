@@ -190,6 +190,7 @@ class ClusteringMixin(BaseMixin, ABC):
     def try_clustering(self, Z: np.ndarray, cluster_amount: int, localid2vid: dict, buildings: pd.DataFrame,
                        consumer_cat_df: pd.DataFrame, transformer_capacities: np.ndarray, double_trans: np.ndarray, ) -> tuple[
             dict, dict, int]:
+        # Clusters into maximum cluster amount -- 2 is the maximum
         flat_groups = fcluster(Z, t=cluster_amount, criterion="maxclust")
         cluster_ids = np.unique(flat_groups)
         cluster_count = len(cluster_ids)
@@ -197,11 +198,17 @@ class ClusteringMixin(BaseMixin, ABC):
         # transformers
         cluster_dict = {}
         invalid_cluster_dict = {}
+        # For each cluster, check if the load can be satisfied with possible
+        # transformers
         for cluster_id in range(1, cluster_count + 1):
+            # Python list of vertex ids (e.g. [142, 3891, 557 ...]) that belong
+            # to the current hierarchical-cluster being inspected.
             vid_list = [localid2vid[lid[0]]
                         for lid in np.argwhere(flat_groups == cluster_id)]
             total_sim_load = utils.simultaneousPeakLoad(
                 buildings, consumer_cat_df, vid_list)
+            # In US first step we need to check for only small transformers
+            # pole mounted
             if (total_sim_load >= max(transformer_capacities)
                     and len(vid_list) >= 5):  # the cluster is too big
                 invalid_cluster_dict[cluster_id] = vid_list
@@ -218,6 +225,7 @@ class ClusteringMixin(BaseMixin, ABC):
                     cluster_dict[cluster_id] = (
                         vid_list, opt_double_transformer)
             else:
+                # "Over-sized load but tiny cluster"
                 opt_transformer = math.ceil(total_sim_load)
                 cluster_dict[cluster_id] = (vid_list, opt_transformer)
         return invalid_cluster_dict, cluster_dict, cluster_count
@@ -533,7 +541,7 @@ class ClusteringMixin(BaseMixin, ABC):
                 WHERE connection_point IN %(c)s
                   AND type != 'Transformer';
 
-                INSERT INTO grid_result (version_id, plz, kcid, bcid, ont_vertice_id, transformer_rated_power)
+                INSERT INTO grid_result (version_id, plz, kcid, bcid, transformer_vertice_id, transformer_rated_power)
                 VALUES (%(v)s, %(pc)s, %(k)s, %(count)s, %(t)s, %(l)s);
 
                 INSERT INTO transformer_positions (version_id, grid_result_id, geom, osm_id, comment)
@@ -674,10 +682,10 @@ class ClusteringMixin(BaseMixin, ABC):
 
     def upsert_transformer_selection(
             self, plz: int, kcid: int, bcid: int, connection_id: int):
-        """Writes the vertice_id of chosen building as ONT location in the grid_result table"""
+        """Writes the vertice_id of chosen building as Transformer location in the grid_result table"""
 
         query = """UPDATE grid_result
-                   SET ont_vertice_id = %(c)s
+                   SET transformer_vertice_id = %(c)s
                    WHERE version_id = %(v)s
                      AND plz = %(p)s
                      AND kcid = %(k)s
