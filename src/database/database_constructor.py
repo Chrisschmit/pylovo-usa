@@ -354,26 +354,28 @@ class DatabaseConstructor:
         Creates the SQL functions that are needed for the app to operate
         """
         cur = self.dbc.conn.cursor()
-        
+
         # List of SQL function files to execute
         sql_files = [
             "postgres_dump_functions.sql",
             "postgres_dump_functions_2.sql"
         ]
-        
+
         for sql_file in sql_files:
             sc_path = os.path.join(os.getcwd(), "src", sql_file)
-            
+
             # Check if file exists before trying to execute
             if os.path.exists(sc_path):
                 with open(sc_path, 'r') as sc_file:
-                    print(f"Executing {sql_file} script with schema '{TARGET_SCHEMA}'.")
+                    print(
+                        f"Executing {sql_file} script with schema '{TARGET_SCHEMA}'.")
                     sql = sc_file.read()
                     cur.execute(sql)
                     self.dbc.conn.commit()
                     print(f"Successfully executed {sql_file}")
             else:
-                print(f"Warning: {sql_file} not found at {sc_path}, skipping...")
+                print(
+                    f"Warning: {sql_file} not found at {sc_path}, skipping...")
 
     def drop_all_tables(self):
         """
@@ -388,4 +390,3 @@ class DatabaseConstructor:
 
         cur.execute(f"DROP SCHEMA {TARGET_SCHEMA} CASCADE")
         self.dbc.conn.commit()
-

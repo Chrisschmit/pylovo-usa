@@ -379,7 +379,7 @@ class PreprocessingMixin(BaseMixin, ABC):
         """
         # setup_query = """SELECT setup_temp_tables();"""
         # self.cur.execute(setup_query)
-        
+
         # # Deduplicate ways_tem before running home connections
         # self._deduplicate_ways_table()
 
@@ -407,44 +407,47 @@ class PreprocessingMixin(BaseMixin, ABC):
             GROUP BY geom
             HAVING COUNT(*) > 1
         )
-        SELECT 
+        SELECT
             COUNT(*) as duplicate_groups,
             SUM(count) as total_duplicate_segments,
             SUM(count - 1) as segments_to_remove
         FROM duplicate_groups
         """
-        
+
         self.cur.execute(count_query)
         result = self.cur.fetchone()
-        
+
         if result and result[0] > 0:
             groups, total_segments, to_remove = result
-            self.logger.info(f"Found {groups} duplicate geometry groups with {total_segments} total segments")
-            self.logger.info(f"Removing {to_remove} duplicate segments (keeping 1 per group)")
-            
+            self.logger.info(
+                f"Found {groups} duplicate geometry groups with {total_segments} total segments")
+            self.logger.info(
+                f"Removing {to_remove} duplicate segments (keeping 1 per group)")
+
             # Remove duplicates - keep the one with the smallest way_id
             remove_query = """
-            DELETE FROM ways_tem w1 
-            USING ways_tem w2 
-            WHERE w1.way_id > w2.way_id 
+            DELETE FROM ways_tem w1
+            USING ways_tem w2
+            WHERE w1.way_id > w2.way_id
               AND ST_Equals(w1.geom, w2.geom)
             """
-            
+
             self.cur.execute(remove_query)
-            
+
             # Get number of affected rows from cursor
             removed_count = self.cur.rowcount
-            
-            self.logger.info(f"Successfully removed {removed_count} duplicate segments")
-            
+
+            self.logger.info(
+                f"Successfully removed {removed_count} duplicate segments")
+
             # Final count
             self.cur.execute("SELECT COUNT(*) FROM ways_tem")
             final_count = self.cur.fetchone()[0]
-            self.logger.info(f"ways_tem now contains {final_count} unique segments")
-            
+            self.logger.info(
+                f"ways_tem now contains {final_count} unique segments")
+
         else:
             self.logger.info("No duplicate geometries found in ways_tem table")
-
 
     def update_ways_cost(self) -> None:
         """
