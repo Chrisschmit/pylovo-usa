@@ -7,6 +7,8 @@ including QuadKey mapping, state-level filtering, and region-specific clipping.
 
 import json
 import re
+import tempfile
+import urllib.request
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
@@ -202,16 +204,15 @@ class MicrosoftBuildingsDataHandler(DataHandler):
         states_url = "https://www2.census.gov/geo/tiger/GENZ2021/shp/cb_2021_us_state_20m.zip"
 
         # Download file first to temporary location, then read it
-        # with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp_file:
-        #     self.logger.info(f"Downloading US states to temporary file: {tmp_file.name}")
-        #     urllib.request.urlretrieve(states_url, tmp_file.name)
+        with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp_file:
+            self.logger.info(f"Downloading US states to temporary file: {tmp_file.name}")
+            urllib.request.urlretrieve(states_url, tmp_file.name)
 
-        #     # Read the downloaded file
-        #     states = gpd.read_file(tmp_file.name)
+            # Read the downloaded file
+            states = gpd.read_file(tmp_file.name)
 
-        #     # Clean up temporary file
-        #     Path(tmp_file.name).unlink()
-        states = gpd.read_file(states_url)
+            # Clean up temporary file
+            Path(tmp_file.name).unlink()
 
         states = states[['NAME', 'STUSPS', 'geometry']].copy()
         states = states.to_crs(4326)
