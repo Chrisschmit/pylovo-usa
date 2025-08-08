@@ -86,8 +86,8 @@ CREATE_QUERIES = {
         version_id varchar(10) NOT NULL,
         postcode_result_regional_identifier bigint NOT NULL,
         settlement_type integer,
-        geom geometry(MultiPolygon,%(epsg)s),
         load_density numeric,
+        geom geometry(MultiPolygon,%(epsg)s),
         CONSTRAINT "postcode_result_pkey" PRIMARY KEY (version_id, postcode_result_regional_identifier),
         CONSTRAINT fk_postcode_result_version_id
             FOREIGN KEY (version_id)
@@ -125,12 +125,12 @@ CREATE_QUERIES = {
     CREATE TABLE IF NOT EXISTS lines_result (
         lines_result_id SERIAL PRIMARY KEY,
         grid_result_id bigint NOT NULL,
-        geom geometry(LineString,%(epsg)s),
         line_name varchar(15),
         std_type varchar(15),
         from_bus integer,
         to_bus integer,
         length_km numeric,
+        geom geometry(LineString,%(epsg)s),
         CONSTRAINT fk_lines_result_grid_result
             FOREIGN KEY (grid_result_id)
             REFERENCES grid_result (grid_result_id)
@@ -155,13 +155,13 @@ CREATE_QUERIES = {
         grid_result_id bigint NOT NULL,
         area numeric,
         type varchar(30),
-        geom geometry(MultiPolygon,%(epsg)s),
         houses_per_building integer,
-        center geometry(Point,%(epsg)s),
         peak_load_in_kw numeric,
         vertice_id integer,
         floors integer,
         connection_point integer,
+        center geometry(Point,%(epsg)s),
+        geom geometry(MultiPolygon,%(epsg)s),
         CONSTRAINT buildings_result_pkey PRIMARY KEY (version_id, osm_id),
         CONSTRAINT fk_buildings_result_grid_result
             FOREIGN KEY (version_id, grid_result_id)
@@ -262,10 +262,11 @@ CREATE_QUERIES = {
     "transformer_positions": """
     CREATE TABLE IF NOT EXISTS transformer_positions (
         grid_result_id bigint PRIMARY KEY,
-        geom geometry(Point,%(epsg)s),
         osm_id varchar,
         version_id varchar(10),
         "comment" varchar,
+        geom geometry(Point,%(epsg)s),
+
         CONSTRAINT uq_tp_osm_v UNIQUE (osm_id, version_id),
         CONSTRAINT fk_tp_version_id
             FOREIGN KEY (version_id)
@@ -285,7 +286,6 @@ CREATE_QUERIES = {
     "transformer_classified": """
     CREATE TABLE IF NOT EXISTS transformer_classified (
         grid_result_id bigint NOT NULL,
-        geom geometry(Point,%(epsg)s),
         kmedoid_clusters integer,
         kmedoid_representative_grid bool,
         kmeans_clusters integer,
@@ -293,6 +293,7 @@ CREATE_QUERIES = {
         gmm_clusters integer,
         gmm_representative_grid bool,
         classification_id integer NOT NULL,
+        geom geometry(Point,%(epsg)s),
         CONSTRAINT pk_grid_result_id PRIMARY KEY (grid_result_id, classification_id),
         CONSTRAINT fk_transformer_classified_classification_id
             FOREIGN KEY (classification_id)
@@ -316,21 +317,22 @@ CREATE_QUERIES = {
         target integer,
         cost double precision,
         reverse_cost double precision,
-        geom geometry(LineString,%(epsg)s),
-        way_id integer PRIMARY KEY
+        way_id integer PRIMARY KEY,
+        geom geometry(LineString,%(epsg)s)
     )
     """,
     "ways_result": """
     CREATE TABLE IF NOT EXISTS ways_result (
         version_id varchar(10) NOT NULL,
+        way_id integer NOT NULL,
+        regional_identifier bigint,
         clazz integer,
         source integer,
         target integer,
         cost double precision,
         reverse_cost double precision,
+
         geom geometry(LineString,%(epsg)s),
-        way_id integer NOT NULL,
-        regional_identifier bigint,
         CONSTRAINT pk_ways_result PRIMARY KEY (version_id, way_id, regional_identifier),
         CONSTRAINT fk_ways_result_version_id_regional_identifier
             FOREIGN KEY (version_id, regional_identifier)
@@ -406,16 +408,16 @@ TEMP_CREATE_QUERIES = {
         osm_id varchar,
         area numeric,
         type varchar(80),
-        geom geometry(Geometry,%(epsg)s),  -- needs to be geometry as multipoint & multipolygon get inserted here
         houses_per_building integer,
-        center geometry(Point,%(epsg)s),
         peak_load_in_kw numeric,
         regional_identifier bigint,
         vertice_id bigint,
         bcid integer,
         kcid integer,
         floors integer,
-        connection_point integer
+        connection_point integer,center geometry(Point,%(epsg)s),
+        geom geometry(Geometry,%(epsg)s)  -- needs to be geometry as multipoint & multipolygon get inserted here
+
     )""",
     "ways_tem": """CREATE TABLE IF NOT EXISTS ways_tem
     (
@@ -424,8 +426,9 @@ TEMP_CREATE_QUERIES = {
         target integer,
         cost double precision,
         reverse_cost double precision,
-        geom geometry(LineString,%(epsg)s),
         way_id integer,
-        regional_identifier bigint
+        regional_identifier bigint,
+        geom geometry(LineString,%(epsg)s)
+
     )""",
 }
