@@ -2,25 +2,32 @@
 CREATE_QUERIES = {
     "res": """CREATE TABLE IF NOT EXISTS res (
         osm_id varchar PRIMARY KEY,
+        c_block_id bigint,
+        build_id bigint,
         area numeric(23, 15),
         use varchar(80),
         comment varchar(80),
         free_walls integer,
-        building_t varchar(80),
-        occupants numeric(23, 15),
+        build_type varchar(80),
+        occupants integer,
+        height float,
+        housing_units integer,
         floors integer,
         constructi varchar(80),
-        refurb_wal numeric(23, 15),
-        refurb_roo numeric(23, 15),
-        refurb_bas numeric(23, 15),
-        refurb_win numeric(23, 15),
+        refurb_wal float,
+        refurb_roo float,
+        refurb_bas float,
+        refurb_win float,
         geom geometry(MultiPolygon,%(epsg)s)
     )
     """,
     "oth": """CREATE TABLE IF NOT EXISTS oth (
         osm_id varchar PRIMARY KEY,
+        c_block_id bigint,
+        build_id bigint,
         area numeric(23, 15),
         use varchar(80),
+        height float,
         comment varchar(80),
         free_walls integer,
         geom geometry(MultiPolygon,%(epsg)s)
@@ -80,7 +87,7 @@ CREATE_QUERIES = {
         postcode_result_regional_identifier bigint NOT NULL,
         settlement_type integer,
         geom geometry(MultiPolygon,%(epsg)s),
-        house_distance numeric,
+        load_density numeric,
         CONSTRAINT "postcode_result_pkey" PRIMARY KEY (version_id, postcode_result_regional_identifier),
         CONSTRAINT fk_postcode_result_version_id
             FOREIGN KEY (version_id)
