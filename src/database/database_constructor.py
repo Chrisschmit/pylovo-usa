@@ -331,8 +331,8 @@ class DatabaseConstructor:
                     target,
                     cost,
                     reverse_cost,
-                    ST_Transform(geom_way, %(epsg)s) as geom,
-                    id AS way_id
+                    id AS way_id,
+                    ST_Transform(geom_way, %(epsg)s) as geom
             FROM public_2po_4pgr"""
         cur.execute(query, {"epsg": EPSG})
 
