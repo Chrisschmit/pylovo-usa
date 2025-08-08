@@ -86,7 +86,7 @@ class PreprocessingMixin(BaseMixin, ABC):
 
         # Fill table
         query = """INSERT INTO buildings_tem (osm_id, area, type, geom, center, floors)
-                   SELECT osm_id, area, building_t, geom, ST_Centroid(geom), floors::int
+                   SELECT osm_id, area, build_type, geom, ST_Centroid(geom), floors::int
                    FROM res
                    WHERE ST_Contains((SELECT post.geom
                                       FROM postcode_result as post
@@ -153,52 +153,65 @@ class PreprocessingMixin(BaseMixin, ABC):
     def set_regional_identifier_settlement_type(
             self, regional_identifier: int) -> None:
         """
-        Determine settlement_type in postcode_result table based on the house_distance metric for a given regional_identifier
-        :param regional_identifier: Postleitzahl (postal code)
+        Determine settlement_type in postcode_result table based on the load_density (MVA/km²) for the given regional_identifier
+        :param regional_identifier: Regional identifier (FIPS code)
         :return: None
         """
-        # Get average distance between buildings by sampling 50 random buildings
-        # and finding their 4 nearest neighbors
-        distance_query = """WITH some_buildings AS (SELECT osm_id, center
-                                                    FROM buildings_tem
-                                                    ORDER BY RANDOM()
-                                                    LIMIT 50)
-                            SELECT b.osm_id, d.dist
-                            FROM some_buildings AS b
-                                     LEFT JOIN LATERAL (
-                                SELECT ST_Distance(b.center, b2.center) AS dist
-                                FROM buildings_tem AS b2
-                                WHERE b.osm_id <> b2.osm_id
-                                ORDER BY b.center <-> b2.center
-                                LIMIT 4) AS d
-                                               ON TRUE;"""
-        self.cur.execute(distance_query)
-        data = self.cur.fetchall()
+        # Get total peak load from buildings_tem for the specific
+        # regional_identifier and area from postcode table
+        load_density_query = """
+            SELECT
+                COALESCE(SUM(bt.peak_load_in_kw), 0) as total_load_kw,
+                p.qkm as area_km2
+            FROM postcode p
+            LEFT JOIN buildings_tem bt ON bt.regional_identifier = p.regional_identifier
+            WHERE p.regional_identifier = %(p)s
+            GROUP BY p.qkm
+        """
 
-        if not data:
+        self.cur.execute(load_density_query, {"p": regional_identifier})
+        result = self.cur.fetchone()
+
+        if not result or result[1] is None:
             raise ValueError(
-                "There is no building in the buildings_tem table!")
+                f"No area data found in postcode table for regional_identifier: {regional_identifier}")
 
-        # Calculate average distance
-        distance = [t[1] for t in data]
-        avg_dis = int(sum(distance) / len(distance))
+        total_load_kw, area_km2 = result
 
-        # Update database with average distance and set settlement types based
-        # on threshold
+        total_load_kw = float(
+            total_load_kw) if total_load_kw is not None else 0.0
+        area_km2 = float(area_km2) if area_km2 is not None else 0.0
+
+        if area_km2 <= 0:
+            raise ValueError(
+                f"Invalid area ({area_km2}) for regional_identifier: {regional_identifier}")
+
+        # Calculate load density in MVA/km² using power factor
+        load_density_mva_km2 = (total_load_kw / POWER_FACTOR) / 1000 / area_km2
+        self.logger.info(
+            f"Load density for: {regional_identifier} is {load_density_mva_km2} MVA/km²")
+
+        # Update database with load density and set settlement types based on
+        # thresholds
         query = """
                 UPDATE postcode_result
-                SET house_distance  = %(avg)s,
+                SET load_density = %(load_density)s,
                     settlement_type = CASE
-                                          WHEN %(avg)s < 25 THEN 3
-                                          WHEN %(avg)s < 45 THEN 2
-                                          ELSE 1
+                                          WHEN %(load_density)s < %(rural_threshold)s THEN 1
+                                          WHEN %(load_density)s < %(urban_threshold)s THEN 2
+                                          ELSE 3
                         END
                 WHERE version_id = %(v)s
                   AND postcode_result_regional_identifier = %(p)s;"""
 
         self.cur.execute(
             query, {
-                "v": VERSION_ID, "avg": avg_dis, "p": regional_identifier})
+                "v": VERSION_ID,
+                "load_density": load_density_mva_km2,
+                "p": regional_identifier,
+                "rural_threshold": RURAL_LD,
+                "urban_threshold": URBAN_LD
+            })
 
     def set_building_peak_load(self) -> int:
         """

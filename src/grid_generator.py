@@ -175,19 +175,17 @@ class GridGenerator:
         self.dbc.remove_duplicate_buildings()
         self.logger.info("Duplicate buildings removed from buildings_tem")
 
-        self.dbc.set_regional_identifier_settlement_type(
-            self.regional_identifier)
-        self.logger.info(
-            "House_distance and settlement_type in postcode_result")
-
         unloadcount = self.dbc.set_building_peak_load()
         self.logger.info(
-            f"Building peakload calculated in buildings_tem, {unloadcount} unloaded buildings are removed from "
-            f"buildings_tem"
-        )
+            f"Building peakload calculated in buildings_tem, {unloadcount} unloaded buildings are removed from buildings_tem")
+        # Removes all buildings with peak load > 100 kW
         too_large_consumers = self.dbc.update_too_large_consumers_to_zero()
         self.logger.info(
             f"{too_large_consumers} too large consumers removed from buildings_tem")
+
+        self.dbc.set_regional_identifier_settlement_type(
+            self.regional_identifier)
+        self.logger.info("Load density and settlement_type in postcode_result")
 
         self.dbc.assign_close_buildings()
         self.logger.info(
