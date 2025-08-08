@@ -46,13 +46,10 @@ class CensusDataHandler(DataHandler):
             f"{filename_prefix}.geojson"
 
         if not output_geojson_path.exists():
-            self.logger.info(f"Downloading and processing from: {shp_url}")
+            self.logger.debug(f"Downloading and processing from: {shp_url}")
             try:
                 # Download file first to temporary location, then read it
                 with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp_file:
-                    self.logger.info(
-                        f"Downloading to temporary file: {
-                            tmp_file.name}")
                     urllib.request.urlretrieve(shp_url, tmp_file.name)
 
                     # Read the downloaded file
@@ -71,7 +68,7 @@ class CensusDataHandler(DataHandler):
                 return None
         else:
             self.logger.info(
-                f"Loading from existing file: {output_geojson_path}")
+                f"Loading from existing file")
             try:
                 return gpd.read_file(output_geojson_path)
             except Exception as e:
@@ -197,8 +194,7 @@ class CensusDataHandler(DataHandler):
                         f"{state_fips}_{county_fips}_full_county_extent_ref.geojson"
                     full_county_extent_gdf.to_file(
                         full_county_extent_ref_path, driver='GeoJSON')
-                    self.logger.info(
-                        f"Reference file for full county extent (from all blocks) saved: {full_county_extent_ref_path}")
+
             except Exception as e:
                 self.logger.warning(
                     f"Could not save full county extent reference boundary: {e}",
@@ -207,17 +203,9 @@ class CensusDataHandler(DataHandler):
             clipping_boundary_for_blocks: Optional[gpd.GeoDataFrame] = None
             if is_subdivision_run and specific_subdivision_gdf is not None and not specific_subdivision_gdf.empty:
                 clipping_boundary_for_blocks = specific_subdivision_gdf
-                self.logger.info(
-                    "Targeting blocks within the specific county subdivision.")
-            else:
-                self.logger.info("Targeting all blocks within the county.")
 
             if clipping_boundary_for_blocks is not None:
-                self.logger.info(
-                    f"Clipping county blocks to the target subdivision boundary.")
                 if county_blocks_gdf_filtered.crs != clipping_boundary_for_blocks.crs:
-                    self.logger.info(
-                        f"Aligning CRS for block clipping: Blocks {county_blocks_gdf_filtered.crs} to Boundary {clipping_boundary_for_blocks.crs}")
                     county_blocks_gdf_filtered = county_blocks_gdf_filtered.to_crs(
                         clipping_boundary_for_blocks.crs)
 
@@ -231,7 +219,7 @@ class CensusDataHandler(DataHandler):
             # Filter out non-polygon geometries before saving
             if processed_target_blocks_gdf is not None and not processed_target_blocks_gdf.empty:
                 # Filter out non-polygon geometries before saving
-                original_count = len(processed_target_blocks_gdf)
+                len(processed_target_blocks_gdf)
 
                 # Keep only Polygon and MultiPolygon geometries
                 processed_target_blocks_gdf = processed_target_blocks_gdf[
@@ -239,23 +227,12 @@ class CensusDataHandler(DataHandler):
                                                                         'Polygon'])
                 ].copy()
 
-                final_count = len(processed_target_blocks_gdf)
-                dropped_count = original_count - final_count
-
-                if dropped_count > 0:
-                    self.logger.info(
-                        f"Filtered out {dropped_count} non-polygon blocks from clipping artifacts")
-                    self.logger.info(
-                        f"Retained {final_count}/{original_count} valid polygon blocks")
-
             if processed_target_blocks_gdf is not None and not processed_target_blocks_gdf.empty:
                 results['target_region_blocks'] = processed_target_blocks_gdf
                 results['target_region_blocks_filepath'] = self.dataset_output_dir / \
                     f"target_region{blocks_filename_suffix}.geojson"
                 processed_target_blocks_gdf.to_file(
                     results['target_region_blocks_filepath'], driver='GeoJSON')
-                self.logger.info(
-                    f"Saved target region blocks: {results['target_region_blocks_filepath']}")
             else:
                 self.logger.warning(
                     "No target region blocks resulted after processing/clipping. This might indicate an issue if blocks were expected.")
@@ -272,11 +249,7 @@ class CensusDataHandler(DataHandler):
         if is_subdivision_run and specific_subdivision_gdf is not None and not specific_subdivision_gdf.empty:
             authoritative_boundary_gdf = specific_subdivision_gdf
             boundary_filename_suffix_for_file = f"_boundary"
-            self.logger.info(
-                "Using specific subdivision as the authoritative target region boundary.")
         elif processed_target_blocks_gdf is not None and not processed_target_blocks_gdf.empty:
-            self.logger.info(
-                "Defining authoritative target region boundary from the extent of processed blocks.")
             try:
                 if processed_target_blocks_gdf.crs is None:
                     self.logger.warning(
@@ -304,12 +277,8 @@ class CensusDataHandler(DataHandler):
                 f"target_region{boundary_filename_suffix_for_file}.geojson"
             authoritative_boundary_gdf.to_file(
                 results['target_region_boundary_filepath'], driver='GeoJSON')
-            self.logger.info(
-                f"Saved authoritative target region boundary: {results['target_region_boundary_filepath']}")
 
             self.orchestrator.set_region_boundary(authoritative_boundary_gdf)
-            self.logger.info(
-                "Authoritative target region boundary successfully set in WorkflowOrchestrator.")
         else:
             self.logger.error(
                 "Authoritative target region boundary GDF is empty or None. Cannot set in orchestrator.")
@@ -423,8 +392,6 @@ class CensusDataHandler(DataHandler):
 
         try:
             plt.savefig(output_file, dpi=300, bbox_inches='tight')
-            self.logger.info(
-                f"Saved census blocks visualization to: {output_file}")
             return str(output_file)
         except Exception as e:
             self.logger.error(
@@ -447,23 +414,15 @@ class CensusDataHandler(DataHandler):
             blocks, subdivision (if applicable), the final region boundary,
             and paths to their saved files.
         """
-        self.logger.info(
-            # Changed plot_blocks to plot
-            f"Processing Census data via orchestrator context. Plotting: {plot}")
-
         try:
-            # The main work, including what would be "downloading", happens
-            # here.
             processed_data = self.download()
 
-            if plot:  # Changed plot_blocks to plot
+            if plot:
                 blocks_for_plot = processed_data.get('target_region_blocks')
 
                 boundary_to_draw = processed_data.get('target_region_boundary')
 
                 if blocks_for_plot is not None and not blocks_for_plot.empty:
-                    self.logger.info(
-                        "Proceeding with census blocks visualization.")
                     self._visualize_census_data(
                         blocks_gdf=blocks_for_plot,
                         boundary_to_plot_gdf=boundary_to_draw

@@ -11,6 +11,7 @@ import geopandas as gpd
 from pyrosm import OSM
 from shapely.geometry import Point
 
+from src.config_loader import EPSG
 from src.import_data.base import DataHandler
 
 if TYPE_CHECKING:
@@ -62,11 +63,10 @@ class OSMDataHandler(DataHandler):
 
         self.logger.info(
             f"Deduplicating power features (threshold: {distance_threshold_meters}m)")
-        initial_count = len(power_gdf)
+        len(power_gdf)
 
-        # Project to US National Grid (EPSG:5070) for accurate distance
         # calculations
-        power_projected = power_gdf.to_crs('EPSG:5070')
+        power_projected = power_gdf.to_crs(f'EPSG:{EPSG}')
 
         # Define priority: substation > transformer > pole
         power_priority = {'substation': 3, 'transformer': 2, 'pole': 1}
@@ -102,12 +102,6 @@ class OSMDataHandler(DataHandler):
 
         # Create deduplicated GeoDataFrame
         deduplicated_gdf = power_gdf.loc[selected_indices].copy()
-
-        removed_count = initial_count - len(deduplicated_gdf)
-        self.logger.info(
-            f"Removed {removed_count} duplicate features, {
-                len(deduplicated_gdf)} remaining"
-        )
 
         return deduplicated_gdf
 
@@ -160,8 +154,7 @@ class OSMDataHandler(DataHandler):
         voltage_distribution = voltage_values.value_counts(dropna=False)
         self.logger.info(f"Voltage distribution: {voltage_distribution}")
 
-        filtered_count = len(power_gdf) - voltage_mask.sum()
-        self.logger.info(f"Removed {filtered_count} high-voltage features")
+        len(power_gdf) - voltage_mask.sum()
 
         return power_gdf[voltage_mask]
 
@@ -187,9 +180,6 @@ class OSMDataHandler(DataHandler):
 
         # Apply transmission filter
         transmission_mask = ~power_gdf.apply(is_transmission_feature, axis=1)
-
-        filtered_count = len(power_gdf) - transmission_mask.sum()
-        self.logger.info(f"Removed {filtered_count} transmission features")
 
         return power_gdf[transmission_mask]
 
@@ -220,9 +210,7 @@ class OSMDataHandler(DataHandler):
         contained_mask = points.geometry.within(polygon_union)
         indices_to_remove = points[contained_mask].index
 
-        filtered_count = len(indices_to_remove)
-        self.logger.info(
-            f"Removed {filtered_count} points contained within polygons")
+        len(indices_to_remove)
 
         return power_gdf.drop(indices_to_remove)
 
@@ -239,9 +227,8 @@ class OSMDataHandler(DataHandler):
         """
         self.logger.info("Converting all geometries to centroids")
 
-        # Project to US National Grid (EPSG:5070) for accurate centroid
         # calculation
-        power_projected = power_gdf.to_crs('EPSG:5070')
+        power_projected = power_gdf.to_crs(f'EPSG:{EPSG}')
 
         # Store original geometry type and area
         power_projected['geom_type'] = power_projected.geometry.geom_type
@@ -292,7 +279,7 @@ class OSMDataHandler(DataHandler):
         power_features.to_file(raw_power_filepath, driver="GeoJSON")
 
         # Initial logging with detailed breakdown
-        initial_count = len(power_features)
+        len(power_features)
 
         # Add element_type column based on geometry
         power_features['element_type'] = power_features.geometry.apply(
@@ -336,28 +323,6 @@ class OSMDataHandler(DataHandler):
         # Save final power features (centroids only)
         power_filepath = self.dataset_output_dir / "power.geojson"
         centroids_power_features.to_file(power_filepath, driver="GeoJSON")
-
-        # Final summary
-        total_removed = initial_count - len(centroids_power_features)
-        reduction_percent = (total_removed / initial_count) * \
-            100 if initial_count > 0 else 0
-
-        final_power_types = centroids_power_features['power'].value_counts()
-
-        self.logger.info("=== PIPELINE SUMMARY ===")
-        self.logger.info("Initial features: %s", initial_count)
-        self.logger.info("Final features: %s", len(centroids_power_features))
-        self.logger.info(
-            "Total removed: %s (%.1f%%)",
-            total_removed,
-            reduction_percent)
-        self.logger.info(
-            "Final power type distribution: %s",
-            dict(final_power_types))
-        self.logger.info(
-            "Successfully extracted %s power features as centroids",
-            len(centroids_power_features)
-        )
 
         return centroids_power_features, power_filepath
 

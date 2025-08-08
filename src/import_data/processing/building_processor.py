@@ -5,7 +5,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
-from src.config_loader import LOG_FILE, LOG_LEVEL
+from src.config_loader import EPSG, LOG_FILE, LOG_LEVEL
 from src.import_data.processing.building_schema import (
     NonResidentialBuildingOutput, ResidentialBuildingOutput)
 from src.utils import create_logger
@@ -53,49 +53,47 @@ class BuildingProcessor:
         --------
         dict : Paths to output files
         """
+        # Check if final output shapefiles already exist
+        shp_output_dir = self.dataset_output_dir / "SHP"
+        residential_shp_path = shp_output_dir / "Res_buildings.shp"
+        other_shp_path = shp_output_dir / "Oth_buildings.shp"
+
+        if residential_shp_path.exists() and other_shp_path.exists():
+            self.logger.info("Building processing output files already exist!")
+            return {
+                "residential_buildings_path": str(residential_shp_path),
+                "other_buildings_path": str(other_shp_path)
+            }
+
         self.logger.info("Starting building classification process")
 
         # Step 0: Only process buildings with a floor area greater than 45 sq
         # meters
-        self.logger.info("Step 0: Filtering out small buildings")
         osm_data['buildings'] = self._filter_small_buildings(
             osm_data['buildings'])
 
         # Step 1: Classify building use (residential, commercial, industrial,
         # etc.)
-        self.logger.info("Step 1: Classifying building use")
+        self.logger.info("Classifying building use")
         all_buildings = self.classify_building_use(
             osm_data.get('buildings'),
             osm_data.get('pois'),
             osm_data.get('landuse'),
         )
 
-        # Step 2: Split buildings by use
-        self.logger.info(f"Found {len(all_buildings)} buildings to process")
-
-        # Step 3: Calculate free walls for all buildings
-        self.logger.info("Step 3: Calculating free walls")
+        # Step 2: Calculate free walls for all buildings
+        self.logger.info("Calculating free walls")
         all_buildings = self.calculate_free_walls(all_buildings)
-        all_buildings.to_file(
-            self.dataset_output_dir /
-            "03_all_buildings_with_free_walls.geojson")
 
-        # Step 4: Calculate floors
-        self.logger.info("Step 4: Calculating floors")
+        # Step 3: Calculate floors
+        self.logger.info("Calculating floors")
         all_buildings = self.calculate_floors(
             all_buildings, microsoft_buildings_data.get('ms_buildings'))
-        all_buildings.to_file(
-            self.dataset_output_dir /
-            "04_all_buildings_with_floors.geojson")
 
-        # Step 5: Assign building IDs
-        self.logger.info("Step 5: Assigning building IDs")
+        # Step 4: Assign building IDs
+        self.logger.info("Assigning building IDs")
         all_buildings = self._assign_building_id(
             all_buildings, census_data.get('target_region_blocks'))
-
-        all_buildings.to_file(
-            self.dataset_output_dir
-            / "05_all_buildings_with_building_id.geojson")
 
         # Split buildings by use after ID assignment
         residential = all_buildings[all_buildings['building_use']
@@ -115,8 +113,7 @@ class BuildingProcessor:
                 residential,
                 census_data.get('target_region_blocks')
             )
-            residential.to_file(self.dataset_output_dir
-                                / "06_residential_buildings_with_building_type.geojson")
+
             # Allot occupants based on census
             residential = self._allot_occupants(
                 residential,
@@ -129,12 +126,13 @@ class BuildingProcessor:
                 residential,
                 nrel_vintage_distribution
             )
-            residential.to_file(self.dataset_output_dir
-                                / "07_FINAL_residential_buildings_with_construction_year.geojson")
 
             residential = residential.rename(
                 columns={
                     'id': 'osm_id',
+                    'census_block_id': 'c_block_id',
+                    'building_id': 'build_id',
+                    "building_type": "build_type",
                     'floor_area': 'area',
                     'building_use': 'use'})
 
@@ -154,9 +152,6 @@ class BuildingProcessor:
                 self.logger.warning("No residential buildings found")
 
         if len(other) > 0:
-            self.logger.info(
-                f"Processing {
-                    len(other)} non-residential buildings")
             other = other.rename(
                 columns={
                     'id': 'osm_id',
@@ -187,10 +182,6 @@ class BuildingProcessor:
 
         # 1. Filter out small buildings and non-buildings
         # Minimum building area threshold (e.g., 45 sq meters)
-        self.logger.info(
-            f"Found {
-                len(buildings)} buildings before small building filter")
-
         # Calculate accurate areas in square meters
         buildings = self._calculate_floor_area(buildings)
 
@@ -277,11 +268,6 @@ class BuildingProcessor:
             self.logger.info(
                 f"Removed {excluded_count} power infrastructure buildings.")
 
-        self.logger.info(f"Total excluded buildings removed: {total_excluded}")
-        self.logger.info(
-            f"Remaining buildings for classification: {
-                len(classified_buildings)}")
-
         # Initialize 'building_use' column for remaining buildings
         classified_buildings['building_use'] = pd.NA
 
@@ -305,7 +291,7 @@ class BuildingProcessor:
                          'hut', 'cabin']  # hut/cabin often residential
             mask = candidate_buildings['building'].isin(res_types)
             candidate_buildings.loc[mask, 'building_use'] = 'residential'
-            self.logger.info(
+            self.logger.debug(
                 f"{mask.sum()} buildings classified as residential from 'building' tag.")
 
             # Commercial from 'building'
@@ -314,7 +300,7 @@ class BuildingProcessor:
             mask = candidate_buildings['building'].isin(
                 com_types) & candidate_buildings['building_use'].isna()
             candidate_buildings.loc[mask, 'building_use'] = 'commercial'
-            self.logger.info(
+            self.logger.debug(
                 f"{mask.sum()} buildings classified as commercial from 'building' tag.")
 
             # Industrial from 'building'
@@ -327,7 +313,7 @@ class BuildingProcessor:
             mask = candidate_buildings['building'].isin(
                 ind_types) & candidate_buildings['building_use'].isna()
             candidate_buildings.loc[mask, 'building_use'] = 'industrial'
-            self.logger.info(
+            self.logger.debug(
                 f"{mask.sum()} buildings classified as industrial from 'building' tag.")
 
             # Public from 'building'
@@ -338,7 +324,7 @@ class BuildingProcessor:
             mask = candidate_buildings['building'].isin(
                 pub_types) & candidate_buildings['building_use'].isna()
             candidate_buildings.loc[mask, 'building_use'] = 'public'
-            self.logger.info(
+            self.logger.debug(
                 f"{mask.sum()} buildings classified as public from 'building' tag.")
 
         # 1.2 'building:use' tag (often more specific than 'building')
@@ -360,7 +346,7 @@ class BuildingProcessor:
                 # Overwrite if more specific, or fill if NA. Let's overwrite
                 # for building:use
                 candidate_buildings.loc[mask, 'building_use'] = syn_val
-            self.logger.info(
+            self.logger.debug(
                 f"Applied 'building:use' tag classifications. Check specific counts if needed.")
 
         # 1.3 'amenity' tag
@@ -382,19 +368,19 @@ class BuildingProcessor:
             mask = candidate_buildings['amenity'].fillna('').str.lower().isin(
                 pub_amenities) & candidate_buildings['building_use'].isna()
             candidate_buildings.loc[mask, 'building_use'] = 'public'
-            self.logger.info(
+            self.logger.debug(
                 f"{mask.sum()} buildings classified as public from 'amenity' tag.")
 
             mask = candidate_buildings['amenity'].fillna('').str.lower().isin(
                 com_amenities) & candidate_buildings['building_use'].isna()
             candidate_buildings.loc[mask, 'building_use'] = 'commercial'
-            self.logger.info(
+            self.logger.debug(
                 f"{mask.sum()} buildings classified as commercial from 'amenity' tag.")
 
             mask = candidate_buildings['amenity'].fillna('').str.lower().isin(
                 res_amenities) & candidate_buildings['building_use'].isna()
             candidate_buildings.loc[mask, 'building_use'] = 'residential'
-            self.logger.info(
+            self.logger.debug(
                 f"{mask.sum()} buildings classified as residential from 'amenity' (shelter).")
 
         # 1.4 'shop' tag
@@ -402,7 +388,7 @@ class BuildingProcessor:
             mask = candidate_buildings['shop'].notna(
             ) & candidate_buildings['building_use'].isna()
             candidate_buildings.loc[mask, 'building_use'] = 'commercial'
-            self.logger.info(
+            self.logger.debug(
                 f"{mask.sum()} buildings classified as commercial from 'shop' tag.")
 
         # 1.5 'office' tag
@@ -417,7 +403,7 @@ class BuildingProcessor:
             mask = candidate_buildings['office'].fillna('').str.lower().isin(
                 public_office_types) & candidate_buildings['building_use'].isna()
             candidate_buildings.loc[mask, 'building_use'] = 'public'
-            self.logger.info(
+            self.logger.debug(
                 f"{mask.sum()} buildings classified as Public from specific 'office' types.")
 
             # General commercial offices
@@ -425,7 +411,7 @@ class BuildingProcessor:
                 ~candidate_buildings['office'].fillna('').str.lower().isin(public_office_types) & \
                 candidate_buildings['building_use'].isna()
             candidate_buildings.loc[mask, 'building_use'] = 'commercial'
-            self.logger.info(
+            self.logger.debug(
                 f"{mask.sum()} buildings classified as commercial from general 'office' tag.")
 
         # 1.6 'building:flats' tag
@@ -433,7 +419,7 @@ class BuildingProcessor:
             mask = candidate_buildings['building:flats'].notna(
             ) & candidate_buildings['building_use'].isna()
             candidate_buildings.loc[mask, 'building_use'] = 'residential'
-            self.logger.info(
+            self.logger.debug(
                 f"{mask.sum()} buildings classified as Residential from 'building:flats' tag.")
 
         # 1.7 'craft' tag
@@ -442,17 +428,17 @@ class BuildingProcessor:
             ) & candidate_buildings['building_use'].isna()
             # Or 'Industrial' for some
             candidate_buildings.loc[mask, 'building_use'] = 'commercial'
-            self.logger.info(
+            self.logger.debug(
                 f"{mask.sum()} buildings classified as commercial from 'craft' tag.")
 
         # Update main dataframe with classifications from candidate_buildings
         classified_buildings.update(candidate_buildings[['building_use']])
 
-        self.logger.info(
+        self.logger.debug(
             f"After initial building tag classification: \n{classified_buildings['building_use'].value_counts(dropna=False)}")
 
         # --- Step 2: Classification by POIs (Spatial Join) ---
-        self.logger.info(
+        self.logger.debug(
             "Starting POI-based classification for remaining unclassified buildings.")
 
         # Ensure POIs GeoDataFrame is provided and not empty
@@ -466,18 +452,12 @@ class BuildingProcessor:
                 self.logger.warning(
                     f"CRS mismatch between buildings ({
                         classified_buildings.crs}) and POIs ({
-                        pois.crs}). "
-                    f"Spatial join results may be incorrect. Reproject to a common CRS."
-                )
-                # Example reprojection (consider which CRS is appropriate for
-                # your area):
+                        pois.crs})")
                 pois = pois.to_crs(classified_buildings.crs)
 
             # Get buildings that are still unclassified
             buildings_to_classify_via_poi = classified_buildings[classified_buildings['building_use'].isna(
             )].copy()
-            self.logger.info(
-                f"Found {len(buildings_to_classify_via_poi)} buildings to attempt POI classification on.")
 
             if not buildings_to_classify_via_poi.empty:
                 buildings_with_pois = gpd.sjoin(
@@ -504,12 +484,12 @@ class BuildingProcessor:
                 if not buildings_with_pois.empty and poi_index_col_name in buildings_with_pois.columns:
                     buildings_with_pois_matches = buildings_with_pois[buildings_with_pois[poi_index_col_name].notna(
                     )].copy()
-                    self.logger.info(
+                    self.logger.debug(
                         f"{len(buildings_with_pois_matches)} building-POI intersections found.")
                 else:
                     # Ensure it's an empty GeoDataFrame
                     buildings_with_pois_matches = gpd.GeoDataFrame()
-                    self.logger.info(
+                    self.logger.debug(
                         "No building-POI intersections found or POI index column missing.")
 
                 # Define POI tags for classification
@@ -618,8 +598,6 @@ class BuildingProcessor:
 
             buildings_to_classify_via_landuse = classified_buildings[classified_buildings['building_use'].isna(
             )].copy()
-            self.logger.info(
-                f"Found {len(buildings_to_classify_via_landuse)} buildings to attempt Landuse classification on.")
 
             if not buildings_to_classify_via_landuse.empty:
                 buildings_with_landuse = gpd.sjoin(
@@ -647,17 +625,9 @@ class BuildingProcessor:
                 if not buildings_with_landuse.empty and landuse_join_index_col_name in buildings_with_landuse.columns:
                     buildings_with_landuse_matches = buildings_with_landuse[buildings_with_landuse[landuse_join_index_col_name].notna(
                     )].copy()
-                    self.logger.info(
-                        f"{len(buildings_with_landuse_matches)} building-landuse intersections (within) found.")
                 else:
                     buildings_with_landuse_matches = gpd.GeoDataFrame()
-                    self.logger.info(
-                        "No building-landuse intersections found or landuse index column missing.")
 
-                # Define Landuse tag mappings (primary column from landuse.geojson seems to be 'landuse')
-                # Adjust the column name 'landuse_landuse' if your actual join results in
-                # a different suffixed name.
-                # Default if 'landuse' was the key column in landuse gdf
                 landuse_col_name = 'landuse_landuse'
                 if landuse_col_name not in buildings_with_landuse_matches.columns and 'landuse' in landuse.columns:
                     # Attempt to find the correct suffixed column if default
@@ -666,15 +636,9 @@ class BuildingProcessor:
                         'landuse') and col.endswith('_landuse')]
                     if potential_cols:
                         landuse_col_name = potential_cols[0]
-                        self.logger.info(
-                            f"Using landuse column: {landuse_col_name}")
                     else:
-                        self.logger.warning(
-                            f"Could not identify the correct landuse type column in the spatially joined data. Searched for columns starting with 'landuse' and ending with '_landuse'. Skipping landuse classification.")
                         landuse_col_name = None  # Ensure we skip if not found
                 elif landuse_col_name not in buildings_with_landuse_matches.columns:
-                    self.logger.warning(
-                        f"Default landuse column '{landuse_col_name}' not found and no alternative identified. Skipping landuse classification.")
                     landuse_col_name = None  # Ensure we skip if not found
 
                 if landuse_col_name:
@@ -707,26 +671,31 @@ class BuildingProcessor:
                                 classified_buildings.loc[building_idx,
                                                          'building_use'] = current_use
 
-                    self.logger.info(
+                    self.logger.debug(
                         f"After Landuse-based classification: \n{classified_buildings['building_use'].value_counts(dropna=False)}")
 
         mask = classified_buildings['building_use'].isna()
         classified_buildings.loc[mask,
                                  'building_use'] = 'residential'  # Default
-        self.logger.info(
+        self.logger.debug(
             f"{mask.sum()} buildings assigned default use 'residential'."
         )
+
+        # Sanity check: Residential buildings cannot be bigger than 800 sq
+        # meters, then set to Commercial
+        classified_buildings.loc[classified_buildings['floor_area']
+                                 > 1000, 'building_use'] = 'commercial'
 
         # ---Step 4: Remove irrelevant properties
         classified_buildings = self._cleaning_osm_data(classified_buildings)
 
         # Final counts
-        self.logger.info("Building use classification complete. Value counts:")
+        self.logger.debug(
+            "Building use classification complete. Value counts:")
         self.logger.info(
             f"\n{
                 classified_buildings['building_use'].value_counts(
                     dropna=False)}")
-
         return classified_buildings
 
     def _cleaning_osm_data(self, gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
@@ -821,35 +790,6 @@ class BuildingProcessor:
             lambda idx: neighbors_dict.get(idx, [])
         )
 
-        # TODO: Delete later Log neighbor distribution analysis
-        neighbor_counts = buildings_with_walls['neighbors'].apply(len)
-        buildings_with_neighbors = (neighbor_counts > 0).sum()
-        total_buildings = len(buildings_with_walls)
-
-        self.logger.info(f"Neighbor Analysis:")
-        self.logger.info(f"  Total buildings: {total_buildings}")
-        self.logger.info(
-            f"  Buildings with neighbors: {buildings_with_neighbors} ({buildings_with_neighbors / total_buildings * 100:.1f}%)")
-        self.logger.info(
-            f"  Buildings without neighbors: {total_buildings - buildings_with_neighbors} ({(total_buildings - buildings_with_neighbors) / total_buildings * 100:.1f}%)")
-
-        # Distribution breakdown
-        neighbor_distribution = neighbor_counts.value_counts().sort_index()
-        self.logger.info(f"  Neighbor count distribution:")
-        for neighbor_count, building_count in neighbor_distribution.items():
-            percentage = building_count / total_buildings * 100
-            self.logger.info(
-                f"    {neighbor_count} neighbors: {building_count} buildings ({percentage:.1f}%)")
-
-        # Summary statistics
-        avg_neighbors = neighbor_counts.mean()
-        max_neighbors = neighbor_counts.max()
-        self.logger.info(
-            f"  Average neighbors per building: {
-                avg_neighbors:.2f}")
-        self.logger.info(
-            f"  Maximum neighbors for any building: {max_neighbors}")
-
         # Calculate free walls (assuming max 4 walls per building)
         buildings_with_walls["free_walls"] = 4
         for index, row in buildings_with_walls.iterrows():
@@ -905,21 +845,21 @@ class BuildingProcessor:
         classified_buildings = classified_buildings.reset_index(drop=True)
 
         # Step 1: Find direct neighbors (touching buildings)
-        self.logger.info("Step 1: Finding direct neighbors for each building")
+        self.logger.debug("Finding direct neighbors for each building")
         neighbors_dict = self._find_direct_neighbors(classified_buildings)
         classified_buildings['neighbors'] = classified_buildings.index.map(
             lambda idx: neighbors_dict.get(idx, [])
         )
 
         # Step 2: Expand to full clusters (all connected buildings)
-        self.logger.info("Step 2: Expanding to full building clusters")
+        self.logger.debug("Expanding to full building clusters")
         clusters_dict = self._expand_to_clusters(neighbors_dict)
         classified_buildings['cluster'] = classified_buildings.index.map(
             lambda idx: sorted(list(clusters_dict.get(idx, {idx})))
         )
 
         # Step 3: Calculate total cluster area
-        self.logger.info("Step 3: Calculating total cluster areas")
+        self.logger.debug("Calculating total cluster areas")
         classified_buildings['total_cluster_area'] = classified_buildings.apply(
             lambda row: classified_buildings.loc[
                 classified_buildings.index.isin(row['cluster']), 'floor_area'
@@ -928,14 +868,14 @@ class BuildingProcessor:
         )
 
         # Step 4: Initial classification based on cluster characteristics
-        self.logger.info(
-            "Step 4: Classifying building types based on cluster characteristics")
+        self.logger.debug(
+            "Classifying building types based on cluster characteristics")
         classified_buildings = self._assign_building_types(
             classified_buildings)
 
         # Log final distribution
         type_counts = classified_buildings['building_type'].value_counts()
-        self.logger.info(f"Building type distribution:\n{type_counts}")
+        self.logger.debug(f"Building type distribution:\n{type_counts}")
 
         return classified_buildings
 
@@ -1137,6 +1077,7 @@ class BuildingProcessor:
         --------
         GeoDataFrame : Same as input, with 'occupants' and 'housing_units' columns filled.
         """
+        self.logger.debug("Starting occupant allocation")
 
         if buildings is None or buildings.empty:
             return buildings
@@ -1155,8 +1096,6 @@ class BuildingProcessor:
         # Initialize output columns
         buildings_with_occupants['occupants'] = 0
         buildings_with_occupants['housing_units'] = 0.0
-
-        self.logger.info("Starting census-based occupant allocation")
 
         for _, census_block in census_blocks.iterrows():
             geoid = census_block['GEOID20']
@@ -1322,10 +1261,6 @@ class BuildingProcessor:
             self.logger.debug(f"Block {geoid}: Allocated {final_allocated}/{total_pop} people "
                               f"({final_allocated / total_pop * 100:.1f}%)")
 
-        # Phase 4: Statistical Analysis and Remaining Population Allocation
-        self.logger.info(
-            "Performing statistical analysis and final allocation adjustments")
-
         # Calculate statistics by building type for buildings with occupants
         building_stats = {}
         for building_type in ['SFH', 'TH', 'MFH', 'AB']:
@@ -1355,9 +1290,6 @@ class BuildingProcessor:
         # Allocate remaining population to buildings with 0 occupants
         zero_occupant_buildings = buildings_with_occupants[buildings_with_occupants['occupants'] == 0]
         if len(zero_occupant_buildings) > 0:
-            self.logger.info(
-                f"Allocating population to {len(zero_occupant_buildings)} buildings with 0 occupants")
-
             for idx in zero_occupant_buildings.index:
                 building_type = buildings_with_occupants.at[idx,
                                                             'building_type']
@@ -1382,7 +1314,6 @@ class BuildingProcessor:
                     buildings_with_occupants.at[idx, 'housing_units'] = max(
                         1, int(round(max_allowed / 2.6)))
 
-        self.logger.info("Completed census-based occupant allocation.")
         return buildings_with_occupants
 
     def _assign_building_id(self, buildings: gpd.GeoDataFrame,
@@ -1410,8 +1341,6 @@ class BuildingProcessor:
             buildings_copy['census_block_id'] = None
             if not buildings_copy.empty:
                 self.dataset_output_dir.mkdir(parents=True, exist_ok=True)
-                buildings_copy.to_file(
-                    self.dataset_output_dir / "5_buildings_unassigned_to_blocks.geojson", driver="GeoJSON")
             return buildings_copy
 
         required_cols = ['GEOID20', 'geometry']
@@ -1429,21 +1358,11 @@ class BuildingProcessor:
                     self.dataset_output_dir / "5_buildings_unassigned_to_blocks.geojson", driver="GeoJSON")
             return buildings_copy
 
-        self.logger.info("Starting centroid-based building ID assignment")
-        self.logger.info(
-            f"Input: {
-                len(buildings)} buildings, {
-                len(census_blocks)} census blocks")
-        self.logger.info(f"Original buildings CRS: {buildings.crs}")
-        self.logger.info(f"Original census_blocks CRS: {census_blocks.crs}")
-
         # Project to target CRS for accurate centroid calculation
-        target_crs = "EPSG:5070"
+        target_crs = f"EPSG:{EPSG}"
         try:
             buildings_proj = buildings.to_crs(target_crs)
             census_blocks_proj = census_blocks.to_crs(target_crs)
-            self.logger.info(
-                f"Projected to {target_crs} for accurate centroid calculation")
         except Exception as e:
             self.logger.error(
                 f"Error during CRS projection to {target_crs}: {e}. Cannot assign IDs.")
@@ -1456,9 +1375,6 @@ class BuildingProcessor:
                     self.dataset_output_dir / "unassigned_buildings.geojson", driver="GeoJSON")
             return buildings_copy
 
-        # Phase 2: Calculate building centroids for spatial matching
-        self.logger.info(
-            "Phase 2: Calculating building centroids for spatial matching")
         try:
             # Create centroids while preserving original building indices and
             # attributes
@@ -1471,8 +1387,6 @@ class BuildingProcessor:
 
             centroid_success_count = building_centroids['centroid'].notna(
             ).sum()
-            self.logger.info(f"Successfully calculated {centroid_success_count}/{len(buildings)} "
-                             f"building centroids ({centroid_success_count / len(buildings) * 100:.1f}% success)")
 
             if centroid_success_count == 0:
                 self.logger.error(
@@ -1489,9 +1403,6 @@ class BuildingProcessor:
             buildings_copy['census_block_id'] = None
             return buildings_copy
 
-        # Phase 3: Single-step spatial join using centroids
-        self.logger.info(
-            "Phase 3: Performing centroid-based spatial join with census blocks")
         try:
             # Spatial join: centroid WITHIN census_block
             joined = gpd.sjoin(
@@ -1504,32 +1415,29 @@ class BuildingProcessor:
             # Count successful assignments
             assigned_mask = joined['index_right'].notna()
             assigned_count = assigned_mask.sum()
-            success_rate = assigned_count / len(buildings) * 100
-
-            self.logger.info(f"Spatial join results: {assigned_count}/{len(buildings)} buildings assigned "
-                             f"({success_rate:.1f}% success)")
+            assigned_count / len(buildings) * 100
 
             # Log assignment distribution by census block
             if assigned_count > 0:
                 block_distribution = joined[assigned_mask].groupby(
                     'GEOID20').size()
-                self.logger.info(
+                self.logger.debug(
                     f"Assignment distribution across {len(block_distribution)} census blocks:")
-                self.logger.info(
+                self.logger.debug(
                     f"  Average buildings per block: {
                         block_distribution.mean():.1f}")
-                self.logger.info(
+                self.logger.debug(
                     f"  Max buildings in single block: {
                         block_distribution.max()}")
-                self.logger.info(
+                self.logger.debug(
                     f"  Min buildings in single block: {
                         block_distribution.min()}")
 
                 # Log top 5 blocks by building count
                 top_blocks = block_distribution.nlargest(5)
-                self.logger.info("Top 5 blocks by building count:")
+                self.logger.debug("Top 5 blocks by building count:")
                 for geoid, count in top_blocks.items():
-                    self.logger.info(f"  Block {geoid}: {count} buildings")
+                    self.logger.debug(f"  Block {geoid}: {count} buildings")
 
         except Exception as e:
             self.logger.error(f"Error during spatial join: {e}")
@@ -1537,10 +1445,6 @@ class BuildingProcessor:
             buildings_copy['building_id'] = None
             buildings_copy['census_block_id'] = None
             return buildings_copy
-
-        # Phase 4: Generate building IDs and assign back to original buildings
-        self.logger.info(
-            "Phase 4: Generating building IDs and mapping back to original geometries")
 
         # Prepare result DataFrame with original polygon geometries
         buildings_with_ids = buildings.copy()
@@ -1577,9 +1481,6 @@ class BuildingProcessor:
                                        'building_id'] = building_id_val
                 buildings_with_ids.loc[original_idx, 'census_block_id'] = geoid
 
-            self.logger.info(
-                f"Generated building IDs for {
-                    len(assignments_df)} buildings")
         else:
             self.logger.warning(
                 "No buildings were successfully assigned to census blocks")
@@ -1598,8 +1499,6 @@ class BuildingProcessor:
                 self.dataset_output_dir.mkdir(parents=True, exist_ok=True)
                 unassigned_buildings.to_file(
                     self.dataset_output_dir / "unassigned_buildings.geojson", driver="GeoJSON")
-                self.logger.info(f"Saved {len(unassigned_buildings)} unassigned buildings "
-                                 "to 'unassigned_buildings.geojson' for debugging")
             except Exception as e:
                 self.logger.error(f"Failed to save unassigned buildings: {e}")
 
@@ -1638,9 +1537,6 @@ class BuildingProcessor:
         # Create a copy to avoid modifying the original
         buildings_with_height_floors = buildings.copy()
 
-        self.logger.info(
-            f"Processing {len(buildings_with_height_floors)} buildings for OSM height and floor information")
-
         # Initial counts
         initial_height_count = buildings_with_height_floors['height'].notna(
         ).sum()
@@ -1661,13 +1557,7 @@ class BuildingProcessor:
                     # Remove common units and extract numeric part
                     height_str = height_str.replace(
                         'm',
-                        '').replace(
-                        'meters',
-                        '').replace(
-                        'ft',
-                        '').replace(
-                        'feet',
-                        '').strip()
+                        '').replace('meters', '').strip()
                     height_float = float(height_str)
                     # Sanity check: building height should be reasonable (1-500
                     # meters)
@@ -1688,12 +1578,6 @@ class BuildingProcessor:
                 buildings_with_height_floors.loc[height_mask,
                                                  'height'] = buildings_with_height_floors.loc[height_mask,
                                                                                               'height'].apply(parse_height)
-
-        # Log after height parsing
-        after_height_parsing = buildings_with_height_floors['height'].notna(
-        ).sum()
-        self.logger.info(
-            f"After height parsing: {after_height_parsing} buildings have height data (+{after_height_parsing - initial_height_count})")
 
         # Extract floor information from OSM 'building:levels' tag
         if 'building:levels' in buildings_with_height_floors.columns:
@@ -1729,7 +1613,7 @@ class BuildingProcessor:
         # Log after floors parsing
         after_floors_parsing = buildings_with_height_floors['floors'].notna(
         ).sum()
-        self.logger.info(
+        self.logger.debug(
             f"After floors parsing: {after_floors_parsing} buildings have floor data (+{after_floors_parsing - initial_floors_count})")
 
         # Handle cases where we have height but no floors - estimate floors from
@@ -1775,10 +1659,10 @@ class BuildingProcessor:
         ).sum()
         total_buildings = len(buildings_with_height_floors)
 
-        self.logger.info(f"OSM tag processing complete:")
-        self.logger.info(
+        self.logger.debug(f"OSM tag processing complete:")
+        self.logger.debug(
             f"  Height data: {final_height_count}/{total_buildings} buildings (+{final_height_count - initial_height_count})")
-        self.logger.info(
+        self.logger.debug(
             f"  Floor data: {final_floors_count}/{total_buildings} buildings (+{final_floors_count - initial_floors_count})")
 
         return buildings_with_height_floors
@@ -1872,9 +1756,6 @@ class BuildingProcessor:
                 "No valid height data found in Microsoft Buildings (all heights are -1 or invalid)")
             return buildings_with_ms_height
 
-        self.logger.info(
-            f"Found {len(valid_ms_buildings)} MS buildings with valid height data (filtered from {len(ms_buildings_projected)})")
-
         # Convert height to numeric if it's not already
         valid_ms_buildings['height'] = pd.to_numeric(
             valid_ms_buildings['height'], errors='coerce')
@@ -1902,8 +1783,8 @@ class BuildingProcessor:
                 ms_centroids_gdf['confidence'],
                 errors='coerce') >= confidence_threshold
             ms_centroids_filtered = ms_centroids_gdf[high_confidence_mask]
-            self.logger.info(
-                f"After confidence filtering (>{confidence_threshold}): {len(ms_centroids_filtered)} high-confidence MS buildings")
+            self.logger.debug(
+                f"After confidence filtering (>{confidence_threshold}): {len(ms_centroids_filtered)} buildings with height data")
         else:
             ms_centroids_filtered = ms_centroids_gdf
 
@@ -1918,25 +1799,6 @@ class BuildingProcessor:
                 lsuffix='ms',          # MS building columns get _ms suffix
                 rsuffix='osm'          # OSM building columns get _osm suffix
             )
-            self.logger.info(
-                f"Length of ms_centroids_filtered: {
-                    len(ms_centroids_filtered)}")
-            self.logger.info(
-                f"Length of buildings_projected: {
-                    len(buildings_projected)}")
-            self.logger.info(
-                f"Centroid-based spatial join results: {len(joined)} MS building centroids matched with OSM buildings")
-
-            # Debug: Check what columns are actually in the joined result
-            self.logger.info(
-                f"Joined DataFrame columns: {
-                    list(
-                        joined.columns)}")
-            self.logger.info(
-                f"Joined DataFrame index name: {
-                    joined.index.name}")
-            self.logger.info(f"Sample of joined data:\n{joined.head()}")
-
             if len(joined) == 0:
                 self.logger.debug(
                     "No MS building centroids fall within OSM buildings")
@@ -1953,11 +1815,6 @@ class BuildingProcessor:
             osm_stats.columns = ['avg_height', 'ms_count'] + \
                 (['avg_confidence'] if 'confidence_ms' in joined.columns else [])
 
-            self.logger.info(
-                f"Calculated height data for {len(osm_stats)} OSM buildings from MS data")
-            self.logger.info(
-                f"Average MS buildings per OSM building: {osm_stats['ms_count'].mean():.1f}")
-
             # Now use the correct OSM building indices
             osm_building_indices = osm_stats.index  # These are now OSM building indices!
             buildings_with_ms_height.loc[osm_building_indices,
@@ -1971,9 +1828,7 @@ class BuildingProcessor:
             buildings_with_ms_height.loc[osm_building_indices,
                                          'floors'] = floors
 
-            assigned_count = len(osm_stats)
-            self.logger.info(
-                f"Successfully assigned MS height data to {assigned_count} OSM buildings")
+            len(osm_stats)
 
         except KeyError as e:
             self.logger.warning(f"Missing expected column: {e}")
@@ -2001,16 +1856,16 @@ class BuildingProcessor:
         if buildings is None or len(buildings) == 0:
             return buildings
 
+        # Start log: announce processing scope
+        initial_total_buildings = len(buildings)
+        self.logger.info(
+            f"Starting floors/height calculation for {initial_total_buildings} buildings")
+
         # Initialize height and floors columns if they don't exist
         if 'height' not in buildings.columns:
             buildings['height'] = None
         if 'floors' not in buildings.columns:
             buildings['floors'] = None
-
-        # Step 1: Extract height and floor information from Microsoft Buildings
-        # data
-        self.logger.info(
-            "Step 1: Extracting height and floors from Microsoft Buildings data")
 
         # Only process buildings which do not have height data yet:
         buildings_without_height = buildings[buildings['height'].isna()]
@@ -2019,14 +1874,10 @@ class BuildingProcessor:
             buildings_without_height, microsoft_buildings)
 
         # Step 1: Extract height and floor information from OSM tags
-        self.logger.info("Step 2: Extracting height and floors from OSM tags")
         # Filter out buildings that have height and floors from MS data before osm
         # tags extraction to not overwrite:
         undetermined_buildings = buildings_with_floors[buildings_with_floors['height'].isna(
         ) | buildings_with_floors['floors'].isna()]
-        self.logger.info(
-            f"Buildings needing OSM tag processing: {
-                len(undetermined_buildings)}")
 
         if len(undetermined_buildings) > 0:
             processed_undetermined = self._calculate_floor_height_from_osm_tags(
@@ -2034,12 +1885,20 @@ class BuildingProcessor:
             # Update only the processed buildings back into the main dataset
             buildings_with_floors.loc[processed_undetermined.index] = processed_undetermined
 
-        # Log final counts after OSM processing
+        # Final summary log (percentages)
         height_count = buildings_with_floors['height'].notna().sum()
         floors_count = buildings_with_floors['floors'].notna().sum()
         total_buildings = len(buildings_with_floors)
+        height_pct = (
+            height_count /
+            total_buildings *
+            100) if total_buildings > 0 else 0.0
+        floors_pct = (
+            floors_count /
+            total_buildings *
+            100) if total_buildings > 0 else 0.0
         self.logger.info(
-            f"After OSM processing: {height_count}/{total_buildings} buildings have height data, {floors_count}/{total_buildings} have floor data")
+            f"Completed floors/height calculation: height={height_pct:.1f}%, floors={floors_pct:.1f}%")
 
         return buildings_with_floors
 
@@ -2094,10 +1953,7 @@ class BuildingProcessor:
         buildings['construction_year'] = assigned_vintages
 
         self.logger.info(
-            f"Assigned construction years to {len(buildings)} buildings. "
-            f"Distribution: {dict(zip(*
-                                      np.unique(assigned_vintages, return_counts=True)))}"
-        )
+            f"Assigned construction years to {len(buildings)} buildings. ")
 
         return buildings
 
@@ -2134,17 +1990,10 @@ class BuildingProcessor:
         if building_type == 'residential':
             output_buildings = ResidentialBuildingOutput.prepare_default_output(
                 buildings)
-            self.logger.info("Applied residential schema filtering")
         else:  # non_residential
             output_buildings = NonResidentialBuildingOutput.prepare_default_output(
                 buildings)
-            self.logger.info("Applied non-residential schema filtering")
 
-        # Write shapefile (field names will be automatically truncated by ESRI
-        # format)
-        self.logger.info(
-            f"Writing {len(output_buildings)} {building_type} buildings to {output_path}")
-        self.logger.info(f"Output columns: {list(output_buildings.columns)}")
         output_buildings.to_file(output_path)
 
         return output_path
@@ -2152,7 +2001,7 @@ class BuildingProcessor:
     def _calculate_floor_area(
             self, buildings: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         """
-        Add floor_area column in square meters and ensure data is in EPSG:5070
+        Add floor_area column in square meters and ensure data is in the correct projection
 
         Parameters:
         -----------
@@ -2161,11 +2010,11 @@ class BuildingProcessor:
 
         Returns:
         --------
-        GeoDataFrame : Buildings with floor_area column added, in EPSG:5070
+        GeoDataFrame : Buildings with floor_area column added, in
         """
-        # First ensure data is in EPSG:5070 (US metric)
-        if buildings.crs != "EPSG:5070":
-            buildings_projected = buildings.to_crs(epsg=5070)
+
+        if buildings.crs != f"EPSG:{EPSG}":
+            buildings_projected = buildings.to_crs(epsg=EPSG)
         else:
             buildings_projected = buildings
 

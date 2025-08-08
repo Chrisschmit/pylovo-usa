@@ -11,7 +11,7 @@ import pandas as pd
 from shapely.ops import unary_union
 from tqdm import tqdm
 
-from src.config_loader import LOG_FILE, LOG_LEVEL, OUTPUT_DIR
+from src.config_loader import EPSG, LOG_FILE, LOG_LEVEL, OUTPUT_DIR
 from src.import_data.base import DataHandler
 from src.utils import create_logger
 
@@ -75,10 +75,9 @@ class CountySegmentationHandler(DataHandler):
         filename = os.path.basename(url)
         local_path = output_dir / filename
         if not local_path.exists():
-            self.logger.info(f"Downloading {url} to {local_path}")
             urllib.request.urlretrieve(url, local_path)
         else:
-            self.logger.info(f"File already exists: {local_path}")
+            self.logger.debug(f"File already exists: {local_path}")
         return local_path
 
     def _read_fips_lookup_file(self, file_path: Path) -> pd.DataFrame:
@@ -128,9 +127,6 @@ class CountySegmentationHandler(DataHandler):
         """
         try:
             with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp_file:
-                self.logger.info(
-                    f"Downloading to temporary file: {
-                        tmp_file.name}")
                 urllib.request.urlretrieve(url, tmp_file.name)
 
                 # Read the downloaded file
@@ -186,9 +182,7 @@ class CountySegmentationHandler(DataHandler):
         results = []
         not_found_subdivisions = []
         # Group by county to process one county at a time
-        for county_fips, group in tqdm(
-            state_df.groupby("county_fips"), desc=f"Counties in {state_abbr}"
-        ):
+        for county_fips, group in state_df.groupby("county_fips"):
             # Filter state-wide data for the current county
             county_cousubs_gdf = all_cousubs_gdf[
                 all_cousubs_gdf["COUNTYFP"] == county_fips
@@ -245,12 +239,12 @@ class CountySegmentationHandler(DataHandler):
                 )
                 population = clipped_blocks["POP20"].astype(int).sum()
 
-                # Unify geometry and project to EPSG:5070 for area calculation
+                # Unify geometry and project to EPSG for area calculation
                 # and output
                 unified_geom = unary_union(subdivision_geom_df.geometry)
                 projected_gds = gpd.GeoSeries(
                     [unified_geom], crs=subdivision_geom_df.crs
-                ).to_crs("EPSG:5070")
+                ).to_crs(f"EPSG:{EPSG}")
                 projected_geom = projected_gds.iloc[0]
 
                 # Calculate area and get WKB from the projected geometry
@@ -267,7 +261,6 @@ class CountySegmentationHandler(DataHandler):
                     }
                 )
 
-        self.logger.info(f"--- Finished processing State: {state_abbr} ---")
         return pd.DataFrame(results), not_found_subdivisions
 
     def process_state(
@@ -287,9 +280,6 @@ class CountySegmentationHandler(DataHandler):
             augmented_df, not_found_list = self._process_state(state_df)
             if not augmented_df.empty:
                 augmented_df.to_csv(chunk_path, index=False)
-                self.logger.info(
-                    f"Saved chunk for state {state_abbr} to {chunk_path}"
-                )
             return not_found_list
         except Exception as e:
             self.logger.error(
@@ -327,14 +317,6 @@ class CountySegmentationHandler(DataHandler):
                 f.write(f"Total Subdivisions Not Found: {total_not_found}\n\n")
                 f.write(not_found_df.to_string(index=False))
 
-            self.logger.info(
-                f"Log of not-found subdivisions saved to: {log_path}"
-            )
-            print(
-                f"\nTotal number of subdivisions not found: {total_not_found}")
-        else:
-            self.logger.info("All subdivisions were found successfully.")
-
     def download(self) -> Dict[str, any]:
         """
         Download and process subcounty segmentation data.
@@ -371,6 +353,29 @@ class CountySegmentationHandler(DataHandler):
         Returns:
             Dict[str, any]: Dictionary containing results and file paths.
         """
+        # Check if final output files already exist
+        if state_filter:
+            state_abbr_upper = state_filter.upper()
+            final_output_path = self.dataset_output_dir / \
+                f"{state_abbr_upper}_cousub_extended.csv"
+            if final_output_path.exists():
+                self.logger.info(
+                    f"Segmentation file already exists for {state_abbr_upper}")
+                return {
+                    "output_file": final_output_path,
+                    "not_found": [],
+                }
+        else:
+            # Check for national file
+            national_output_path = self.dataset_output_dir / "national_cousub_extended.csv"
+            if national_output_path.exists():
+                self.logger.info(
+                    f"National segmentation file already exists: {national_output_path}")
+                return {
+                    "output_file": national_output_path,
+                    "not_found": [],
+                }
+
         # Download the lookup data
         download_results = self.download()
         fips_df = download_results["fips_data"]
@@ -411,15 +416,8 @@ class CountySegmentationHandler(DataHandler):
             tasks.append((state_df, chunk_path, state_abbr))
 
         if len(tasks) <= 1:
-            self.logger.info(
-                f"Processing {len(tasks)} state "
-            )
             results = [self.process_state(task) for task in tasks]
         else:
-            self.logger.info(
-                f"Processing {len(tasks)} states using {num_processes} "
-                "parallel workers."
-            )
             # Parallel processing for multiple tasks
             with Pool(min(num_processes, len(tasks))) as pool:
                 results = list(
@@ -429,8 +427,6 @@ class CountySegmentationHandler(DataHandler):
                             tasks),
                         total=len(tasks),
                         desc="Processing All States"))
-        self.logger.info("Parallel processing finished.")
-
         # Flatten the list of lists of not-found subdivisions
         all_not_found = [
             item for sublist in results if sublist for item in sublist

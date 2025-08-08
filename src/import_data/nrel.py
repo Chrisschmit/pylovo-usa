@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Optional, OrderedDict
 
 import pandas as pd
-from tqdm import tqdm
 
 from src.config_loader import INPUT_DATA
 from src.import_data.base import DataHandler
@@ -48,9 +47,6 @@ class NRELDataHandler(DataHandler):
 
         if nrel_path_str:
             self.input_file_path = Path(nrel_path_str)
-            self.logger.info(
-                f"NREL input file path set to: {
-                    self.input_file_path}")
         else:
             self.logger.warning(
                 "NREL input data path ('nrel_data') not found in configuration."
@@ -157,56 +153,35 @@ class NRELDataHandler(DataHandler):
         chunk_size = 100_000
 
         try:
-            try:
-                with open(self.input_file_path, 'r') as f:
-                    total_lines = sum(1 for _ in f) - 1
-                total_chunks = max(
-                    1, (total_lines // chunk_size) +
-                    (1 if total_lines % chunk_size > 0 else 0)
-                )
-            except Exception:
-                total_chunks = None
-                self.logger.warning(
-                    "Could not determine file size for progress tracking")
-
             # Process file in chunks
-            with tqdm(
-                total=total_chunks, desc=f"Processing NREL for {region_name}", unit="chunk"
-            ) as pbar:
-                for chunk in pd.read_csv(
-                    self.input_file_path, sep="\t", chunksize=chunk_size, low_memory=False
-                ):
+            for chunk in pd.read_csv(
+                self.input_file_path, sep="\t", chunksize=chunk_size, low_memory=False
+            ):
 
-                    if 'in.county' not in chunk.columns:
-                        pbar.update(1)
-                        continue
+                if 'in.county' not in chunk.columns:
+                    continue
 
-                    # Filter for target county
-                    county_ids_no_g = chunk['in.county'].astype(
-                        str).str.removeprefix('G')
+                # Filter for target county
+                county_ids_no_g = chunk['in.county'].astype(
+                    str).str.removeprefix('G')
 
-                    state_match = pd.Series(False, index=county_ids_no_g.index)
-                    valid_state = county_ids_no_g.str.len() >= 2
-                    state_match[valid_state] = (
-                        county_ids_no_g[valid_state].str[:2] == str_state_fips
-                    )
+                state_match = pd.Series(False, index=county_ids_no_g.index)
+                valid_state = county_ids_no_g.str.len() >= 2
+                state_match[valid_state] = (
+                    county_ids_no_g[valid_state].str[:2] == str_state_fips
+                )
 
-                    county_match = pd.Series(
-                        False, index=county_ids_no_g.index)
-                    valid_county = county_ids_no_g.str.len() >= 6
-                    county_match[valid_county] = (
-                        county_ids_no_g[valid_county].str[3:6] == str_county_fips
-                    )
+                county_match = pd.Series(
+                    False, index=county_ids_no_g.index)
+                valid_county = county_ids_no_g.str.len() >= 6
+                county_match[valid_county] = (
+                    county_ids_no_g[valid_county].str[3:6] == str_county_fips
+                )
 
-                    county_chunk = chunk[state_match & county_match]
+                county_chunk = chunk[state_match & county_match]
 
-                    if not county_chunk.empty:
-                        county_data_frames.append(county_chunk)
-                        pbar.set_postfix_str(
-                            f"Found {sum(len(df) for df in county_data_frames)} total rows"
-                        )
-
-                    pbar.update(1)
+                if not county_chunk.empty:
+                    county_data_frames.append(county_chunk)
 
             # Save results if data found
             if county_data_frames:
@@ -214,9 +189,6 @@ class NRELDataHandler(DataHandler):
                 county_data.to_parquet(parquet_path, index=False)
                 county_data.to_csv(csv_path, index=False)
 
-                self.logger.info(
-                    f"Saved {
-                        len(county_data)} NREL records to {parquet_path}")
                 return {"parquet_path": parquet_path, "csv_path": csv_path}
             else:
                 self.logger.warning(f"No NREL data found for {region_name}")

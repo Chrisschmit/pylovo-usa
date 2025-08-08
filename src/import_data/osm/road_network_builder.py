@@ -440,10 +440,6 @@ class RoadNetworkBuilder(DataHandler):
             total_chunks = (len(insert_value_tuples) +
                             chunk_size - 1) // chunk_size
 
-            self.logger.info(
-                f"Generating {len(insert_value_tuples)} insert statements in "
-                f"{total_chunks} chunks of {chunk_size}")
-
             # Insert statement template
             insert_prefix_parts = [
                 "INSERT INTO public_2po_4pgr VALUES"
@@ -456,9 +452,6 @@ class RoadNetworkBuilder(DataHandler):
                 chunk_insert = insert_prefix + "\n" + ",\n".join(chunk) + ";\n"
                 full_sql_content.append(chunk_insert)
 
-            self.logger.info(
-                f"Generated {total_chunks} INSERT statements with "
-                f"{len(insert_value_tuples)} total rows.")
         else:
             self.logger.warning("No insert statements generated.")
 
@@ -613,7 +606,32 @@ class RoadNetworkBuilder(DataHandler):
                 - sql_file: Path to the generated SQL file
                 - geojson_file: Path to the network GeoJSON file
         """
+        # Define expected output file paths
+        geojson_path = self.dataset_output_dir / "road_network.geojson"
+        sql_path = self.dataset_output_dir / "ways_public_2po_4pgr.sql"
 
-        results = self.build_network()
+        # Check if output files already exist
+        if geojson_path.exists() and sql_path.exists():
+            self.logger.info(f"Road network files already exist!")
 
-        return results
+            # Load existing edges data if available
+            try:
+                edges_gdf = gpd.read_file(geojson_path)
+                self.logger.info(
+                    f"Loaded existing road network with {
+                        len(edges_gdf)} edges")
+            except Exception as e:
+                self.logger.warning(
+                    f"Could not load existing GeoJSON file: {e}")
+                edges_gdf = None
+
+            return {
+                'nodes': None,
+                'edges': edges_gdf,
+                'sql_file': sql_path,
+                'geojson_file': geojson_path,
+            }
+        else:
+            results = self.build_network()
+
+            return results

@@ -16,12 +16,16 @@ class ResidentialBuildingOutput:
 
     # Required fields (no default values) must come first - using original
     # column names
-    osm_id: str  # Unique identifier
+    osm_id: str  # Unique OSM identifier
+    c_block_id: str  # Census block identifier
+    build_id: str  # Building identifier
     area: float  # Total floor area in m²
     use: str  # Primary use - should be 'residential'
     free_walls: int  # Number of free walls
-    building_type: str  # Building typology (SFH, TH, MFH, AB)
+    build_type: str  # Building typology (SFH, TH, MFH, AB)
+    height: float  # Building height in meters
     occupants: int  # Number of occupants
+    housing_units: int  # Number of housing units
     floors: int  # Number of floors/stories
     construction_year: str  # Construction period
     geometry: object  # Building footprint geometry
@@ -96,8 +100,11 @@ class NonResidentialBuildingOutput:
     # Required fields (no default values) must come first - using original
     # column names
     osm_id: str  # Unique identifier
+    c_block_id: str  # Census block identifier
+    build_id: str  # Building identifier
     area: float  # Total floor area in m²
     use: str  # Primary use (commercial, industrial, public)
+    height: float  # Building height in meters
     free_walls: int  # Number of free walls
     geometry: object  # Building footprint geometry
 

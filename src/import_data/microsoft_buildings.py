@@ -205,7 +205,9 @@ class MicrosoftBuildingsDataHandler(DataHandler):
 
         # Download file first to temporary location, then read it
         with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp_file:
-            self.logger.info(f"Downloading US states to temporary file: {tmp_file.name}")
+            self.logger.info(
+                f"Downloading US states to temporary file: {
+                    tmp_file.name}")
             urllib.request.urlretrieve(states_url, tmp_file.name)
 
             # Read the downloaded file
@@ -449,10 +451,6 @@ class MicrosoftBuildingsDataHandler(DataHandler):
         --------
         gpd.GeoDataFrame : Filtered buildings for the region
         """
-        self.logger.info(
-            f"Loading and filtering {
-                len(building_files)} building files to region..."
-        )
 
         # Get region boundary from orchestrator
         region_boundary = self.orchestrator.get_region_boundary()
@@ -478,7 +476,6 @@ class MicrosoftBuildingsDataHandler(DataHandler):
 
         # Ensure same CRS
         if combined_buildings.crs != region_boundary.crs:
-            self.logger.info("Aligning CRS for region filtering")
             combined_buildings = combined_buildings.to_crs(region_boundary.crs)
 
         # Filter buildings to region
@@ -570,18 +567,9 @@ class MicrosoftBuildingsDataHandler(DataHandler):
         if fips.get('subdivision'):
             region_name = f"{fips['subdivision']}, {region_name}"
 
-        self.logger.info(
-            f"Processing Microsoft building data for {region_name}")
-
         try:
-            # The download() method already handles everything:
-            # 1. Check if file exists (return existing data)
-            # 2. Download building files
-            # 3. Filter to region
-            # 4. Save results
             download_results = self.download()
 
-            self.logger.info("Microsoft Buildings processing complete")
             return download_results
 
         except Exception as e:

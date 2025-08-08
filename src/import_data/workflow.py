@@ -10,8 +10,8 @@ import pandas as pd
 from pyrosm import OSM
 from shapely.geometry import MultiPolygon, Polygon
 
-from src.config_loader import (INPUT_DATA, LOG_FILE, LOG_LEVEL, OUTPUT_DIR,
-                               REGION)
+from src.config_loader import (EPSG, INPUT_DATA, LOG_FILE, LOG_LEVEL,
+                               OUTPUT_DIR, REGION)
 from src.utils import create_logger
 
 # Define all known dataset names for directory creation
@@ -96,9 +96,6 @@ class WorkflowOrchestrator:
             try:
                 # Download file first to temporary location, then move it
                 with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-                    self.logger.debug(
-                        f"Downloading to temporary file: {
-                            tmp_file.name}")
                     urllib.request.urlretrieve(lookup_url, tmp_file.name)
 
                     # Move the temporary file to the final location
@@ -285,7 +282,7 @@ class WorkflowOrchestrator:
         Returns:
             Optional[pyrosm.OSM]: The initialized OSM parser, or None on failure.
         """
-        self.logger.info("Attempting to lazily initialize OSM parser...")
+        self.logger.info("Initializing OSM parser")
         input_paths = INPUT_DATA
         osm_pbf_path = Path(input_paths.get("OSM_PBF_FILE"))
 
@@ -301,30 +298,22 @@ class WorkflowOrchestrator:
             if self.has_region_boundary():
                 boundary_gdf = self.get_region_boundary()  # Original is in EPSG:4269
 
-                # Project to a meter-based CRS (EPSG:5070) for accurate
+                # Project to a meter-based CRS (EPSG) for accurate
                 # buffering
-                self.logger.info(
-                    f"Projecting boundary from {
-                        boundary_gdf.crs} to EPSG:5070 for buffering."
-                )
-                boundary_gdf_5070 = boundary_gdf.to_crs("EPSG:5070")
+                boundary_gdf_EPSG = boundary_gdf.to_crs(f"EPSG:{EPSG}")
 
                 # Assume a single geometry entry as per system design
-                boundary_geometry_5070 = boundary_gdf_5070.geometry.iloc[0]
+                boundary_geometry_EPSG = boundary_gdf_EPSG.geometry.iloc[0]
 
-                # Apply a 15-meter buffer in the projected CRS (EPSG:5070)
-                self.logger.info(
-                    "Applying 15-meter buffer to boundary in EPSG:5070.")
-                buffered_geometry_5070 = boundary_geometry_5070.buffer(25.0)
+                # Apply a 25-meter buffer in the projected CRS (EPSG)
+                buffered_geometry_EPSG = boundary_geometry_EPSG.buffer(25.0)
 
                 # Create a temporary GeoDataFrame to hold the buffered geometry
-                buffered_gdf_5070 = gpd.GeoDataFrame(
-                    [buffered_geometry_5070], columns=['geometry'], crs="EPSG:5070"
+                buffered_gdf_EPSG = gpd.GeoDataFrame(
+                    [buffered_geometry_EPSG], columns=['geometry'], crs=f"EPSG:{EPSG}"
                 )
                 # Reproject to WGS84 (EPSG:4326) as expected by pyrosm
-                self.logger.info(
-                    "Re-projecting buffered boundary to EPSG:4326 for pyrosm.")
-                boundary_gdf_4326 = buffered_gdf_5070.to_crs("EPSG:4326")
+                boundary_gdf_4326 = buffered_gdf_EPSG.to_crs("EPSG:4326")
                 final_boundary_geometry = boundary_gdf_4326.geometry.iloc[0]
 
                 # Ensure the geometry is a Polygon or MultiPolygon as expected
@@ -337,9 +326,6 @@ class WorkflowOrchestrator:
                         "OSM parser might not work as expected."
                     )
 
-                self.logger.info(
-                    f"Initializing pyrosm.OSM with PBF: {osm_pbf_path} and buffered, reprojected bounding box."
-                )
                 osm_parser = OSM(
                     str(osm_pbf_path),
                     bounding_box=final_boundary_geometry)
@@ -347,10 +333,6 @@ class WorkflowOrchestrator:
                     "pyrosm.OSM parser initialized successfully with bounding box.")
             else:
                 # No boundary set - process entire PBF file
-                self.logger.info(
-                    f"No region boundary set. Initializing pyrosm.OSM with entire PBF file: "
-                    f"{osm_pbf_path}"
-                )
                 osm_parser = OSM(str(osm_pbf_path))
                 self.logger.info(
                     "pyrosm.OSM parser initialized successfully for entire PBF file.")
@@ -376,9 +358,6 @@ class WorkflowOrchestrator:
             Optional[pyrosm.OSM]: The initialized OSM parser, or None if initialization fails.
         """
         if self._osm_parser is None:
-            self.logger.info(
-                "OSM parser not yet initialized. Attempting lazy initialization."
-            )
             self._osm_parser = self._initialize_osm_parser()
 
         if self._osm_parser is None:
