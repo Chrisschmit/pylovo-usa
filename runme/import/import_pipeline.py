@@ -65,33 +65,43 @@ def run_full_pipeline(
     try:
         # # Initialize the orchestrator, loading config, setting up FIPS,
         # and creating all output directories
+        logger.info("--------------------------------")
+        logger.info("STEP 1: Initializing WorkflowOrchestrator")
+        logger.info("--------------------------------")
         orchestrator = WorkflowOrchestrator()
 
-        # --- STEP 1: REGIONAL DATA EXTRACTION & PREPARATION ---
-        logger.info("STEP 1: Regional Data Extraction & Preparation")
-
+        # --- STEP 2: REGIONAL DATA EXTRACTION & PREPARATION ---
+        logger.info("--------------------------------")
+        logger.info("STEP 2: Regional Data Extraction & Preparation")
+        logger.info("--------------------------------")
         census_handler = CensusDataHandler(orchestrator)
         census_data = census_handler.process(plot=False)
 
-        # --- STEP 2: Process NREL Data ---
-
-        logger.info("STEP 2: Processing NREL data")
+        # --- STEP 3: Process NREL Data ---
+        logger.info("--------------------------------")
+        logger.info("STEP 3: Processing NREL data")
+        logger.info("--------------------------------")
         nrel_handler = NRELDataHandler(orchestrator)
         nrel_data = nrel_handler.process()
 
-        # --- STEP 3: Extract OSM Data ---
-        logger.info("STEP 3: Extracting OSM data")
+        # --- STEP 4: Extract OSM Data ---
+        logger.info("--------------------------------")
+        logger.info("STEP 4: Extracting OSM data")
+        logger.info("--------------------------------")
         osm_handler = OSMDataHandler(orchestrator)
         osm_data = osm_handler.process(plot=False)
 
-        # --- STEP 3.5: Process Microsoft Buildings Data ---
-        logger.info("STEP 3.5: Processing Microsoft Buildings data")
+        # --- STEP 5: Process Microsoft Buildings Data ---
+        logger.info("STEP 5: Processing Microsoft Buildings data")
+        logger.info("--------------------------------")
         microsoft_buildings_handler = MicrosoftBuildingsDataHandler(
             orchestrator)
         microsoft_buildings_data = microsoft_buildings_handler.process()
 
-        # # --- STEP 4: Building Classification ---
-        logger.info("STEP 4: Building Classification")
+        # # --- STEP 6: Building Classification ---
+        logger.info("--------------------------------")
+        logger.info("STEP 6: Building Classification")
+        logger.info("--------------------------------")
         building_processor = BuildingProcessor(
             orchestrator.get_dataset_specific_output_directory(
                 "BUILDINGS_OUTPUT"))
@@ -103,13 +113,17 @@ def run_full_pipeline(
             nrel_data["vintage_distribution"]
         )
 
-        # --- STEP 5: ROUTABLE ROAD NETWORK GENERATION ---
-        logger.info("STEP 5: Routable Road Network Generation")
+        # --- STEP 7: ROUTABLE ROAD NETWORK GENERATION ---
+        logger.info("--------------------------------")
+        logger.info("STEP 7: Routable Road Network Generation")
+        logger.info("--------------------------------")
         road_network_builder = RoadNetworkBuilder(orchestrator=orchestrator)
         _ = road_network_builder.process()
 
-        # --- STEP 6: US County Segmentation ---
-        logger.info("STEP 6: US County Segmentation")
+        # --- STEP 8: US County Segmentation ---
+        logger.info("--------------------------------")
+        logger.info("STEP 8: US County Segmentation")
+        logger.info("--------------------------------")
         subcounty_segmentation_handler = CountySegmentationHandler(
             orchestrator=orchestrator)
         subcounty_segmentation_handler.process(
