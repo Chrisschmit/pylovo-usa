@@ -54,6 +54,11 @@ CONSUMER_CATEGORIES:
 LARGE_COMPONENT_LOWER_BOUND: 2000
 LARGE_COMPONENT_DIVIDER: 1000
 
+# Load density thresholds for settlement type classification (MVA/km²)
+POWER_FACTOR: 0.9 # 90% of the peak load is used for the load density calculation
+RURAL_LD:       # Rural areas: < X MVA/km²
+URBAN_LD:      # Urban areas: > X MVA/km² 
+
 # Voltage properties
 # TODO: for the US we need differnt VN for single, split and three phase
 VN: 400  # V
