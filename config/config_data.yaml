@@ -74,6 +74,25 @@ CLUSTERING_PARAMETERS:
   - vsw_per_branch
   - max_vsw_of_a_branch
 
+# BUILDING IMPORT DEFINITIONS
+# Threshold values for building type classification
+# Apartment Buildings (AB)
+# Townhouses (TH)
+# Single Family Homes (SFH)
+# Multi-Family Homes (MFH)
+
+BUILDING_TYPE_THRESHOLDS:
+  AB_MIN_FLOOR_AREA: 600  # m² - individual buildings above this area are classified as Apartment Buildings
+  AB_MIN_CLUSTER_AREA: 1000  # m² - clusters with total area above this are classified as Apartment Buildings
+  TH_MAX_FLOOR_AREA: 270  # m² - maximum floor area for Townhouse classification
+  TH_MAX_HEIGHT: 12  # m - maximum height for Townhouse classification (optional constraint)
+  SFH_MAX_FLOOR_AREA: 200  # m² - maximum floor area for Single Family Home classification
+  SFH_MAX_HEIGHT: 12  # m - maximum height for Single Family Home classification (optional constraint)
+  SFH_MAX_CLUSTER_SIZE: 2  # maximum number of buildings in cluster for SFH classification
+  TH_MIN_CLUSTER_SIZE: 3  # minimum number of buildings in cluster for Townhouse classification
+  TH_MIN_NEIGHBORS: 2  # minimum number of direct neighbors for Townhouse classification
+  MFH_MAX_FLOOR_AREA: 600  # m² - Multi-Family Homes must be below this area (catch-all category)
+
 MUNICIPAL_REGISTER:
   - regional_identifier
   - pop

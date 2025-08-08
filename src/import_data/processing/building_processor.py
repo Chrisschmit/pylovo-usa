@@ -5,7 +5,8 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
-from src.config_loader import EPSG, LOG_FILE, LOG_LEVEL
+from src.config_loader import (BUILDING_TYPE_THRESHOLDS, EPSG, LOG_FILE,
+                               LOG_LEVEL)
 from src.import_data.processing.building_schema import (
     NonResidentialBuildingOutput, ResidentialBuildingOutput)
 from src.utils import create_logger
@@ -126,6 +127,8 @@ class BuildingProcessor:
                 residential,
                 nrel_vintage_distribution
             )
+            residential.to_file(self.dataset_output_dir
+                                / "07_Final_residential_buildings_with_building_id_after_allotment.geojson")
 
             residential = residential.rename(
                 columns={
@@ -288,7 +291,7 @@ class BuildingProcessor:
             # Residential from 'building'
             res_types = ['residential', 'house', 'detached', 'apartments', 'terrace',
                          'dormitory', 'semidetached_house', 'bungalow', 'static_caravan',
-                         'hut', 'cabin']  # hut/cabin often residential
+                         'hut', 'cabin', 'apartments']  # hut/cabin often residential
             mask = candidate_buildings['building'].isin(res_types)
             candidate_buildings.loc[mask, 'building_use'] = 'residential'
             self.logger.debug(
@@ -962,11 +965,13 @@ class BuildingProcessor:
         """
         Assign building types based on cluster characteristics and geometric properties.
 
+        Thresholds are loaded from config/config_data.yaml BUILDING_TYPE_THRESHOLDS section.
+
         Type assignment rules:
-        - AB: Clusters with total area > 2000 m²
-        - TH: Linear arrangements with 2 neighbors of similar size
-        - SFH: Small isolated buildings or small clusters
-        - MFH: Everything else
+        - AB (Apartment Block): floor_area > AB_MIN_FLOOR_AREA OR (cluster_size ≥ 2 AND total_cluster_area > AB_MIN_CLUSTER_AREA)
+        - TH (Townhouse/Row): neighbors ≥ TH_MIN_NEIGHBORS AND floor_area ≤ TH_MAX_FLOOR_AREA AND cluster_size ≥ TH_MIN_CLUSTER_SIZE AND height ≤ TH_MAX_HEIGHT (optional)
+        - SFH (Single Family Home): floor_area ≤ SFH_MAX_FLOOR_AREA AND height < SFH_MAX_HEIGHT (optional) AND cluster_size ≤ SFH_MAX_CLUSTER_SIZE
+        - MFH (Multi-Family Home): floor_area < MFH_MAX_FLOOR_AREA AND not already labeled by rules above
 
         Parameters:
         -----------
@@ -979,9 +984,18 @@ class BuildingProcessor:
         """
         buildings['building_type'] = None
 
-        # Rule 1: Large clusters (> 2000 m²) are Apartment Buildings (AB)
-        large_cluster_mask = buildings['total_cluster_area'] > 2000
-        buildings.loc[large_cluster_mask, 'building_type'] = 'AB'
+        # Rule 1: Apartment Buildings (AB)
+        # - Individual buildings with floor area > AB_MIN_FLOOR_AREA
+        ab_mask1 = buildings['floor_area'] > BUILDING_TYPE_THRESHOLDS['AB_MIN_FLOOR_AREA']
+        buildings.loc[ab_mask1, 'building_type'] = 'AB'
+
+        # - Clusters with ≥2 buildings and total cluster area > AB_MIN_CLUSTER_AREA
+        ab_mask2 = (
+            (buildings['cluster'].apply(len) >= 2)
+            & (buildings['total_cluster_area'] > BUILDING_TYPE_THRESHOLDS['AB_MIN_CLUSTER_AREA'])
+            & (buildings['building_type'].isna())
+        )
+        buildings.loc[ab_mask2, 'building_type'] = 'AB'
 
         # Propagate AB classification to all buildings in the same cluster
         ab_clusters = buildings[buildings['building_type']
@@ -990,73 +1004,79 @@ class BuildingProcessor:
             cluster_mask = buildings['cluster'].apply(lambda x: x == cluster)
             buildings.loc[cluster_mask, 'building_type'] = 'AB'
 
-        # Rule 2: Small isolated buildings are Single Family Homes (SFH)
-        # - Area < 200 m² and no neighbors
-        sfh_mask1 = (
-            (buildings['floor_area'] < 200)
-            & (buildings['neighbors'].apply(len) == 0)
+        # Rule 2: Single Family Homes (SFH)
+        # - floor_area ≤ SFH_MAX_FLOOR_AREA AND height < SFH_MAX_HEIGHT (if available) AND cluster_size ≤ SFH_MAX_CLUSTER_SIZE
+        sfh_mask = (
+            (buildings['floor_area'] <=
+             BUILDING_TYPE_THRESHOLDS['SFH_MAX_FLOOR_AREA'])
+            & (buildings['cluster'].apply(len) <= BUILDING_TYPE_THRESHOLDS['SFH_MAX_CLUSTER_SIZE'])
             & (buildings['building_type'].isna())
         )
-        buildings.loc[sfh_mask1, 'building_type'] = 'SFH'
 
-        # - Area < 200 m² and only 2 buildings in cluster with total < 400 m²
-        sfh_mask2 = (
-            (buildings['floor_area'] < 200)
-            & (buildings['cluster'].apply(len) == 2)
-            & (buildings['total_cluster_area'] < 400)
+        # Add height constraint if height data is available
+        if 'height' in buildings.columns:
+            height_constraint = (
+                buildings['height'].isna()) | (
+                pd.to_numeric(
+                    buildings['height'],
+                    errors='coerce') < BUILDING_TYPE_THRESHOLDS['SFH_MAX_HEIGHT'])
+            sfh_mask = sfh_mask & height_constraint
+
+        buildings.loc[sfh_mask, 'building_type'] = 'SFH'
+
+        # Rule 3: Townhouses (TH)
+        # - neighbors ≥ TH_MIN_NEIGHBORS AND floor_area ≤ TH_MAX_FLOOR_AREA AND cluster_size ≥ TH_MIN_CLUSTER_SIZE
+        #   Height is permissive: (height is NULL) OR (height ≤ TH_MAX_HEIGHT)
+        th_mask = (
+            (buildings['neighbors'].apply(len) >=
+             BUILDING_TYPE_THRESHOLDS['TH_MIN_NEIGHBORS'])
+            & (buildings['floor_area'] <= BUILDING_TYPE_THRESHOLDS['TH_MAX_FLOOR_AREA'])
+            & (buildings['cluster'].apply(len) >= BUILDING_TYPE_THRESHOLDS['TH_MIN_CLUSTER_SIZE'])
             & (buildings['building_type'].isna())
         )
-        buildings.loc[sfh_mask2, 'building_type'] = 'SFH'
 
-        # Rule 3: Terraced houses (TH) - linear arrangements with similar-sized neighbors
-        # Buildings with exactly 2 neighbors of similar size (within 10%
-        # difference)
-        for idx, row in buildings[buildings['building_type'].isna(
-        )].iterrows():
-            if len(row['neighbors']) == 2 and row['floor_area'] < 270:
-                neighbor_areas = buildings.loc[row['neighbors'],
-                                               'floor_area'].values
-                building_area = row['floor_area']
-
-                # Check if neighbors are similar in size (within 10%)
-                similar_size = all(
-                    0.9 <= building_area / area <= 1.1 or 0.9 <= area / building_area <= 1.1
-                    for area in neighbor_areas
+        # Add permissive height constraint if height data is available
+        if 'height' in buildings.columns:
+            height_constraint = (
+                buildings['height'].isna()
+                | (
+                    pd.to_numeric(buildings['height'], errors='coerce')
+                    <= BUILDING_TYPE_THRESHOLDS['TH_MAX_HEIGHT']
                 )
+            )
+            th_mask = th_mask & height_constraint
 
-                if similar_size:
-                    buildings.at[idx, 'building_type'] = 'TH'
+        buildings.loc[th_mask, 'building_type'] = 'TH'
 
-        # Propagate TH classification to neighbors
-        th_indices = buildings[buildings['building_type'] == 'TH'].index
-        for idx in th_indices:
-            neighbors = buildings.at[idx, 'neighbors']
-            neighbor_mask = buildings.index.isin(
-                neighbors) & buildings['building_type'].isna()
-            buildings.loc[neighbor_mask, 'building_type'] = 'TH'
+        # Propagate TH classification within clusters to ensure consistency
+        th_clusters = buildings[buildings['building_type']
+                                == 'TH']['cluster'].tolist()
+        for cluster in th_clusters:
+            # Unclassified buildings in this cluster that meet TH criteria
+            cluster_mask = (
+                buildings['cluster'].apply(lambda x: x == cluster)
+                & buildings['building_type'].isna()
+                & (buildings['floor_area'] <= BUILDING_TYPE_THRESHOLDS['TH_MAX_FLOOR_AREA'])
+            )
 
-        # Rule 4: Everything else is Multi-Family Home (MFH)
+            # Apply the same permissive height logic during propagation
+            if 'height' in buildings.columns:
+                height_constraint = (
+                    buildings['height'].isna()
+                    | (
+                        pd.to_numeric(buildings['height'], errors='coerce')
+                        <= BUILDING_TYPE_THRESHOLDS['TH_MAX_HEIGHT']
+                    )
+                )
+                cluster_mask = cluster_mask & height_constraint
+
+            buildings.loc[cluster_mask, 'building_type'] = 'TH'
+
+        # Rule 4: Multi-Family Homes (MFH)
+        # - floor_area < 600 m² AND not already labeled by rules above
+        # Final catch-all: Any remaining unclassified buildings default to MFH
         mfh_mask = buildings['building_type'].isna()
         buildings.loc[mfh_mask, 'building_type'] = 'MFH'
-
-        # Additional refinement: Check for linear MFH that should be TH
-        # This handles row houses that might have been missed
-        for idx, row in buildings[buildings['building_type']
-                                  == 'MFH'].iterrows():
-            if row['total_cluster_area'] < 1000 and len(row['cluster']) >= 3:
-                # Check if buildings in cluster form a linear arrangement
-                cluster_buildings = buildings.loc[
-                    buildings.index.isin(row['cluster'])
-                ]
-
-                # Simple heuristic: if most buildings have exactly 2 neighbors,
-                # it's likely linear
-                two_neighbor_count = (
-                    cluster_buildings['neighbors'].apply(len) == 2).sum()
-                if two_neighbor_count >= len(cluster_buildings) * 0.6:
-                    buildings.loc[
-                        buildings.index.isin(row['cluster']), 'building_type'
-                    ] = 'TH'
 
         return buildings
 
