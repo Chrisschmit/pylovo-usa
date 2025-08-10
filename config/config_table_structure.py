@@ -11,7 +11,7 @@ CREATE_QUERIES = {
         build_type varchar(80),
         occupants integer,
         height float,
-        housing_units integer,
+        housing_un float,
         floors integer,
         constructi varchar(80),
         refurb_wal float,
