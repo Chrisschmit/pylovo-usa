@@ -227,7 +227,7 @@ class PreprocessingMixin(BaseMixin, ABC):
                                                WHEN type IN ('TH', 'Commercial', 'Public', 'Industrial') THEN 1
                                                WHEN type = 'SFH' AND area < 160 THEN 1
                                                WHEN type = 'SFH' AND area >= 160 THEN 2
-                                               WHEN type IN ('MFH', 'AB') THEN floor(area / 50) * floors
+                                               WHEN type IN ('MFH', 'AB') THEN floor(area / %(avg_apartment_area)s) * floors
                                                ELSE 0
                     END);
                 UPDATE buildings_tem b
@@ -237,11 +237,10 @@ class PreprocessingMixin(BaseMixin, ABC):
                                            WHEN b.type IN ('Commercial', 'Public', 'Industrial') THEN b.area *
                                                                                                       (SELECT peak_load_per_m2
                                                                                                        FROM consumer_categories
-                                                                                                       WHERE definition = b.type) /
-                                                                                                      1000
+                                                                                                       WHERE definition = b.type)
                                            ELSE 0
                     END);"""
-        self.cur.execute(query)
+        self.cur.execute(query, {"avg_apartment_area": AVG_APARTMENT_AREA})
 
         count_query = ("""SELECT COUNT(*)
                           FROM buildings_tem

@@ -42,13 +42,19 @@ CABLE_COST_DICT:
 SIM_FACTOR: {Residential: 0.07, Public: 0.6, Commercial: 0.5}
 
 PEAK_LOAD_HOUSEHOLD: 30.00
+
+# Average apartment area in square meters
+AVG_APARTMENT_AREA: 75
+
+# Peak load per m2 for commercial, public and industrial is in kW/m2
+# Peak load per household for SFH, MFH, TH and AB is in kW/household
 CONSUMER_CATEGORIES:
-  - {consumer_category_id: 1, definition: Commercial, peak_load: null, yearly_consumption: null, peak_load_per_m2: 79.00, yearly_consumption_per_m2: 245.70, sim_factor: 0.50}
-  - {consumer_category_id: 2, definition: Public, peak_load: null, yearly_consumption: null, peak_load_per_m2: 29.00, yearly_consumption_per_m2: 155.70, sim_factor: 0.60}
+  - {consumer_category_id: 1, definition: Commercial, peak_load: null, yearly_consumption: null, peak_load_per_m2: 0.79, yearly_consumption_per_m2: 2.457, sim_factor: 0.50}
+  - {consumer_category_id: 2, definition: Public, peak_load: null, yearly_consumption: null, peak_load_per_m2: 0.29, yearly_consumption_per_m2: 1.557, sim_factor: 0.60}
   - {consumer_category_id: 9, definition: SFH, peak_load: 30.00, yearly_consumption: 0.00, peak_load_per_m2: null, yearly_consumption_per_m2: null, sim_factor: 0.07}
-  - {consumer_category_id: 10, definition: MFH, peak_load: 30.00, yearly_consumption: 0.00, peak_load_per_m2: null, yearly_consumption_per_m2: null, sim_factor: 0.07}
+  - {consumer_category_id: 10, definition: MFH, peak_load: 15.00, yearly_consumption: 0.00, peak_load_per_m2: null, yearly_consumption_per_m2: null, sim_factor: 0.07}
   - {consumer_category_id: 11, definition: TH, peak_load: 30.00, yearly_consumption: 0.00, peak_load_per_m2: null, yearly_consumption_per_m2: null, sim_factor: 0.07}
-  - {consumer_category_id: 12, definition: AB, peak_load: 30.00, yearly_consumption: 0.00, peak_load_per_m2: null, yearly_consumption_per_m2: null, sim_factor: 0.07}
+  - {consumer_category_id: 12, definition: AB, peak_load: 15.00, yearly_consumption: 0.00, peak_load_per_m2: null, yearly_consumption_per_m2: null, sim_factor: 0.07}
 
 # Larger components are divided by k-means clustering in roughly LARGE_COMPONENT_DIVIDER sizes
 LARGE_COMPONENT_LOWER_BOUND: 2000
@@ -56,7 +62,7 @@ LARGE_COMPONENT_DIVIDER: 1000
 
 # Load density thresholds for settlement type classification (MVA/km²)
 POWER_FACTOR: 0.9 # 90% of the peak load is used for the load density calculation
-RURAL_LD:       # Rural areas: < X MVA/km²
+RURAL_LD:      # Rural areas: < X MVA/km²
 URBAN_LD:      # Urban areas: > X MVA/km² 
 
 # Voltage properties
