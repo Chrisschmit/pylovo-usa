@@ -104,9 +104,9 @@ class DatabaseClient(
         self.cur.execute(query)
 
         # Save ways results
-        query = f"""INSERT INTO ways_result
-                        SELECT '{VERSION_ID}' as version_id, clazz, source, target, cost, reverse_cost, geom, way_id,
-                        %(p)s as regional_identifier FROM ways_tem;"""
+        query = f"""INSERT INTO ways_result (version_id, way_id, regional_identifier, clazz, source, target, cost, reverse_cost, geom)
+                        SELECT '{VERSION_ID}' as version_id, way_id, %(p)s as regional_identifier, clazz, source, target, cost, reverse_cost, geom
+                        FROM ways_tem;"""
 
         self.cur.execute(query, vars={"p": regional_identifier})
 

@@ -370,8 +370,8 @@ class PreprocessingMixin(BaseMixin, ABC):
         :param regional_identifier:
         :return: number of ways in ways_tem
         """
-        query = """INSERT INTO ways_tem
-                   SELECT *
+        query = """INSERT INTO ways_tem (clazz, source, target, cost, reverse_cost, way_id, regional_identifier, geom)
+                   SELECT clazz, source, target, cost, reverse_cost, way_id, %(p)s, geom
                    FROM ways AS w
                    WHERE ST_Intersects(w.geom, (SELECT ST_Buffer(geom, 50)
                                                 FROM postcode_result
