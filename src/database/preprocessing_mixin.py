@@ -400,14 +400,8 @@ class PreprocessingMixin(BaseMixin, ABC):
         Updates ways_tem, creates pgr network topology in new tables and performs component analysis:
         :return:
         """
-        # setup_query = """SELECT setup_temp_tables();"""
-        # self.cur.execute(setup_query)
-
-        # # Deduplicate ways_tem before running home connections
-        # self._deduplicate_ways_table()
 
         connection_query = """ SELECT draw_home_connections(); """
-        # connection_query = """ SELECT draw_home_connections_set_based(); """
         self.cur.execute(connection_query)
 
         topology_query = """select pgr_createTopology('ways_tem', 0.01, id:='way_id', the_geom:='geom', clean:=true) """
