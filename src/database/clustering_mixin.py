@@ -506,9 +506,9 @@ class ClusteringMixin(BaseMixin, ABC):
             self.logger.debug("Incorrect settlement type number specified.")
             return
 
-        query = """SELECT equipment_data.s_max_kva, cost_eur
+        query = """SELECT equipment_data.s_max_kva, cost
                    FROM equipment_data
-                   WHERE typ = 'Transformer' \
+                   WHERE type = 'Transformer' \
                      AND application_area IN %(tuple)s
                    ORDER BY s_max_kva;"""
 

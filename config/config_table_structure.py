@@ -33,17 +33,27 @@ CREATE_QUERIES = {
         geom geometry(MultiPolygon,%(epsg)s)
     )
     """,
-    "equipment_data": """
-    CREATE TABLE IF NOT EXISTS equipment_data (
-        name varchar(100) PRIMARY KEY,
-        s_max_kva integer,
-        max_i_a integer,
-        r_mohm_per_km integer,
-        x_mohm_per_km integer,
-        z_mohm_per_km integer,
-        cost_eur integer,
-        typ varchar(50),
-        application_area integer
+    "equipment_data":
+    """CREATE TABLE IF NOT EXISTS equipment_data (
+    name VARCHAR(100) PRIMARY KEY,           -- Equipment name
+    type VARCHAR(50),                        -- Equipment category: 'Substation', 'Transformer', 'Line'
+    application_area INTEGER,                -- Defines to which settlement type the equipment belongs to
+    ovh_ung VARCHAR(12),                     -- Installation type: 'Overhead' or 'Underground'
+    n_phases SMALLINT,                       -- Number of phases (1, 2, or 3)
+    voltage_level VARCHAR(25),               -- Nominal voltage class (e.g.'HV-MV', 'MV-LV')
+    s_max_kva INTEGER,                       -- Rated apparent power in kVA
+    primary_voltage_kv NUMERIC,              -- Primary side voltage in kilovolts
+    secondary_voltage_kv NUMERIC,            -- Secondary side voltage in kilovolts
+    reactance_pu NUMERIC,                    -- Per-unit reactance
+    no_load_losses_kw NUMERIC,               -- No-load (core) losses in kilowatts
+    short_circuit_res_ohm NUMERIC,           -- Short-circuit resistance in ohms
+    r_ohm_per_km NUMERIC,                    -- Resistance per km in ohms 
+    x_ohm_per_km NUMERIC,                    -- Inductive reactance per km in ohms 
+    z_ohm_per_km NUMERIC,                    -- Impedance per km in ohms
+    capacitance_nf_per_km NUMERIC,           -- Capacitance per km in nanofarads
+    max_i_a INTEGER,                         -- Maximum current in amperes
+    line_voltage NUMERIC,                    -- Nominal line voltage in kilovolts
+    cost NUMERIC                             -- Investment cost (currency assumed unless extra field added)
     )
     """,
     "version": """CREATE TABLE IF NOT EXISTS version (

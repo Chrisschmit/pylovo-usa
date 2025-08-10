@@ -1,0 +1,4 @@
+name,type,application_area,ovh_ung,n_phases,voltage_level,s_max_kva,primary_voltage_kv,secondary_voltage_kv,reactance_pu,no_load_losses_kw,short_circuit_res_ohm,r_ohm_per_km,x_ohm_per_km,z_ohm_per_km,capacitance_nf_per_km,max_i_a,line_voltage,cost
+DUMMY_SUB_1,Substation,1,Underground,3,EHV-HV,50000,138,12.47,0.08,50,0.001,0,0,0,,,,500000.00
+DUMMY_TRANS_75,Transformer,1,Overhead,3,MV-LV,75,12.47,0.416,0.0324,0.45,0.0402432,0,0,0,,,,35175.00
+DUMMY_CABLE_50,Cable,1,Underground,3,LV,,,,,,,1.2,0.08,1.201,9.5,150,0.416,25.50

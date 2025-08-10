@@ -19,11 +19,11 @@ class GridMixin(BaseMixin, ABC):
         """Create standard pandapower cable types from equipment_data table."""
         query = """
                 SELECT name,
-                       r_mohm_per_km / 1000.0 as r_ohm_per_km,
-                       x_mohm_per_km / 1000.0 as x_ohm_per_km,
+                       r_ohm_per_km,
+                       x_ohm_per_km,
                        max_i_a / 1000.0       as max_i_ka
                 FROM equipment_data
-                WHERE typ = 'Cable' \
+                WHERE type = 'Cable' \
                 """
 
         # Execute query and fetch cable data
