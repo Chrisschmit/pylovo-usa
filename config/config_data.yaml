@@ -46,34 +46,6 @@ INPUT_DATA:
   # Download from https://data.openei.org/s3_viewer?bucket=oedi-data-lake&prefix=nrel-pds-building-stock%2Fend-use-load-profiles-for-us-building-stock%2F2021%2Fresstock_tmy3_release_1%2Ftimeseries_aggregates_metadata%2F
   NREL_FILE: "/Users/magic-rabbit/Library/Mobile Documents/com~apple~CloudDocs/01_University/06_MIT_Stay/Master_Thesis/02_Data/GridTracer/Input/NREL_Residential_typology.tsv"
 
-CLUSTERING_PARAMETERS:
-  - version_id
-  - regional_identifier
-  - bcid
-  - kcid
-  - no_connection_buses
-  - no_branches
-  - no_house_connections
-  - no_house_connections_per_branch
-  - no_households
-  - no_household_equ
-  - no_households_per_branch
-  - max_no_of_households_of_a_branch
-  - house_distance_km
-  - transformer_mva
-  - osm_trafo
-  - max_trafo_dis
-  - avg_trafo_dis
-  - cable_length_km
-  - cable_len_per_house
-  - max_power_mw
-  - simultaneous_peak_load_mw
-  - resistance
-  - reactance
-  - ratio
-  - vsw_per_branch
-  - max_vsw_of_a_branch
-
 # BUILDING IMPORT DEFINITIONS
 # Threshold values for building type classification
 # Apartment Buildings (AB)
@@ -92,16 +64,3 @@ BUILDING_TYPE_THRESHOLDS:
   TH_MIN_CLUSTER_SIZE: 3  # minimum number of buildings in cluster for Townhouse classification
   TH_MIN_NEIGHBORS: 2  # minimum number of direct neighbors for Townhouse classification
   MFH_MAX_FLOOR_AREA: 600  # m² - Multi-Family Homes must be below this area (catch-all category)
-
-MUNICIPAL_REGISTER:
-  - regional_identifier
-  - pop
-  - area
-  - lat
-  - lon
-  - ags
-  - name_city
-  - fed_state
-  - regio7
-  - regio5
-  - pop_den

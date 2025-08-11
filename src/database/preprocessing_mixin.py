@@ -509,11 +509,7 @@ class PreprocessingMixin(BaseMixin, ABC):
         return count
 
     def get_fips_log(self) -> pd.DataFrame:
-        """get fips log: the fips code of the region of interest of which the buildings
-        have already been imported to the database
-        :return: table with column of fips_code
-        :rtype: DataFrame
-         """
+        """get fips log: the fips code of the region of interest of which the buildings have already been imported to the database"""
         query = """SELECT *
                    FROM fips_log;"""
         df_query = pd.read_sql_query(query, con=self.conn, )

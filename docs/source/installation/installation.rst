@@ -96,7 +96,6 @@ Below is a detailed outline of its functionality:
 
    - **Grid Generation**: The PLZ code (Postleitzahl) defines areas for grid creation.
    - **Building Dataset Import**: The AGS (Amtlicher Gemeindeschlüssel) is required for linking municipal data with building datasets (see :doc:`../../grid_generation/index`).
-   - **Area Classification**: The Regiostar class is necessary for categorizing municipalities, enabling accurate analyses (see :doc:`../../classification/index`).
 
 B. ENS students and employees: Access ENS database
 ---------------------------------------------------

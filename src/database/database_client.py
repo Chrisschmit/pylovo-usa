@@ -144,44 +144,6 @@ class DatabaseClient(
         self.conn.commit()
         self.logger.info(f"Version {version_id} deleted from all tables")
 
-    def delete_classification_version_from_related_tables(
-        self, classification_id: str
-    ) -> None:
-        """
-        Deletes all rows with the given classification_id from related tables:
-        transformer_classified, sample_set, and classification_version.
-
-        :param classification_id: ID of the classification version to delete
-        """
-        query = "DELETE FROM classification_version WHERE classification_id = %(cid)s;"
-        self.cur.execute(query, {"cid": classification_id})
-        self.conn.commit()
-
-        self.logger.info(f"Deleted classification ID {classification_id}.")
-
-    def delete_regional_identifier_from_sample_set_table(
-        self, classification_id: str, regional_identifier: int
-    ) -> None:
-        """
-        Deletes the row corresponding to the given classification ID and regional_identifier from the sample_set table.
-
-        :param classification_id: ID of the classification version
-        :param regional_identifier: Postal code to be removed
-        """
-        query = """
-                DELETE
-                FROM sample_set
-                WHERE classification_id = %(cid)s
-                  AND regional_identifier = %(p)s; \
-                """
-        self.cur.execute(
-            query, {
-                "cid": classification_id, "p": regional_identifier})
-        self.conn.commit()
-        self.logger.info(
-            f"Deleted regional_identifier {regional_identifier} for classification ID {classification_id} from sample_set table."
-        )
-
     def delete_transformers(self) -> None:
         """all transformers are deleted from table transformers in database"""
         delete_query = "TRUNCATE TABLE transformers;"
@@ -190,11 +152,7 @@ class DatabaseClient(
         self.logger.info("Transformers deleted.")
 
     def write_fips_log(self, fips_code: int) -> None:
-        """write ags log to database: the amtliche gemeindeschluessel of the municipalities of which the buildings
-        have already been imported to the database
-        :param fips_code:  fips_code to be added
-        :rtype ags: numpy integer 64
-        """
+        """write fips log to database: the fips code of the region of interest of which the buildings have already been imported to the database"""
         query = """INSERT INTO fips_log (fips_code)
                    VALUES (%(f)s); """
         self.cur.execute(

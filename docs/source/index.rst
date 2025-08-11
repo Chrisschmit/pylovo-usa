@@ -34,7 +34,6 @@ In this documentation you can find instructions and information on:
     :alt: Default view
 
 * How the grids are generated in :doc:`grid_generation/explanation/grid_generation_process`.
-* How to create grid classes and representative grids in :doc:`classification/index`.
 * How to visualise your results in :doc:`visualisation/index`.
 
 Legal Notice
@@ -55,7 +54,6 @@ Structure
     self
     installation/installation
     grid_generation/index
-    classification/index
     visualisation/index
     further_reading
     docs_sphinx/index

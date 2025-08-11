@@ -10,4 +10,3 @@ see also examples notebooks to see the use of the functions
 
    plot_networks
    plot_network_data_per_plz
-   plot_classification

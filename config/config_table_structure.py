@@ -66,15 +66,6 @@ CREATE_QUERIES = {
         other_parameters varchar
     )
     """,
-    "classification_version": """
-    CREATE TABLE IF NOT EXISTS classification_version (
-        classification_id integer NOT NULL,
-        version_comment varchar, 
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        classification_region varchar,
-        CONSTRAINT classification_pkey PRIMARY KEY (classification_id)
-    )
-    """,
     "postcode": """
     CREATE TABLE IF NOT EXISTS postcode (
         id SERIAL PRIMARY KEY,
@@ -185,41 +176,6 @@ CREATE_QUERIES = {
     CREATE INDEX idx_buildings_result_grid_result_id
     ON buildings_result (grid_result_id);
     """,
-    "municipal_register": """CREATE TABLE IF NOT EXISTS municipal_register (
-        regional_identifier bigint,
-        pop bigint,
-        area double precision,
-        lat double precision,
-        lon double precision,
-        ags bigint,
-        name_city text,
-        fed_state integer,
-        regio7 integer,
-        regio5 integer,
-        pop_den double precision,
-        CONSTRAINT municipal_register_pkey PRIMARY KEY (regional_identifier, ags)
-    )
-    """,
-    "sample_set": """CREATE TABLE IF NOT EXISTS sample_set (
-        classification_id integer NOT NULL,
-        regional_identifier bigint NOT NULL,
-        ags bigint,
-        bin_no int,
-        bins numeric,
-        perc_bin numeric,
-        count numeric,
-        perc numeric,
-        CONSTRAINT sample_set_pkey PRIMARY KEY (classification_id, regional_identifier),
-        CONSTRAINT fk_sample_set_classification_id
-            FOREIGN KEY (classification_id)
-            REFERENCES classification_version (classification_id)
-            ON DELETE CASCADE,
-        CONSTRAINT fk_sample_set_regional_identifier
-            FOREIGN KEY (regional_identifier, ags)
-            REFERENCES municipal_register (regional_identifier, ags)
-            ON DELETE CASCADE
-    )
-    """,
     "clustering_parameters": """CREATE TABLE IF NOT EXISTS clustering_parameters (
         grid_result_id bigint PRIMARY KEY,
         
@@ -293,28 +249,6 @@ CREATE_QUERIES = {
     """,
 
 
-    "transformer_classified": """
-    CREATE TABLE IF NOT EXISTS transformer_classified (
-        grid_result_id bigint NOT NULL,
-        kmedoid_clusters integer,
-        kmedoid_representative_grid bool,
-        kmeans_clusters integer,
-        kmeans_representative_grid bool,
-        gmm_clusters integer,
-        gmm_representative_grid bool,
-        classification_id integer NOT NULL,
-        geom geometry(Point,%(epsg)s),
-        CONSTRAINT pk_grid_result_id PRIMARY KEY (grid_result_id, classification_id),
-        CONSTRAINT fk_transformer_classified_classification_id
-            FOREIGN KEY (classification_id)
-            REFERENCES classification_version (classification_id)
-            ON DELETE CASCADE,
-        CONSTRAINT fk_transformer_classified_grid_result
-            FOREIGN KEY (grid_result_id)
-            REFERENCES grid_result (grid_result_id)
-            ON DELETE CASCADE
-    )
-    """,
     "fips_log": """
     CREATE TABLE IF NOT EXISTS fips_log (
         fips_code bigint PRIMARY KEY
@@ -375,13 +309,6 @@ CREATE_QUERIES = {
         SELECT tp.*, gr.kcid, gr.bcid, gr.regional_identifier
         FROM transformer_positions tp
         JOIN grid_result gr ON tp.grid_result_id = gr.grid_result_id
-    )
-    """,
-    "transformer_classified_with_grid": """
-    CREATE OR REPLACE VIEW transformer_classified_with_grid AS (
-        SELECT tc.*, gr.version_id, gr.kcid, gr.bcid, gr.regional_identifier
-        FROM transformer_classified tc
-        JOIN grid_result gr ON tc.grid_result_id = gr.grid_result_id
     )
     """,
     "buildings_result_with_grid": """

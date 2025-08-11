@@ -15,9 +15,6 @@ from src.load_data.load_transformers import (
     EPSG, RELATION_ID, fetch_trafos, get_trafos_processed_3035_geojson_path,
     get_trafos_processed_geojson_path, process_trafos)
 
-# uncomment for automated building import of buildings in regiostar_samples
-# from raw_data.import_building_data import OGR_FILE_LIST
-
 
 class DatabaseConstructor:
     """

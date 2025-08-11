@@ -121,7 +121,7 @@ def import_buildings_for_multiple_regional_identifier(
         sgc = DatabaseConstructor()
         sgc.ogr_to_db(ogr_ls_dict)
 
-        # adding the added ags to the log file
+        # adding the fips_code to the log file
         for regional_identifier in regional_identifier_to_add:
             dbc_client.write_fips_log(int(regional_identifier))
 

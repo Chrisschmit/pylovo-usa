@@ -73,9 +73,6 @@ class GridGenerator:
             self.logger.info(
                 f"Skipped regional_identifier {self.regional_identifier} due to generation error.")
             self.dbc.conn.rollback()  # rollback the transaction
-            self.dbc.delete_regional_identifier_from_sample_set_table(
-                # delete from sample set
-                str(CLASSIFICATION_VERSION), self.regional_identifier)
             traceback.print_exc()
             return
 
@@ -123,8 +120,6 @@ class GridGenerator:
                 self.logger.info(
                     f"Skipped regional_identifier {self.regional_identifier} due to generation error.")
                 self.dbc.conn.rollback()  # rollback the transaction
-                self.dbc.delete_regional_identifier_from_sample_set_table(str(CLASSIFICATION_VERSION),
-                                                                          self.regional_identifier)  # delete from sample set
                 continue
             print(
                 '-------------------- end',

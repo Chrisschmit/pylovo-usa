@@ -76,9 +76,6 @@ class ParameterCalculator:
                 f"Error during analysis for regional_identifier {regional_identifier}: {e}")
             self.dbc.logger.info(
                 f"Skipped regional_identifier {regional_identifier} due to analysis error.")
-            self.dbc.delete_regional_identifier_from_sample_set_table(
-                # delete from sample set
-                str(CLASSIFICATION_VERSION), regional_identifier)
 
     def calc_parameters_per_grid(self, regional_identifier: int) -> None:
         """Calculate parameters for all grids of a regional_identifier."""
@@ -160,11 +157,6 @@ class ParameterCalculator:
          self.max_vsw_of_a_branch,) = self.calc_resistance(net, G)
 
         self.vsw_per_branch = self.resistance / self.no_branches
-
-    def get_parameters_as_dataframe(self) -> pd.DataFrame:
-        params = [value for key, value in vars(self).items() if key != "dbc"]
-        df_parameters = pd.DataFrame([params], columns=CLUSTERING_PARAMETERS)
-        return df_parameters
 
     def get_simultaneous_peak_load(self) -> float:
         data_list, _, _ = self.dbc.read_per_trafo_dict(
