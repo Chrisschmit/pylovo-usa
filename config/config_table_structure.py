@@ -345,6 +345,7 @@ TEMP_CREATE_QUERIES = {
         osm_id varchar,
         area numeric,
         type varchar(80),
+        grid_level_connection varchar(20), -- Either MV or LV     
         houses_per_building integer,
         peak_load_in_kw numeric,
         regional_identifier bigint,

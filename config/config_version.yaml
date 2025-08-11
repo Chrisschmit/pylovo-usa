@@ -60,6 +60,10 @@ CONSUMER_CATEGORIES:
 LARGE_COMPONENT_LOWER_BOUND: 2000
 LARGE_COMPONENT_DIVIDER: 1000
 
+# Peak load thresholds for grid level connection
+LV_THRESHOLD_KW: 200
+MV_THRESHOLD_KW: 1000
+
 # Load density thresholds for settlement type classification (MVA/km²)
 POWER_FACTOR: 0.9 # 90% of the peak load is used for the load density calculation
 RURAL_LD:      # Rural areas: < X MVA/km²

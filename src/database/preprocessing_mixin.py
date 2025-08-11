@@ -84,9 +84,9 @@ class PreprocessingMixin(BaseMixin, ABC):
         :return:
         """
 
-        # Fill table
-        query = """INSERT INTO buildings_tem (osm_id, area, type, geom, center, floors)
-                   SELECT osm_id, area, build_type, geom, ST_Centroid(geom), floors::int
+        # Fill table - keep grid_level_connection NULL initially
+        query = """INSERT INTO buildings_tem (osm_id, area, type, geom, center, floors, grid_level_connection)
+                   SELECT osm_id, area, build_type, geom, ST_Centroid(geom), floors::int, NULL::varchar
                    FROM res
                    WHERE ST_Contains((SELECT post.geom
                                       FROM postcode_result as post
@@ -108,9 +108,9 @@ class PreprocessingMixin(BaseMixin, ABC):
         :return:
         """
 
-        # Fill table
-        query = """INSERT INTO buildings_tem(osm_id, area, type, geom, center)
-                   SELECT osm_id, area, use, geom, ST_Centroid(geom)
+        # Fill table - keep grid_level_connection NULL initially
+        query = """INSERT INTO buildings_tem(osm_id, area, type, geom, center, grid_level_connection)
+                   SELECT osm_id, area, use, geom, ST_Centroid(geom), NULL::varchar
                    FROM oth AS o
                    WHERE o.use in ('Commercial', 'Public')
                      AND ST_Contains((SELECT post.geom
@@ -255,55 +255,99 @@ class PreprocessingMixin(BaseMixin, ABC):
 
         return count
 
-    def update_too_large_consumers_to_zero(self) -> int:
+    def assign_grid_level_connection_by_peak_load(self) -> int:
         """
-        Sets the load to zero if the peak load is too large (> 100)
-        :return: number of the large customers
+        Assigns LV/MV grid level based on peak load thresholds and caps very large consumers.
+
+        Rules:
+        - 0 < peak_load_in_kw <= lower_threshold_kw  => grid_level_connection = 'LV'
+        - lower_threshold_kw < peak_load_in_kw <= upper_threshold_kw => grid_level_connection = 'MV'
+        - peak_load_in_kw > upper_threshold_kw => set peak_load_in_kw = 0 and clear grid_level_connection
+
+
+        :return:
         """
         query = """
+            WITH lv AS (
                 UPDATE buildings_tem
-                SET peak_load_in_kw = 0
-                WHERE peak_load_in_kw > 100
-                  AND type IN ('Commercial', 'Public');
-                SELECT COUNT(*)
-                FROM buildings_tem
-                WHERE peak_load_in_kw = 0;"""
-        self.cur.execute(query)
-        too_large = self.cur.fetchone()[0]
+                SET grid_level_connection = 'LV'
+                WHERE peak_load_in_kw > 0
+                  AND peak_load_in_kw <= %(lower)s
+                RETURNING 1
+            ),
+            mv AS (
+                UPDATE buildings_tem
+                SET grid_level_connection = 'MV'
+                WHERE peak_load_in_kw > %(lower)s
+                  AND peak_load_in_kw <= %(upper)s
+                RETURNING 1
+            ),
+            zeroed AS (
+                UPDATE buildings_tem
+                SET peak_load_in_kw = 0,
+                    grid_level_connection = NULL
+                WHERE peak_load_in_kw > %(upper)s
+                RETURNING 1
+            )
+            SELECT
+                (SELECT COUNT(*) FROM lv)  AS lv_count,
+                (SELECT COUNT(*) FROM mv)  AS mv_count,
+                (SELECT COUNT(*) FROM zeroed) AS zeroed_count;
+        """
+        self.cur.execute(
+            query, {
+                "lower": LV_THRESHOLD_KW, "upper": MV_THRESHOLD_KW})
+        lv_count, mv_count, zeroed_count = self.cur.fetchone()
+        self.logger.info(
+            f"Grid-level assignment: LV={lv_count}, MV={mv_count}, Zeroed={zeroed_count}")
+        return
 
-        return too_large
+    def remove_zero_peak_load_buildings(self) -> int:
+        """
+        * Remove buildings with peak load = 0
+        :return: Number of removed buildings from buildings_tem
+        """
+        query = """DELETE
+                  FROM buildings_tem
+                  WHERE peak_load_in_kw = 0;"""
+        self.cur.execute(query)
+        self.logger.info(
+            f"Buildings with peak load = 0 removed from buildings_tem, {
+                self.cur.rowcount} buildings removed")
+        return
 
     def assign_close_buildings(self) -> None:
         """
         * Set peak load to zero, if a building is too near or touching to a too large customer?
         :return:
         """
+        total_zeroed = 0
         while True:
-            remove_query = """WITH close (un) AS (SELECT ST_Union(geom)
-                                                  FROM buildings_tem
-                                                  WHERE peak_load_in_kw = 0)
-                              UPDATE buildings_tem b
-                              SET peak_load_in_kw = 0
-                              FROM close AS c
-                              WHERE ST_Touches(b.geom, c.un)
-                                AND b.type IN ('Commercial', 'Public', 'Industrial')
-                                AND b.peak_load_in_kw != 0;"""
-            self.cur.execute(remove_query)
-
-            count_query = """WITH close (un) AS (SELECT ST_Union(geom)
-                                                 FROM buildings_tem
-                                                 WHERE peak_load_in_kw = 0)
-                             SELECT COUNT(*)
-                             FROM buildings_tem AS b,
-                                  close AS c
-                             WHERE ST_Touches(b.geom, c.un)
-                               AND b.type IN ('Commercial', 'Public', 'Industrial')
-                               AND b.peak_load_in_kw != 0;"""
-            self.cur.execute(count_query)
-            count = self.cur.fetchone()[0]
-            if count == 0 or count is None:
+            cascade_zero_query = """
+                WITH close (un) AS (
+                    SELECT ST_Union(geom)
+                    FROM buildings_tem
+                    WHERE peak_load_in_kw = 0
+                ),
+                upd AS (
+                    UPDATE buildings_tem b
+                    SET peak_load_in_kw = 0
+                    FROM close AS c
+                    WHERE ST_Touches(b.geom, c.un)
+                      AND b.type IN ('Commercial', 'Public', 'Industrial')
+                      AND b.peak_load_in_kw != 0
+                    RETURNING 1
+                )
+                SELECT COUNT(*) FROM upd;
+            """
+            self.cur.execute(cascade_zero_query)
+            updated = self.cur.fetchone()[0]
+            total_zeroed += int(updated or 0)
+            if not updated:
                 break
 
+        self.logger.info(
+            f"Close-building zeroed (touching cascades): {total_zeroed}")
         return None
 
     def insert_transformers(self, regional_identifier: int) -> None:

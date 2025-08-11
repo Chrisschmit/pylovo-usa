@@ -140,6 +140,7 @@ class GridGenerator:
         self.prepare_buildings()
         self.prepare_transformers()
         self.prepare_ways()
+
         self.apply_kmeans_clustering()
         # We are going to generate MV clusters for every kmeans cluster, currently each kmeans clsuter contains around ~1000 buildings.
         # Prep buildings for the clustering: Above >100kw will be directly
@@ -173,18 +174,17 @@ class GridGenerator:
         unloadcount = self.dbc.set_building_peak_load()
         self.logger.info(
             f"Building peakload calculated in buildings_tem, {unloadcount} unloaded buildings are removed from buildings_tem")
-        # Removes all buildings with peak load > 100 kW
-        too_large_consumers = self.dbc.update_too_large_consumers_to_zero()
-        self.logger.info(
-            f"{too_large_consumers} too large consumers removed from buildings_tem")
+        # Update all buildings with peak load > TRESHHOLD to MV level
+        self.dbc.assign_grid_level_connection_by_peak_load()
+
+        # Remove all buildings from buildings_tem with peak load = 0
+        self.dbc.remove_zero_peak_load_buildings()
 
         self.dbc.set_regional_identifier_settlement_type(
             self.regional_identifier)
         self.logger.info("Load density and settlement_type in postcode_result")
 
         self.dbc.assign_close_buildings()
-        self.logger.info(
-            "All close buildings assigned and removed from buildings_tem")
 
     def prepare_transformers(self):
         """
