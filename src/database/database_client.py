@@ -74,6 +74,7 @@ class DatabaseClient(
     def get_sqla_engine(self):
         return self.sqla_engine
 
+    # TODO: Refactor not compatible with new grid structure
     def save_tables(self, regional_identifier: int):
 
         # finding duplicates that violate the buildings_result_pkey constraint
@@ -99,7 +100,7 @@ class DatabaseClient(
                     center, peak_load_in_kw, vertice_id, floors, bt.connection_point
                     FROM buildings_tem bt
                     JOIN grid_result gr
-                    ON bt.regional_identifier = gr.regional_identifier AND bt.kcid = gr.kcid AND bt.bcid = gr.bcid and gr.version_id = '{VERSION_ID}'
+                    ON bt.regional_identifier = gr.regional_identifier AND bt.kcid = gr.kcid AND bt.scid = gr.scid and gr.version_id = '{VERSION_ID}'
                     WHERE peak_load_in_kw != 0 AND peak_load_in_kw != -1;"""
         self.cur.execute(query)
 

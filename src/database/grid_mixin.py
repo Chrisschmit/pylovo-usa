@@ -46,6 +46,7 @@ class GridMixin(BaseMixin, ABC):
             f"Created {len(cables)} standard cable types from equipment_data table")
         return None
 
+    # TODO: Refactor not compatible with new grid structure
     def get_vertices_from_bcid(
             self, regional_identifier: int, kcid: int, bcid: int) -> tuple[dict, int]:
         # get Transformer_vertice_ids from grid_result table

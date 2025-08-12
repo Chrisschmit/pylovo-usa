@@ -145,7 +145,17 @@ class GridGenerator:
         # We are going to generate MV clusters for every kmeans cluster, currently each kmeans clsuter contains around ~1000 buildings.
         # Prep buildings for the clustering: Above >100kw will be directly
         # connected to MV, below will be clustered.
-        self.position_all_transformers()
+
+        # First position LV_Transformers for each bcid cluster and buildings
+        # with grid_level_connection = LV
+        self.position_distribution_transformers()
+
+        # Now position MV_substations and connect them to the LV_Transformers
+        # and the buildings which have grid_levle_connection = MV
+        # TODO: Implement this
+        self.position_mv_substations()
+
+        # Install cables for each grid.
         self.install_cables_parallel(max_workers=4)
 
     def prepare_postcodes(self):
@@ -266,7 +276,7 @@ class GridGenerator:
             # K-means applied to large component to define subgroups with
             # cluster ids
             cluster_count = int(conn_building_count / LARGE_COMPONENT_DIVIDER)
-            self.dbc.update_large_kmeans_cluster(vertices, cluster_count)
+            self.dbc.update_large_kans_cluster(vertices, cluster_count)
             log_msg = f"Large component {component_index} clustered into {cluster_count} groups" if component_index is not None else f"Large component clustered into {cluster_count} groups"
             self.logger.debug(log_msg)
         else:
@@ -274,29 +284,30 @@ class GridGenerator:
             # building threshold
             self.dbc.update_kmeans_cluster(vertices)
 
-    def position_all_transformers(self):
+    def position_distribution_transformers(self):
         """
-        Positions all transformers for each bcid cluster (brownfield with existing transformers and greenfield)
-        FROM: buildings_tem, grid_result
-        INTO: buildings_tem, grid_result
+        Positions all transformers for LVeach bcid cluster (brownfield with existing transformers and greenfield)
+        FROM: buildings_tem, lv_grid_result
+        INTO: buildings_tem, lv_grid_result
         """
         kcid_length = self.dbc.get_kcid_length()
 
         for _ in range(kcid_length):
-            kcid = self.dbc.get_next_unfinished_kcid(self.regional_identifier)
-            self.logger.debug(f"working on kcid {kcid}")
+            kcid = self.dbc.get_next_unfinished_kcid_for_lv(
+                self.regional_identifier)
+            self.logger.info(f"working on kcid {kcid}")
             # Building clustering
             # 0. Check for existing transformers from OSM
             transformers = self.dbc.get_included_transformers(kcid)
 
-            # Case 1: No transformers present
+            # Case 1: No transformers present GREENFIELD PLACEMENT
             if not transformers:
                 self.logger.debug(f"kcid{kcid} has no included transformer")
                 # Create greenfield building clusters
-                self.create_bcid_for_kcid(self.regional_identifier, kcid)
+                self.create_bcid_for_kcid_new(self.regional_identifier, kcid)
                 self.logger.debug(f"kcid{kcid} building clusters finished")
 
-            # Case 2: Transformers present
+            # Case 2: Transformers present BROWNFIELD clusters with existing transformers ets negative bcids
             else:
                 self.logger.debug(
                     f"kcid{kcid} has {len(transformers)} transformers")
@@ -308,7 +319,7 @@ class GridGenerator:
                 # Check buildings and manage clusters
                 if self.dbc.count_kmean_cluster_consumers(kcid) > 1:
                     # TODO: name should include transformer_size allocation
-                    self.create_bcid_for_kcid(self.regional_identifier, kcid)
+                    self.create_bcid_for_kcid_new(self.regional_identifier, kcid)
                 else:
                     # TODO: check approach with isolated buildings
                     self.dbc.delete_isolated_building(
@@ -324,21 +335,240 @@ class GridGenerator:
                         self.regional_identifier, kcid, bcid)
                     self.logger.debug(
                         f"Transformer positioning for kcid{kcid}, bcid{bcid} finished")
-                    self.dbc.update_transformer_rated_power(
+                    # Is for the third case in create bcid for kcid --> invalid
+                    # ceil transformer size he get s a multiple of 630
+                    self.dbc.update_dist_transformer_rated_power(
                         self.regional_identifier, kcid, bcid, 1)
                     self.logger.debug(
-                        "transformer_rated_power in grid_result is updated.")
+                        "transformer_rated_power in lv_grid_result is updated.")
+
+    def position_mv_substations(self):
+        """
+        Positions all MV_substations for each bcid cluster (brownfield with existing transformers and greenfield)
+        FROM: buildings_tem, lv_grid_result
+        INTO: buildings_tem, lv_grid_result
+        """
+        kcid_length = self.dbc.get_kcid_length()
+
+        for _ in range(kcid_length):
+            # Which kcids
+            # kcid = self.dbc.get_next_unfinished_kcid_for_mv(
+            #     self.regional_identifier)
+            # self.logger.info(f"working on kcid {kcid}")
+
+            # Get MV buildings from kcid
+            # mv_buildings = self.dbc.get_buildings_from_kcid(
+            #     kcid, grid_level_connection="MV")
+
+            # Get distribution transformers from kcid
+            # self.dbc.get_distribution_transformers(kcid)
+
+            #
+
+            # Get MV substations from kcid
+
+    def create_bcid_for_kcid_new(
+            self, regional_identifier: int, kcid: int) -> None:
+        """
+        NEW: Distance-limited + capacity-constrained clustering for U.S.-realistic LV groups.
+
+        What changes vs. the old version:
+        - We cut the dendrogram by a *distance threshold* (meters) appropriate to the settlement type
+          instead of forcing a fixed number of clusters.
+        - We validate each group against both transformer capacity (with planning PF and headroom)
+          and a max-homes constraint. Violations are split recursively by tightening the distance cap
+          only on the offending group.
+
+        Steps
+        1) Load buildings, consumer category metadata, settlement type, transformer sizes.
+        2) Build road-graph distance matrix for the current kcid.
+        3) Make an initial average-linkage dendrogram.
+        4) Run try_clustering_new() with a settlement-dependent distance cap and homes cap.
+        5) While any invalid group remains:
+           - Slice to that group, rebuild Z on the sub-matrix, *tighten the distance cap* (×0.67, floor 40 m).
+           - Re-run try_clustering_new() on the subproblem; merge results.
+        6) Persist valid groups to lv_grid_result (as before).
+
+        Notes
+        - We still assign a transformer size here (smallest single ≥ required kVA).
+        - Physical placement is unchanged and happens later.
+        """
+        # --- Parameters (can be moved to config if desired) ---
+        PF_PLANNING = 0.90
+        # 1=City, 2=Village, 3=Rural
+        DIST_CAPS = {1: 120.0, 2: 160.0, 3: 220.0}
+        HOMES_CAPS = {1: 12, 2: 12, 3: 20}
+        MIN_DIST_CAP = 40.0
+        SHRINK = 0.70
+
+        # 1) Load data
+        buildings = self.dbc.get_buildings_from_kcid(
+            kcid, grid_level_connection="LV")
+        if buildings.empty:
+            return
+        consumer_cat_df = self.dbc.get_consumer_categories()
+        settlement_type = self.dbc.get_settlement_type_from_regional_identifier(
+            regional_identifier)
+        transformer_capacities, transformer_costs = self.dbc.get_transformer_data(
+            settlement_type)
+        if transformer_capacities is None or len(transformer_capacities) == 0:
+            self.logger.debug(
+                "No transformer capacities available; aborting clustering.")
+            return
+
+        # 2) Distances
+        localid2vid, dist_mat, _ = self.dbc.get_distance_matrix_from_kcid(kcid)
+        # If there is only a single node or no distances, nothing to cluster
+        if dist_mat.size == 0 or dist_mat.shape[0] <= 1:
+            return
+        dist_vector = squareform(dist_mat)
+
+        # 3) Initial hierarchy
+        Z = linkage(dist_vector, method="average")
+        # Distance cap is a function of the settlement type and determines the
+        # maximum distance between two buildings in the same cluster
+        dist_cap = DIST_CAPS.get(settlement_type, 160.0)
+        # Homes cap is a function of the settlement type and determines the
+        # maximum number of buildings in the same cluster
+        homes_cap = HOMES_CAPS.get(settlement_type, 8)
+
+        valid_cluster_dict: dict[int, tuple[list[int], int]] = {}
+        invalid_cluster_dict_global: dict[int, list[int]] = {}
+
+        # Evaluate initial cut
+        inv, ok, _ = self.dbc.try_clustering_new(
+            Z=Z,
+            localid2vid=localid2vid,
+            buildings=buildings,
+            consumer_cat_df=consumer_cat_df,
+            transformer_capacities=np.asarray(
+                transformer_capacities, dtype=float),
+            dist_cap_m=dist_cap,
+            homes_cap=homes_cap,
+            pf_planning=PF_PLANNING,
+        )
+        # Merge results
+        if ok:
+            valid_cluster_dict.update(
+                {i: v for i, v in enumerate(ok.values())})
+        if inv:
+            invalid_cluster_dict_global.update(
+                {i: v for i, v in enumerate(inv.values())})
+
+        # 4) Split invalid groups recursively
+        while invalid_cluster_dict_global:
+            self.logger.info(
+                f"New invalid cluster dict global: {invalid_cluster_dict_global}")
+            # pop first invalid group
+            invalid_vids = invalid_cluster_dict_global.pop(0)
+            invalid_cluster_dict_global = dict(
+                enumerate(invalid_cluster_dict_global.values()))
+
+            # map these vids to local indices in the *original* matrix
+            full_localids = {v: k for k, v in localid2vid.items()}
+            sub_local_ids = [full_localids[v]
+                             for v in invalid_vids if v in full_localids]
+
+            # build sub-matrix
+            sub_mat = dist_mat[np.ix_(sub_local_ids, sub_local_ids)]
+            if sub_mat.shape[0] <= 1:
+                # cannot split further; accept as a degenerate cluster with
+                # rounded size
+                total_sim_kw = float(
+                    utils.simultaneousPeakLoad(
+                        buildings,
+                        consumer_cat_df,
+                        invalid_vids))
+                needed_kva = (total_sim_kw / PF_PLANNING)
+                self.logger.debug(f"Needed kVA: {needed_kva}")
+                chosen = int(np.asarray(transformer_capacities)[np.asarray(transformer_capacities) >= needed_kva][0]) \
+                    if len(transformer_capacities) and needed_kva > 0 else int(math.ceil(total_sim_kw))
+                valid_cluster_dict[len(valid_cluster_dict)] = (
+                    invalid_vids, chosen)
+                self.logger.debug(f"Valid cluster dict: {valid_cluster_dict}")
+                continue
+
+            # tighten distance cap for this subproblem
+            dist_cap = max(MIN_DIST_CAP, dist_cap * SHRINK)
+
+            Zsub = linkage(squareform(sub_mat, checks=False), method="average")
+
+            self.logger.info(
+                f"start new clustering with dist_cap: {dist_cap} and homes_cap: {homes_cap}")
+
+            inv_sub, ok_sub, _ = self.dbc.try_clustering_new(
+                Z=Zsub,
+                localid2vid=dict(
+                    enumerate([localid2vid[i] for i in sub_local_ids])),
+                buildings=buildings,
+                consumer_cat_df=consumer_cat_df,
+                transformer_capacities=np.asarray(
+                    transformer_capacities, dtype=float),
+                dist_cap_m=dist_cap,
+                homes_cap=homes_cap,
+                pf_planning=PF_PLANNING,
+            )
+
+            if ok_sub:
+                # append with new indices
+                for tpl in ok_sub.values():
+                    self.logger.info(f"New Valid cluster: {tpl}")
+                    valid_cluster_dict[len(valid_cluster_dict)] = tpl
+            if inv_sub:
+                # queue the remaining invalids
+                for vids in inv_sub.values():
+                    invalid_cluster_dict_global[len(
+                        invalid_cluster_dict_global)] = vids
+                invalid_cluster_dict_global = dict(
+                    enumerate(invalid_cluster_dict_global.values()))
+
+        # 5) Persist results
+        self.dbc.clear_lv_grid_result_in_kmean_cluster(
+            regional_identifier, kcid)
+        self.logger.info(
+            "Now updating the lv_grid_result table with the new valid clusters")
+        for bcid, (vids, kva) in valid_cluster_dict.items():
+            self.dbc.upsert_bcid(
+                regional_identifier,
+                kcid,
+                bcid,
+                vertices=vids,
+                transformer_rated_power=kva)
+
+        self.logger.info(
+            f"[NEW] Found {
+                len(valid_cluster_dict)} LV clusters for regional_identifier={regional_identifier}, KCID={kcid}"
+        )
 
     def create_bcid_for_kcid(
             self, regional_identifier: int, kcid: int) -> None:
         """
-        Create building clusters (bcids) with average linkage method for a given kcid.
-        :param regional_identifier: Postal code
-        :param kcid: K-means cluster ID
+        Compute electrical building clusters (bcids) and assign a transformer size per cluster for a given kcid.
+
+        What this does:
+        - Partitions buildings inside one k-means component (`kcid`) into electrically feasible clusters (bcids)
+          using hierarchical clustering (average linkage) guided by distances on the road graph and load constraints.
+        - Selects an appropriate transformer rated power for each resulting bcid (based on aggregated demand and
+          available standard sizes).
+        - Persists the bcids and their chosen transformer sizes to the database (but does NOT set the physical
+          transformer position yet).
+
+        Important distinction:
+        - This function determines “what clusters exist” and “how big the transformer should be” for each cluster.
+        - The spatial placement (which vertex to place the transformer at) is performed later in
+          `position_greenfield_transformers` during the "Process unfinished clusters" step in
+          `position_distributing_transformers`.
+
+        :param regional_identifier: Postal code / regional identifier
+        :param kcid: K-means cluster ID (street-network component identifier)
         :return: None
         """
         # Get data needed for clustering
-        buildings = self.dbc.get_buildings_from_kcid(kcid)
+        # - buildings: candidate consumers inside this kcid
+        # - consumer_cat_df: category metadata (peak loads, simultaneity factors)
+        # - settlement_type: influences available transformer sizes
+        buildings = self.dbc.get_buildings_from_kcid(
+            kcid, grid_level_connection="LV")
         consumer_cat_df = self.dbc.get_consumer_categories()
         settlement_type = self.dbc.get_settlement_type_from_regional_identifier(
             regional_identifier)
@@ -347,6 +577,8 @@ class GridGenerator:
         double_trans = np.multiply(transformer_capacities[2:4], 2)
 
         # Get distance matrix and prepare for hierarchical clustering
+        # Distances are measured along the road graph between connection points; we flatten to a condensed
+        # distance vector required by scipy's linkage.
         localid2vid, dist_mat, vid2localid = self.dbc.get_distance_matrix_from_kcid(
             kcid)
         dist_vector = squareform(dist_mat)
@@ -355,6 +587,8 @@ class GridGenerator:
             return
 
         # Initialize hierarchical clustering
+        # Start with average linkage; we will iteratively adjust cluster counts
+        # below.
         Z = linkage(dist_vector, method="average")
         valid_cluster_dict = {}
         invalid_trans_cluster_dict = {}
@@ -362,6 +596,13 @@ class GridGenerator:
         new_localid2vid = localid2vid
 
         # Iterative clustering process
+        # Strategy:
+        # 1) Try a split into `cluster_amount` clusters; evaluate each cluster against transformer feasibility
+        #    (load limits and available transformer sizes).
+        # 2) Accept feasible clusters (append to valid_cluster_dict).
+        # 3) For the first infeasible cluster (too large), re-cluster only its members by rebuilding distance
+        # matrices and linkage, then repeat until no infeasible clusters
+        # remain.
         while True:
             # Try clustering with current parameters
             invalid_cluster_dict, cluster_dict, _ = self.dbc.try_clustering(Z, cluster_amount, new_localid2vid, buildings,
@@ -369,6 +610,8 @@ class GridGenerator:
                                                                             double_trans)
 
             # Process valid clusters
+            # Merge newly found valid clusters into the global dictionary,
+            # keeping indices compact.
             if cluster_dict:
                 current_valid_amount = len(valid_cluster_dict)
                 valid_cluster_dict.update(
@@ -378,6 +621,8 @@ class GridGenerator:
                     enumerate(valid_cluster_dict.values()))
 
             # Process invalid clusters
+            # Keep track of clusters that violate transformer sizing
+            # constraints and need further splitting.
             if invalid_cluster_dict:
                 current_invalid_amount = len(invalid_trans_cluster_dict)
                 invalid_trans_cluster_dict.update(
@@ -392,6 +637,8 @@ class GridGenerator:
                 break
             else:
                 # Process too large clusters by re-clustering them
+                # Take the first too-large cluster, restrict the problem to its buildings, rebuild distances
+                # and linkage, and try again with a fresh split.
                 self.logger.info(
                     f"Found {len(invalid_trans_cluster_dict)} too_large clusters for regional_identifier: {regional_identifier}, KCID: {kcid}")
 
@@ -402,6 +649,8 @@ class GridGenerator:
                                      for v in invalid_vertice_ids]
 
                 # Create new mappings and distance matrix for the subclustering
+                # Map global local IDs to the subproblem and slice the distance
+                # matrix accordingly.
                 new_localid2vid = {
                     k: v for k, v in localid2vid.items() if k in invalid_local_ids}
                 new_localid2vid = dict(enumerate(new_localid2vid.values()))
@@ -410,6 +659,8 @@ class GridGenerator:
                 new_dist_vector = squareform(new_dist_mat)
 
                 # Prepare for next iteration
+                # Reset hierarchy and the number of desired clusters for the
+                # subproblem.
                 Z = linkage(new_dist_vector, method="average")
                 cluster_amount = 2
                 del invalid_trans_cluster_dict[0]
@@ -424,8 +675,11 @@ class GridGenerator:
         # We could calculate the total transformer cost by summing the costs of all selected transformers:
         # total_transformer_cost = sum([transformer2cost[v[1]] for v in valid_cluster_dict.values()])
 
-        # Save results to database
-        self.dbc.clear_grid_result_in_kmean_cluster(regional_identifier, kcid)
+        # Save results to database:
+        # - Clear any previous grid definitions for this kcid and regional identifier
+        # - Upsert each bcid with its member vertices and the chosen transformer rated power
+        self.dbc.clear_lv_grid_result_in_kmean_cluster(
+            regional_identifier, kcid)
         for bcid, cluster_data in valid_cluster_dict.items():
             self.dbc.upsert_bcid(regional_identifier, kcid, bcid, vertices=cluster_data[0],
                                  transformer_rated_power=cluster_data[1])

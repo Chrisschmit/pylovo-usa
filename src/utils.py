@@ -52,8 +52,6 @@ def simultaneousPeakLoad(buildings_df, consumer_cat_df, vertice_ids):
     # Calculates the simultaneous peak load of buildings with given vertice ids
     subset_df = buildings_df[buildings_df['connection_point'].isin(
         vertice_ids)]
-    print(f"{len(subset_df)} buildings are given.")
-    # print(subset_df)
     occurring_categories = (['SFH', 'MFH', 'AB', 'TH'], [
                             'Commercial'], ['Public'], ['Industrial'])
 
@@ -75,7 +73,6 @@ def simultaneousPeakLoad(buildings_df, consumer_cat_df, vertice_ids):
         sim_load = oneSimultaneousLoad(installed_power, load_count, sim_factor)
         category_load_dict[cat[0]] = sim_load
 
-    # print(category_load_dict)
     # Calculate total sim load (Kiefer S. 142)
     total_sim_load = sum(category_load_dict.values())
     print(f"Total sim load: {total_sim_load}")

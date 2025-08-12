@@ -137,6 +137,7 @@ class ClusteringMixin(BaseMixin, ABC):
                                              FROM buildings_tem \
                                              WHERE kcid = %(k)s \
                                                AND bcid ISNULL \
+                                               AND grid_level_connection = 'LV'
                                              ORDER BY connection_point) AS b), \
                                       false);"""
         params = {"k": kcid}
@@ -190,6 +191,51 @@ class ClusteringMixin(BaseMixin, ABC):
     def try_clustering(self, Z: np.ndarray, cluster_amount: int, localid2vid: dict, buildings: pd.DataFrame,
                        consumer_cat_df: pd.DataFrame, transformer_capacities: np.ndarray, double_trans: np.ndarray, ) -> tuple[
             dict, dict, int]:
+        """
+        Partition a k-means component into at most `cluster_amount` electrical sub-clusters and classify them
+        as valid (feasible with available transformer sizing) or invalid (too large and must be split again).
+
+        Inputs
+        - Z: Linkage matrix from hierarchical clustering (e.g., scipy.cluster.hierarchy.linkage) built on a
+             condensed distance vector for the connection points of this k-means component.
+        - cluster_amount: Target maximum number of clusters to cut from the hierarchy (criterion="maxclust").
+        - localid2vid: Mapping from local index (0..N-1 used in the distance matrix) to graph vertex id
+                       (vertice_id used in the database). Example: {0: 5346, 1: 3263, ...}.
+        - buildings: DataFrame of buildings (for this kcid) used by the simultaneity-load calculations.
+        - consumer_cat_df: Consumer categories table (peak loads, sim factors) used in load aggregation.
+        - transformer_capacities: 1D array of available single-transformer sizes (ascending, typically in kVA).
+        - double_trans: 1D array of available “double transformer” sizes (ascending), e.g., two units in parallel.
+
+        Algorithm
+        1) Cut the dendrogram into up to `cluster_amount` flat groups with fcluster(..., criterion="maxclust").
+        2) For each resulting flat group (cluster_id in [1..cluster_count]):
+           - Translate local indices to global vertex ids (vid_list) via `localid2vid`.
+           - Compute simultaneous peak load for the buildings mapped to `vid_list`.
+           - Decision logic:
+             a) If total_sim_load ≥ max(transformer_capacities) and the cluster has ≥ 5 buildings → mark as
+                invalid (needs further splitting): invalid_cluster_dict[cluster_id] = vid_list.
+             b) If total_sim_load < max(transformer_capacities) → valid. Pick the “closest-fitting” size between
+                the minimal single transformer that exceeds the load and the minimal double-transformer group
+                that exceeds 1.15 × load. Store as cluster_dict[cluster_id] = (vid_list, chosen_size).
+             c) Otherwise (oversized load but the cluster is tiny, < 5 buildings) → treat as valid fallback and
+                assign a custom size rounded up to the next integer: cluster_dict[cluster_id] = (vid_list, ceil(load)).
+
+        Returns
+        - invalid_cluster_dict: dict[int, list[int]]
+            Maps flat-group ids → list of vertex ids that form an “invalid” cluster (too large and must be split
+            again at a later iteration). Example: {2: [142, 3891, 557], 3: [101, 77, 902, ...]}.
+        - cluster_dict: dict[int, tuple[list[int], int]]
+            Maps flat-group ids → (vid_list, transformer_size). The transformer_size is the selected rating for
+            this cluster, chosen as described above. Example: {1: ([12, 45, 78], 250), 4: ([9, 10], 400)}.
+        - cluster_count: int
+            The number of flat groups created by the current cut (len(unique(fcluster(...)))).
+
+        Notes
+        - The keys (cluster_id) refer to the current flat cut of the dendrogram and are not stable across
+          re-clustering iterations. Callers typically reindex/normalize these after aggregating results.
+        - Feasible clusters are returned in `cluster_dict`; infeasible ones in `invalid_cluster_dict` for further
+          recursive splitting by the caller.
+        """
         # Clusters into maximum cluster amount -- 2 is the maximum
         flat_groups = fcluster(Z, t=cluster_amount, criterion="maxclust")
         cluster_ids = np.unique(flat_groups)
@@ -209,25 +255,32 @@ class ClusteringMixin(BaseMixin, ABC):
                 buildings, consumer_cat_df, vid_list)
             # In US first step we need to check for only small transformers
             # pole mounted
+            # Too large load and buildings count >5 --> invalid cluster
             if (total_sim_load >= max(transformer_capacities)
                     and len(vid_list) >= 5):  # the cluster is too big
                 invalid_cluster_dict[cluster_id] = vid_list
+
+            # Load can be served by a given transformer --> valid cluster
             elif total_sim_load < max(transformer_capacities):
+
                 # find the smallest transformer, that satisfies the load
-                opt_transformer = transformer_capacities[transformer_capacities >
-                                                         total_sim_load][0]
-                opt_double_transformer = double_trans[double_trans >
-                                                      total_sim_load * 1.15][0]
-                if (opt_double_transformer -
-                        total_sim_load) > (opt_transformer - total_sim_load):
-                    cluster_dict[cluster_id] = (vid_list, opt_transformer)
+                optimal_transformer = transformer_capacities[transformer_capacities >
+                                                             total_sim_load][0]
+                optimal_double_transformer = double_trans[double_trans >
+                                                          total_sim_load * 1.15][0]
+                if (optimal_double_transformer -
+                        total_sim_load) > (optimal_transformer - total_sim_load):
+                    cluster_dict[cluster_id] = (vid_list, optimal_transformer)
                 else:
                     cluster_dict[cluster_id] = (
-                        vid_list, opt_double_transformer)
+                        vid_list, optimal_double_transformer)
             else:
-                # "Over-sized load but tiny cluster"
-                opt_transformer = math.ceil(total_sim_load)
-                cluster_dict[cluster_id] = (vid_list, opt_transformer)
+                # FALLBACK: If the load can be served by a given transformer, but the number of buildings in the cluster is less than 5, then we use the smallest transformer
+                # total_sim_load ≥ max(transformer_capacities) and number of
+                # buildings in the cluster is less than 5. --> valid cluster
+                optimal_transformer = math.ceil(total_sim_load)
+                cluster_dict[cluster_id] = (vid_list, optimal_transformer)
+
         return invalid_cluster_dict, cluster_dict, cluster_count
 
     def get_kcid_length(self) -> int:
@@ -238,16 +291,16 @@ class ClusteringMixin(BaseMixin, ABC):
         kcid_length = self.cur.fetchone()[0]
         return kcid_length
 
-    def get_next_unfinished_kcid(self, regional_identifier: int) -> int:
+    def get_next_unfinished_kcid_for_lv(self, regional_identifier: int) -> int:
         """
         :return: one unmodeled k mean cluster ID - regional_identifier
         """
         query = """SELECT kcid
                    FROM buildings_tem
                    WHERE kcid NOT IN (SELECT DISTINCT kcid
-                                      FROM grid_result
+                                      FROM lv_grid_result
                                       WHERE version_id = %(v)s
-                                        AND grid_result.regional_identifier = %(regional_identifier)s)
+                                        AND lv_grid_result.regional_identifier = %(regional_identifier)s)
                      AND kcid IS NOT NULL
                    ORDER BY kcid
                    LIMIT 1;"""
@@ -272,11 +325,11 @@ class ClusteringMixin(BaseMixin, ABC):
             data := self.cur.fetchall()) else [])
         return transformers_list
 
-    def clear_grid_result_in_kmean_cluster(
+    def clear_lv_grid_result_in_kmean_cluster(
             self, regional_identifier: int, kcid: int):
         # Remove old clustering at same postcode cluster
         clear_query = """DELETE
-                         FROM grid_result
+                         FROM lv_grid_result
                          WHERE version_id = %(v)s
                            AND regional_identifier = %(pc)s
                            AND kcid = %(kc)s
@@ -290,7 +343,7 @@ class ClusteringMixin(BaseMixin, ABC):
     def upsert_bcid(self, regional_identifier: int, kcid: int, bcid: int,
                     vertices: list, transformer_rated_power: int):
         """
-        Assign buildings in buildings_tem the bcid and stores the cluster in grid_result
+        Assign buildings in buildings_tem the bcid and stores the cluster in lv_grid_result
         Args:
             regional_identifier: postcode cluster ID - regional_identifier
             kcid: kmeans cluster ID
@@ -312,7 +365,7 @@ class ClusteringMixin(BaseMixin, ABC):
         self.cur.execute(building_query, params)
 
         # Insert new clustering
-        cluster_query = """INSERT INTO grid_result (version_id, regional_identifier, kcid, bcid, transformer_rated_power)
+        cluster_query = """INSERT INTO lv_grid_result (version_id, regional_identifier, kcid, bcid, dist_transformer_rated_power)
                            VALUES (%(v)s, %(pc)s, %(kc)s, %(bc)s, %(s)s); """
 
         params = {"v": VERSION_ID, "pc": regional_identifier, "bc": bcid,
@@ -366,11 +419,11 @@ class ClusteringMixin(BaseMixin, ABC):
         Returns: A list of greenfield building clusters for a given regional_identifier
         """
         query = """SELECT DISTINCT bcid
-                   FROM grid_result
+                   FROM lv_grid_result
                    WHERE version_id = %(v)s
                      AND kcid = %(kc)s
                      AND regional_identifier = %(pc)s
-                     AND model_status ISNULL
+                     AND lv_model_status ISNULL
                    ORDER BY bcid; """
         params = {"v": VERSION_ID, "pc": regional_identifier, "kc": kcid}
         self.cur.execute(query, params)
@@ -378,18 +431,21 @@ class ClusteringMixin(BaseMixin, ABC):
             data := self.cur.fetchall()) else []
         return bcid_list
 
-    def get_buildings_from_kcid(self, kcid: int, ) -> pd.DataFrame:
+    def get_buildings_from_kcid(
+            self, kcid: int, grid_level_connection: str = "LV") -> pd.DataFrame:
         """
         Args:
             kcid: kmeans_cluster ID
+            grid_level_connection: grid_level_connection of the buildings
         Returns: A dataframe with all building information
         """
         buildings_query = """SELECT *
                              FROM buildings_tem
                              WHERE connection_point IS NOT NULL
                                AND kcid = %(k)s
-                               AND bcid ISNULL;"""
-        params = {"k": kcid}
+                               AND bcid ISNULL
+                               AND grid_level_connection = %(g)s;"""
+        params = {"k": kcid, "g": grid_level_connection}
 
         buildings_df = pd.read_sql_query(
             buildings_query, con=self.conn, params=params)
@@ -400,6 +456,96 @@ class ClusteringMixin(BaseMixin, ABC):
             f"Building data fetched. {len(buildings_df)} buildings from kc={kcid} ...")
 
         return buildings_df
+
+    def try_clustering_new(
+        self,
+        Z: np.ndarray,
+        localid2vid: dict,
+        buildings: pd.DataFrame,
+        consumer_cat_df: pd.DataFrame,
+        transformer_capacities: np.ndarray,
+        dist_cap_m: float,
+        homes_cap: int,
+        pf_planning: float = 0.90,
+    ) -> tuple[dict, dict, int]:
+        """
+        NEW (distance-limited, capacity-constrained) clustering evaluation.
+
+        Differences vs. old try_clustering:
+        - Uses a *distance* cut on the dendrogram (criterion="distance") rather than a fixed cluster count.
+        - Enforces both a max-homes constraint and a transformer loading constraint during validation.
+
+        Inputs
+        - Z: Linkage matrix built from the condensed road-graph distance vector for the current subproblem.
+        - localid2vid: {local_index -> vertice_id} mapping for the current subproblem.
+        - buildings: DataFrame of candidate buildings (for this kcid) used by simultaneity-load calculations.
+        - consumer_cat_df: Consumer categories (used by utils.simultaneousPeakLoad).
+        - transformer_capacities: ascending single-transformer sizes (kVA) allowed for the current settlement.
+        - dist_cap_m: maximum allowed inter-merge distance (meters) for fcluster(..., criterion="distance").
+        - homes_cap: maximum number of service points per cluster for this settlement type.
+        - pf_planning: power factor used to convert kW→kVA during planning.
+
+        Returns
+        - invalid_cluster_dict: dict[int, list[int]] -> group_id -> list of vertex ids needing further split.
+        - cluster_dict: dict[int, tuple[list[int], int]] -> group_id -> (vid_list, selected_transformer_kVA).
+                         Here we pick the smallest single transformer >= cluster kVA (no doubles).
+        - cluster_count: number of groups from the current flat cut.
+        """
+        # 1) Flat cut by distance
+        flat_groups = fcluster(Z, t=dist_cap_m, criterion="distance")
+        cluster_ids = np.unique(flat_groups)
+        cluster_count = len(cluster_ids)
+
+        cluster_dict: dict[int, tuple[list[int], int]] = {}
+        invalid_cluster_dict: dict[int, list[int]] = {}
+
+        # Pre-calc max feasible kVA
+        if transformer_capacities.size == 0:
+            max_kva_allowed = 0.0
+        else:
+            max_kva_allowed = float(transformer_capacities.max())
+
+        for cluster_id in range(1, cluster_count + 1):
+            self.logger.debug(f"Cluster ID: {cluster_id}")
+            # Map local ids in this group back to global graph vertex ids
+            lid_idx = np.argwhere(flat_groups == cluster_id)
+            vid_list = [localid2vid[int(lid[0])] for lid in lid_idx]
+
+            # Compute simultaneous peak load in kW
+            total_sim_kw = utils.simultaneousPeakLoad(
+                buildings, consumer_cat_df, vid_list)
+            total_sim_kva = float(
+                total_sim_kw) / pf_planning if pf_planning > 0 else float(total_sim_kw)
+
+            homes_ok = (len(vid_list) <= homes_cap)
+            kva_ok = (total_sim_kva <= max_kva_allowed)
+
+            if homes_ok and kva_ok:
+                self.logger.debug(f"Cluster vertex_ids: {vid_list}")
+                self.logger.debug(f"Cluster ID: {cluster_id} is valid")
+                # Choose the smallest single transformer that exceeds kVA demand
+                # (so that planned loading stays within limit)
+                needed_kva = total_sim_kva
+                feasible = transformer_capacities[transformer_capacities >= needed_kva]
+                if feasible.size == 0:
+                    self.logger.debug(
+                        f"Cluster ID: {cluster_id} is invalid because no single transformer large enough")
+                    # No single transformer large enough -> mark invalid
+                    # (caller will split further)
+                    invalid_cluster_dict[cluster_id] = vid_list
+                else:
+                    self.logger.debug(f"Cluster ID: {cluster_id} is valid")
+                    # Choose the smallest single transformer that exceeds kVA
+                    # demand
+                    chosen_size = int(feasible[0])
+                    cluster_dict[cluster_id] = (vid_list, chosen_size)
+            else:
+                self.logger.debug(
+                    f"Cluster ID: {cluster_id} is invalid because of not homes_ok and kva_ok. homes_ok = {homes_ok} or kva_ok = {kva_ok}")
+                # If the cluster is not valid, mark it as invalid
+                invalid_cluster_dict[cluster_id] = vid_list
+
+        return invalid_cluster_dict, cluster_dict, cluster_count
 
     def get_buildings_from_bcid(
             self, regional_identifier: int, kcid: int, bcid: int) -> pd.DataFrame:
@@ -423,23 +569,45 @@ class ClusteringMixin(BaseMixin, ABC):
 
         return buildings_df
 
-    def update_transformer_rated_power(
+    def update_dist_transformer_rated_power(
             self, regional_identifier: int, kcid: int, bcid: int, note: int):
         """
-        Updates transformer_rated_power in grid_result
-        :param regional_identifier:
-        :param kcid:
-        :param bcid:
-        :param note:
-        :return:
+        Update the transformer_rated_power (kVA) for a specific building cluster in lv_grid_result
+        according to the allowed catalog for the postcode’s settlement type.
+
+        Behavior
+        - Determines the settlement type for the provided regional_identifier and loads the allowed
+          single-transformer sizes (ascending) via get_transformer_data.
+        - If note == 0:
+            Bump the currently stored transformer_rated_power to the next larger single size
+            from the catalog (no double-transformer options considered).
+        - If note != 0:
+            Consider both the single sizes and the double-transformer options (parallel units).
+            If the currently stored value already matches any allowed size, do nothing.
+            Otherwise normalize it by rounding up to the nearest 630 multiple and update.
+
+        Parameters
+        - regional_identifier: Postcode/area identifier of the cluster.
+        - kcid: K-means component identifier the cluster belongs to.
+        - bcid: Building cluster identifier to update.
+        - note: Mode flag controlling the update strategy.
+                0  -> Only single-transformer catalog bump to next larger size.
+                !=0 -> Include double-transformer combinations and normalize fallback sizes.
+
+        Returns
+        - None. Updates are written directly to lv_grid_result.
+
+        Side effects
+        - Updates lv_grid_result.dist_transformer_rated_power for the (version_id, regional_identifier, kcid, bcid) row.
+        - Emits a debug log when a double/multiple transformer group assignment occurs.
         """
         sdl = self.get_settlement_type_from_regional_identifier(
             regional_identifier)
         transformer_capacities, _ = self.get_transformer_data(sdl)
 
         if note == 0:
-            old_query = """SELECT transformer_rated_power
-                           FROM grid_result
+            old_query = """SELECT dist_transformer_rated_power
+                           FROM lv_grid_result
                            WHERE version_id = %(v)s
                              AND regional_identifier = %(p)s
                              AND kcid = %(k)s
@@ -451,8 +619,8 @@ class ClusteringMixin(BaseMixin, ABC):
 
             new_transformer_rated_power = transformer_capacities[transformer_capacities > transformer_rated_power][
                 0].item()
-            update_query = """UPDATE grid_result
-                              SET transformer_rated_power = %(n)s
+            update_query = """UPDATE lv_grid_result
+                              SET dist_transformer_rated_power = %(n)s
                               WHERE version_id = %(v)s
                                 AND regional_identifier = %(p)s
                                 AND kcid = %(k)s
@@ -464,8 +632,8 @@ class ClusteringMixin(BaseMixin, ABC):
             combined = np.concatenate(
                 (transformer_capacities, double_trans), axis=None)
             np.sort(combined, axis=None)
-            old_query = """SELECT transformer_rated_power
-                           FROM grid_result
+            old_query = """SELECT dist_transformer_rated_power
+                           FROM lv_grid_result
                            WHERE version_id = %(v)s
                              AND regional_identifier = %(p)s
                              AND kcid = %(k)s
@@ -478,8 +646,8 @@ class ClusteringMixin(BaseMixin, ABC):
                 return None
             new_transformer_rated_power = np.ceil(
                 transformer_rated_power / 630) * 630
-            update_query = """UPDATE grid_result
-                              SET transformer_rated_power = %(n)s
+            update_query = """UPDATE lv_grid_result
+                              SET dist_transformer_rated_power = %(n)s
                               WHERE version_id = %(v)s
                                 AND regional_identifier = %(p)s
                                 AND kcid = %(k)s
@@ -546,18 +714,19 @@ class ClusteringMixin(BaseMixin, ABC):
                 WHERE connection_point IN %(c)s
                   AND type != 'Transformer';
 
-                INSERT INTO grid_result (version_id, regional_identifier, kcid, bcid, transformer_vertice_id, transformer_rated_power)
+                INSERT INTO lv_grid_result (version_id, regional_identifier, kcid, bcid, dist_transformer_rated_power)
                 VALUES (%(v)s, %(pc)s, %(k)s, %(count)s, %(t)s, %(l)s);
 
-                INSERT INTO transformer_positions (version_id, grid_result_id, geom, osm_id, comment)
+                INSERT INTO transformer_positions (version_id, lv_grid_result_id, grid_level, osm_id, comment, geom)
                 VALUES (
                         %(v)s,
-                        (SELECT grid_result_id
-                         FROM grid_result
+                        (SELECT lv_grid_result_id
+                         FROM lv_grid_result
                          WHERE version_id = %(v)s AND regional_identifier = %(pc)s AND kcid = %(k)s AND bcid = %(count)s),
-                        (SELECT center FROM buildings_tem WHERE vertice_id = %(t)s),
+                        'LV',
                         (SELECT osm_id FROM buildings_tem WHERE vertice_id = %(t)s),
-                        'Normal'); \
+                        'Normal',
+                        (SELECT center FROM buildings_tem WHERE vertice_id = %(t)s)); \
                 """
         params = {"v": VERSION_ID, "count": count, "c": tuple(conn_id_list), "t": transformer_id, "k": kcid, "pc": regional_identifier,
                   "l": transformer_rated_power, }
@@ -687,33 +856,52 @@ class ClusteringMixin(BaseMixin, ABC):
 
     def upsert_transformer_selection(
             self, regional_identifier: int, kcid: int, bcid: int, connection_id: int):
-        """Writes the vertice_id of chosen building as Transformer location in the grid_result table"""
+        """
+        Persist the user's transformer selection for a building cluster in three steps.
 
-        query = """UPDATE grid_result
-                   SET transformer_vertice_id = %(c)s
+        Steps
+        1) Update `grid_result.transformer_vertice_id` with the selected road-graph vertex (`connection_id`).
+        2) Set `grid_result.model_status = 1` to mark the cluster as modeled/confirmed.
+        3) Insert a row into `transformer_positions` linking the corresponding `grid_result_id` and storing the
+           geometry of the selected vertex (`ways_tem_vertices_pgr.id = connection_id`) with comment "on_way".
+
+        Args:
+            regional_identifier: Postcode/area identifier of the cluster.
+            kcid: K-means component identifier.
+            bcid: Building-cluster identifier.
+            connection_id: Selected road-graph vertex id (`ways_tem_vertices_pgr.id`) as transformer location.
+
+        Returns:
+            None
+        """
+
+        query = """UPDATE lv_grid_result
+                   SET dist_transformer_vertice_id = %(c)s
                    WHERE version_id = %(v)s
                      AND regional_identifier = %(p)s
                      AND kcid = %(k)s
                      AND bcid = %(b)s;
 
-        UPDATE grid_result
-        SET model_status = 1
+        UPDATE lv_grid_result
+        SET lv_model_status = 1
         WHERE version_id = %(v)s
           AND regional_identifier = %(p)s
           AND kcid = %(k)s
           AND bcid = %(b)s;
 
-        INSERT INTO transformer_positions (version_id, grid_result_id, geom, comment)
+        INSERT INTO transformer_positions (version_id, lv_grid_result_id, grid_level, osm_id, comment, geom)
         VALUES(
                 %(v)s,
-                (SELECT grid_result_id
-                 FROM grid_result
+                (SELECT lv_grid_result_id
+                 FROM lv_grid_result
                  WHERE version_id = %(v)s \
                    AND regional_identifier = %(p)s \
                    AND kcid = %(k)s \
                    AND bcid = %(b)s),
-                (SELECT the_geom FROM ways_tem_vertices_pgr WHERE id = %(c)s),
-                'on_way');"""
+                'LV',
+                (SELECT osm_id FROM buildings_tem WHERE vertice_id = %(c)s),
+                'on_way',
+                (SELECT the_geom FROM ways_tem_vertices_pgr WHERE id = %(c)s));"""
         params = {
             "v": VERSION_ID,
             "c": connection_id,

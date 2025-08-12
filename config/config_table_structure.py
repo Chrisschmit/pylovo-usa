@@ -100,28 +100,69 @@ CREATE_QUERIES = {
             ON DELETE CASCADE
     )
     """,
-    # old name: building_clusters, got merged with grids
+    # Final grid result (source of truth)
     "grid_result": """
     CREATE TABLE IF NOT EXISTS grid_result (
         grid_result_id SERIAL PRIMARY KEY,
         version_id varchar(10) NOT NULL,
-        kcid integer NOT NULL,
-        bcid integer NOT NULL,
         regional_identifier bigint NOT NULL,
-        transformer_rated_power bigint,
+        kcid integer NOT NULL,
+        scid integer NOT NULL,
+        substation_rated_power bigint,
+        substation_vertice_id bigint,
         model_status integer,
-        transformer_vertice_id bigint,
         grid json,
-        CONSTRAINT cluster_identifier UNIQUE (version_id, kcid, bcid, regional_identifier),
-        CONSTRAINT unique_grid_result_id_version_id UNIQUE (version_id, grid_result_id),
+        CONSTRAINT uq_grid_result
+            UNIQUE (version_id, regional_identifier, kcid, scid),
+        CONSTRAINT unique_grid_result_id_version_id
+            UNIQUE (version_id, grid_result_id),
         CONSTRAINT fk_grid_result_version_id_regional_identifier
             FOREIGN KEY (version_id, regional_identifier)
-            REFERENCES postcode_result (version_id, postcode_result_regional_identifier)
+            REFERENCES postcode_result(
+                version_id, postcode_result_regional_identifier
+            )
             ON DELETE CASCADE
     );
-    CREATE INDEX idx_grid_result_version_id_regional_identifier_bcid_kcid
-    ON grid_result (version_id, regional_identifier, bcid, kcid)
+
+    CREATE INDEX idx_grid_result_v_reg_kcid_scid
+        ON grid_result(version_id, regional_identifier, kcid, scid)
     """,
+        "lv_grid_result": """
+
+    CREATE TABLE IF NOT EXISTS lv_grid_result (
+        lv_grid_result_id SERIAL PRIMARY KEY,
+        version_id varchar(10) NOT NULL,
+        regional_identifier bigint NOT NULL,
+        kcid integer NOT NULL,
+        bcid integer NOT NULL,
+        scid integer NULL,
+        parent_grid_result_id integer NULL,
+        dist_transformer_rated_power bigint,
+        dist_transformer_vertice_id bigint,
+        lv_model_status integer,
+        CONSTRAINT uq_lv_grid_result
+            UNIQUE (version_id, regional_identifier, kcid, bcid),
+        CONSTRAINT unique_lv_grid_result_id_version_id
+            UNIQUE (version_id, lv_grid_result_id),
+        CONSTRAINT fk_lv_grid_result_version_id_regional_identifier
+            FOREIGN KEY (version_id, regional_identifier)
+            REFERENCES postcode_result(
+                version_id, postcode_result_regional_identifier
+            )
+            ON DELETE CASCADE,
+        CONSTRAINT fk_lv_parent
+            FOREIGN KEY (parent_grid_result_id)
+            REFERENCES grid_result(grid_result_id)
+            ON DELETE CASCADE
+    );
+    CREATE INDEX idx_lv_grid_result_v_reg_kcid_bcid
+        ON lv_grid_result(version_id, regional_identifier, kcid, bcid);
+    CREATE INDEX idx_lv_grid_result_parent
+        ON lv_grid_result(parent_grid_result_id)
+    """,
+
+
+
     "lines_result": """
     CREATE TABLE IF NOT EXISTS lines_result (
         lines_result_id SERIAL PRIMARY KEY,
@@ -227,13 +268,23 @@ CREATE_QUERIES = {
     
     "transformer_positions": """
     CREATE TABLE IF NOT EXISTS transformer_positions (
-        grid_result_id bigint PRIMARY KEY,
+        position_id SERIAL PRIMARY KEY,
+        version_id varchar(10) NOT NULL,
+        grid_result_id bigint NULL,
+        lv_grid_result_id bigint NULL,
+        grid_level varchar(8) NOT NULL, -- 'MV' | 'LV'
         osm_id varchar,
-        version_id varchar(10),
         "comment" varchar,
         geom geometry(Point,%(epsg)s),
 
-        CONSTRAINT uq_tp_osm_v UNIQUE (osm_id, version_id),
+        CONSTRAINT ck_tp_role_values
+            CHECK (grid_level IN ('MV', 'LV')),
+        CONSTRAINT ck_tp_role_fk
+            CHECK (
+                (grid_level = 'MV' AND lv_grid_result_id IS NULL) OR
+                (grid_level = 'LV' AND lv_grid_result_id IS NOT NULL)
+            ),
+
         CONSTRAINT fk_tp_version_id
             FOREIGN KEY (version_id)
             REFERENCES version (version_id)
@@ -241,6 +292,10 @@ CREATE_QUERIES = {
         CONSTRAINT fk_tp_grid_result_id
             FOREIGN KEY (grid_result_id)
             REFERENCES grid_result (grid_result_id)
+            ON DELETE CASCADE,
+        CONSTRAINT fk_tp_lv_grid_result_id
+            FOREIGN KEY (lv_grid_result_id)
+            REFERENCES lv_grid_result (lv_grid_result_id)
             ON DELETE CASCADE,
         CONSTRAINT fk_tp_osm_id
             FOREIGN KEY (osm_id)
@@ -306,17 +361,39 @@ CREATE_QUERIES = {
     """,
     "transformer_positions_with_grid": """
     CREATE OR REPLACE VIEW transformer_positions_with_grid AS (
-        SELECT tp.*, gr.kcid, gr.bcid, gr.regional_identifier
+        SELECT
+        tp.*,
+        gr.kcid,
+        gr.scid,
+        gr.regional_identifier,
+        lv.bcid
         FROM transformer_positions tp
-        JOIN grid_result gr ON tp.grid_result_id = gr.grid_result_id
+        JOIN grid_result gr
+        ON tp.grid_result_id = gr.grid_result_id
+        LEFT JOIN lv_grid_result lv
+        ON tp.lv_grid_result_id = lv.lv_grid_result_id
     )
+    """,
+    "v_grid_result_with_bcids": """
+    CREATE OR REPLACE VIEW v_grid_result_with_bcids AS
+    SELECT
+        gr.*,
+        COALESCE(
+            array_agg(lv.bcid ORDER BY lv.bcid)
+                FILTER (WHERE lv.lv_grid_result_id IS NOT NULL),
+            '{}'
+        ) AS bcids
+    FROM grid_result gr
+    LEFT JOIN lv_grid_result lv
+        ON lv.parent_grid_result_id = gr.grid_result_id
+    GROUP BY gr.grid_result_id
     """,
     "buildings_result_with_grid": """
     CREATE OR REPLACE VIEW buildings_result_with_grid AS (
         SELECT
             (br.version_id || '_' || br.osm_id) AS id,
             br.*,
-            gr.kcid, gr.bcid, gr.regional_identifier
+            gr.kcid, gr.scid, gr.regional_identifier
         FROM buildings_result br
         JOIN grid_result gr ON br.grid_result_id = gr.grid_result_id
     )
@@ -332,7 +409,7 @@ CREATE_QUERIES = {
             lr.from_bus,
             lr.to_bus,
             lr.length_km,
-            gr.version_id, gr.kcid, gr.bcid, gr.regional_identifier
+            gr.version_id, gr.kcid, gr.scid, gr.regional_identifier
         FROM lines_result lr
         JOIN grid_result gr ON lr.grid_result_id = gr.grid_result_id
     )
@@ -350,8 +427,9 @@ TEMP_CREATE_QUERIES = {
         peak_load_in_kw numeric,
         regional_identifier bigint,
         vertice_id bigint,
-        bcid integer,
-        kcid integer,
+        scid integer NULL,
+        bcid integer NULL,
+        kcid integer NULL,
         floors integer,
         connection_point integer,center geometry(Point,%(epsg)s),
         geom geometry(Geometry,%(epsg)s)  -- needs to be geometry as multipoint & multipolygon get inserted here
