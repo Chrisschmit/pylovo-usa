@@ -351,6 +351,7 @@ class DatabaseConstructor:
         # List of SQL function files to execute
         sql_files = [
             "postgres_dump_functions.sql",
+            "postgres_dump_functions_set_based.sql"
         ]
 
         for sql_file in sql_files:
