@@ -1173,6 +1173,9 @@ class ClusteringMixin(BaseMixin, ABC):
                         int(cluster.optimal_vertex),
                         0  # Initial model status
                     ))
+                    
+                    result_id = self.cur.fetchone()[0]
+                    created_ids.append(result_id)
 
                     self._update_buildings_bcid(
                         regional_identifier=regional_identifier,
