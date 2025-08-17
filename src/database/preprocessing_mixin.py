@@ -445,7 +445,10 @@ class PreprocessingMixin(BaseMixin, ABC):
         :return:
         """
 
-        connection_query = """ SELECT draw_home_connections(); """
+        connection_query = """ SELECT setup_connection_infrastructure(); """
+        self.cur.execute(connection_query)
+
+        connection_query = """ SELECT draw_building_connections(); """
         self.cur.execute(connection_query)
 
         topology_query = """select pgr_createTopology('ways_tem', 0.01, id:='way_id', the_geom:='geom', clean:=true) """

@@ -67,7 +67,11 @@ def simultaneousPeakLoad(buildings_df, consumer_cat_df, vertice_ids):
         if load_count == 0:
             continue
 
-        sim_factor = consumer_cat_df.loc[cat[0]]['sim_factor']  # g_inf
+        # Find the sim_factor by filtering the definition column
+        category_row = consumer_cat_df[consumer_cat_df['definition'] == cat[0]]
+        if category_row.empty:
+            continue
+        sim_factor = category_row.iloc[0]['sim_factor']  # g_inf
 
         # Calculate simultaneous load (Kerber.2011) Gl. 3.2 - S. 23
         sim_load = oneSimultaneousLoad(installed_power, load_count, sim_factor)

@@ -31,11 +31,11 @@ class UtilsMixin(BaseMixin, ABC):
 
     def get_list_from_regional_identifier(
             self, regional_identifier: int) -> list:
-        query = """SELECT DISTINCT kcid, bcid
+        query = """SELECT DISTINCT kcid, scid
                    FROM grid_result
                    WHERE version_id = %(v)s
                      AND regional_identifier = %(p)s
-                   ORDER BY kcid, bcid;"""
+                   ORDER BY kcid, scid;"""
         self.cur.execute(query, {"p": regional_identifier, "v": VERSION_ID})
         cluster_list = self.cur.fetchall()
 
