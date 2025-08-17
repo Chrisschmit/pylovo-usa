@@ -7,36 +7,16 @@ Used by both LV and MV infrastructure placement components.
 Key components:
 - Equipment dataclasses: TransformerEquipment, CableEquipment
 - Infrastructure result classes: InfrastructureCluster
-- Configuration classes: PlacementConfig
 - Load aggregator strategy classes: LVLoadAggregator, MVLoadAggregator
 """
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import pandas as pd
 
 from src import utils
-
-
-@dataclass
-class PlacementConfig:
-    """Configuration parameters for infrastructure placement."""
-    grid_level: str  # "LV" or "MV"
-    distance_caps: Dict[int, float]  # settlement_type -> max_distance_meters
-    capacity_limits: Dict[int, int]  # settlement_type -> max_units
-    min_distance_cap: float
-    shrink_factor: float
-    planning_power_factor: float
-
-    def get_distance_cap(self, settlement_type: int) -> float:
-        """Get distance cap for given settlement type."""
-        return self.distance_caps.get(settlement_type, 160.0)
-
-    def get_capacity_limit(self, settlement_type: int) -> int:
-        """Get capacity limit for given settlement type."""
-        return self.capacity_limits.get(settlement_type, 12)
 
 
 @dataclass
@@ -235,26 +215,6 @@ class MVLoadAggregator(LoadAggregator):
         if not building.empty:
             return float(building.iloc[0]['peak_load_in_kw'])
         return 0.0
-
-
-# Pre-configured placement configurations
-LV_CONFIG = PlacementConfig(
-    grid_level="LV",
-    distance_caps={1: 120.0, 2: 160.0, 3: 220.0},
-    capacity_limits={1: 12, 2: 12, 3: 20},
-    min_distance_cap=40.0,
-    shrink_factor=0.70,
-    planning_power_factor=0.90
-)
-
-MV_CONFIG = PlacementConfig(
-    grid_level="MV",
-    distance_caps={1: 800.0, 2: 1200.0, 3: 2000.0},
-    capacity_limits={1: 10, 2: 50, 3: 2500},
-    min_distance_cap=200.0,
-    shrink_factor=0.75,
-    planning_power_factor=0.85
-)
 
 
 def create_equipment_from_database_row(row: dict) -> Equipment:
