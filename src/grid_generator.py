@@ -5,8 +5,6 @@ from pathlib import Path
 import numpy as np
 import pandapower as pp
 import pandas as pd
-from scipy.cluster.hierarchy import linkage
-from scipy.spatial.distance import squareform
 
 import src.database.database_client as dbc
 from src import utils
@@ -37,6 +35,10 @@ class GridGenerator:
 
     def __del__(self):
         self.dbc.__del__()
+
+    # ------------------------------------------------------------
+    # MAIN GRID GENERATION FUNCTIONS
+    # ------------------------------------------------------------
 
     def generate_grid_for_single_regional_identifier(
             self, regional_identifier: str, analyze_grids: bool = False) -> None:
@@ -151,12 +153,15 @@ class GridGenerator:
         self.position_distribution_transformers()
 
         # Now position MV_substations and connect them to the LV_Transformers
-        # and the buildings which have grid_levle_connection = MV
-        # TODO: Implement this
+        # and the buildings which have grid_level_connection = MV
         self.position_mv_substations()
 
         # Install cables for each grid.
         self.install_cables_parallel(max_workers=4)
+
+    # ------------------------------------------------------------
+    # DATA PREPARATION SECTION
+    # ------------------------------------------------------------
 
     def prepare_postcodes(self):
         """
@@ -218,7 +223,8 @@ class GridGenerator:
         ways_count = self.dbc.set_ways_tem_table(self.regional_identifier)
         self.logger.info(f"The ways_tem table filled with {ways_count} ways")
         # self.dbc.connect_unconnected_ways()
-        self.logger.info("Ways connection finished in ways_tem")
+        self.logger.info(
+            "Connecting road_network to the buildings, this might take a while...")
         self.dbc.draw_building_connection()
         self.logger.info("Building connection finished in ways_tem")
 
@@ -226,6 +232,10 @@ class GridGenerator:
         unconn = self.dbc.set_vertice_id()
         self.logger.debug(
             f"vertice id set, {unconn} buildings with no vertice id")
+
+    # ------------------------------------------------------------
+    # CLUSTERING SECTION
+    # ------------------------------------------------------------
 
     def apply_kmeans_clustering(self):
         """
@@ -276,7 +286,7 @@ class GridGenerator:
             # K-means applied to large component to define subgroups with
             # cluster ids
             cluster_count = int(conn_building_count / LARGE_COMPONENT_DIVIDER)
-            self.dbc.update_large_kans_cluster(vertices, cluster_count)
+            self.dbc.update_large_kmeans_cluster(vertices, cluster_count)
             log_msg = f"Large component {component_index} clustered into {cluster_count} groups" if component_index is not None else f"Large component clustered into {cluster_count} groups"
             self.logger.debug(log_msg)
         else:
@@ -284,6 +294,9 @@ class GridGenerator:
             # building threshold
             self.dbc.update_kmeans_cluster(vertices)
 
+    # ------------------------------------------------------------
+    # TRANSFORMER POSITIONING SECTION
+    # ------------------------------------------------------------
     def position_distribution_transformers(self):
         """
         Positions all transformers for LVeach bcid cluster (brownfield with existing transformers and greenfield)
@@ -293,531 +306,385 @@ class GridGenerator:
         kcid_length = self.dbc.get_kcid_length()
 
         for _ in range(kcid_length):
-            kcid = self.dbc.get_next_unfinished_kcid_for_lv(
-                self.regional_identifier)
+            kcid = self.dbc.get_next_unfinished_kcid(
+                self.regional_identifier, "lv_grid_result")
             self.logger.info(f"working on kcid {kcid}")
-            # Building clustering
-            # 0. Check for existing transformers from OSM
-            transformers = self.dbc.get_included_transformers(kcid)
 
-            # Case 1: No transformers present GREENFIELD PLACEMENT
-            if not transformers:
-                self.logger.debug(f"kcid{kcid} has no included transformer")
-                # Create greenfield building clusters
-                self.create_bcid_for_kcid_new(self.regional_identifier, kcid)
-                self.logger.debug(f"kcid{kcid} building clusters finished")
-
-            # Case 2: Transformers present BROWNFIELD clusters with existing transformers ets negative bcids
-            else:
-                self.logger.debug(
-                    f"kcid{kcid} has {len(transformers)} transformers")
-                # Create brownfield building clusters with existing
-                # transformers
-                self.position_brownfield_transformers(
-                    self.regional_identifier, kcid, transformers)
-
-                # Check buildings and manage clusters
-                if self.dbc.count_kmean_cluster_consumers(kcid) > 1:
-                    # TODO: name should include transformer_size allocation
-                    self.create_bcid_for_kcid_new(self.regional_identifier, kcid)
-                else:
-                    # TODO: check approach with isolated buildings
-                    self.dbc.delete_isolated_building(
-                        self.regional_identifier, kcid)
-                self.logger.debug("rest building cluster finished")
-
-            # Process unfinished clusters
-            for bcid in self.dbc.get_greenfield_bcids(
-                    self.regional_identifier, kcid):
-                # Transformer positioning for greenfield clusters
-                if bcid >= 0:
-                    self.position_greenfield_transformers(
-                        self.regional_identifier, kcid, bcid)
-                    self.logger.debug(
-                        f"Transformer positioning for kcid{kcid}, bcid{bcid} finished")
-                    # Is for the third case in create bcid for kcid --> invalid
-                    # ceil transformer size he get s a multiple of 630
-                    self.dbc.update_dist_transformer_rated_power(
-                        self.regional_identifier, kcid, bcid, 1)
-                    self.logger.debug(
-                        "transformer_rated_power in lv_grid_result is updated.")
-
-    def position_mv_substations(self):
-        """
-        Positions all MV_substations for each bcid cluster (brownfield with existing transformers and greenfield)
-        FROM: buildings_tem, lv_grid_result
-        INTO: buildings_tem, lv_grid_result
-        """
-        kcid_length = self.dbc.get_kcid_length()
-
-        for _ in range(kcid_length):
-            # Which kcids
-            # kcid = self.dbc.get_next_unfinished_kcid_for_mv(
-            #     self.regional_identifier)
-            # self.logger.info(f"working on kcid {kcid}")
-
-            # Get MV buildings from kcid
-            # mv_buildings = self.dbc.get_buildings_from_kcid(
-            #     kcid, grid_level_connection="MV")
-
-            # Get distribution transformers from kcid
-            # self.dbc.get_distribution_transformers(kcid)
-
-            #
-
-            # Get MV substations from kcid
-
-    def create_bcid_for_kcid_new(
-            self, regional_identifier: int, kcid: int) -> None:
-        """
-        NEW: Distance-limited + capacity-constrained clustering for U.S.-realistic LV groups.
-
-        What changes vs. the old version:
-        - We cut the dendrogram by a *distance threshold* (meters) appropriate to the settlement type
-          instead of forcing a fixed number of clusters.
-        - We validate each group against both transformer capacity (with planning PF and headroom)
-          and a max-homes constraint. Violations are split recursively by tightening the distance cap
-          only on the offending group.
-
-        Steps
-        1) Load buildings, consumer category metadata, settlement type, transformer sizes.
-        2) Build road-graph distance matrix for the current kcid.
-        3) Make an initial average-linkage dendrogram.
-        4) Run try_clustering_new() with a settlement-dependent distance cap and homes cap.
-        5) While any invalid group remains:
-           - Slice to that group, rebuild Z on the sub-matrix, *tighten the distance cap* (×0.67, floor 40 m).
-           - Re-run try_clustering_new() on the subproblem; merge results.
-        6) Persist valid groups to lv_grid_result (as before).
-
-        Notes
-        - We still assign a transformer size here (smallest single ≥ required kVA).
-        - Physical placement is unchanged and happens later.
-        """
-        # --- Parameters (can be moved to config if desired) ---
-        PF_PLANNING = 0.90
-        # 1=City, 2=Village, 3=Rural
-        DIST_CAPS = {1: 120.0, 2: 160.0, 3: 220.0}
-        HOMES_CAPS = {1: 12, 2: 12, 3: 20}
-        MIN_DIST_CAP = 40.0
-        SHRINK = 0.70
-
-        # 1) Load data
-        buildings = self.dbc.get_buildings_from_kcid(
-            kcid, grid_level_connection="LV")
-        if buildings.empty:
-            return
-        consumer_cat_df = self.dbc.get_consumer_categories()
-        settlement_type = self.dbc.get_settlement_type_from_regional_identifier(
-            regional_identifier)
-        transformer_capacities, transformer_costs = self.dbc.get_transformer_data(
-            settlement_type)
-        if transformer_capacities is None or len(transformer_capacities) == 0:
-            self.logger.debug(
-                "No transformer capacities available; aborting clustering.")
-            return
-
-        # 2) Distances
-        localid2vid, dist_mat, _ = self.dbc.get_distance_matrix_from_kcid(kcid)
-        # If there is only a single node or no distances, nothing to cluster
-        if dist_mat.size == 0 or dist_mat.shape[0] <= 1:
-            return
-        dist_vector = squareform(dist_mat)
-
-        # 3) Initial hierarchy
-        Z = linkage(dist_vector, method="average")
-        # Distance cap is a function of the settlement type and determines the
-        # maximum distance between two buildings in the same cluster
-        dist_cap = DIST_CAPS.get(settlement_type, 160.0)
-        # Homes cap is a function of the settlement type and determines the
-        # maximum number of buildings in the same cluster
-        homes_cap = HOMES_CAPS.get(settlement_type, 8)
-
-        valid_cluster_dict: dict[int, tuple[list[int], int]] = {}
-        invalid_cluster_dict_global: dict[int, list[int]] = {}
-
-        # Evaluate initial cut
-        inv, ok, _ = self.dbc.try_clustering_new(
-            Z=Z,
-            localid2vid=localid2vid,
-            buildings=buildings,
-            consumer_cat_df=consumer_cat_df,
-            transformer_capacities=np.asarray(
-                transformer_capacities, dtype=float),
-            dist_cap_m=dist_cap,
-            homes_cap=homes_cap,
-            pf_planning=PF_PLANNING,
-        )
-        # Merge results
-        if ok:
-            valid_cluster_dict.update(
-                {i: v for i, v in enumerate(ok.values())})
-        if inv:
-            invalid_cluster_dict_global.update(
-                {i: v for i, v in enumerate(inv.values())})
-
-        # 4) Split invalid groups recursively
-        while invalid_cluster_dict_global:
-            self.logger.info(
-                f"New invalid cluster dict global: {invalid_cluster_dict_global}")
-            # pop first invalid group
-            invalid_vids = invalid_cluster_dict_global.pop(0)
-            invalid_cluster_dict_global = dict(
-                enumerate(invalid_cluster_dict_global.values()))
-
-            # map these vids to local indices in the *original* matrix
-            full_localids = {v: k for k, v in localid2vid.items()}
-            sub_local_ids = [full_localids[v]
-                             for v in invalid_vids if v in full_localids]
-
-            # build sub-matrix
-            sub_mat = dist_mat[np.ix_(sub_local_ids, sub_local_ids)]
-            if sub_mat.shape[0] <= 1:
-                # cannot split further; accept as a degenerate cluster with
-                # rounded size
-                total_sim_kw = float(
-                    utils.simultaneousPeakLoad(
-                        buildings,
-                        consumer_cat_df,
-                        invalid_vids))
-                needed_kva = (total_sim_kw / PF_PLANNING)
-                self.logger.debug(f"Needed kVA: {needed_kva}")
-                chosen = int(np.asarray(transformer_capacities)[np.asarray(transformer_capacities) >= needed_kva][0]) \
-                    if len(transformer_capacities) and needed_kva > 0 else int(math.ceil(total_sim_kw))
-                valid_cluster_dict[len(valid_cluster_dict)] = (
-                    invalid_vids, chosen)
-                self.logger.debug(f"Valid cluster dict: {valid_cluster_dict}")
-                continue
-
-            # tighten distance cap for this subproblem
-            dist_cap = max(MIN_DIST_CAP, dist_cap * SHRINK)
-
-            Zsub = linkage(squareform(sub_mat, checks=False), method="average")
-
-            self.logger.info(
-                f"start new clustering with dist_cap: {dist_cap} and homes_cap: {homes_cap}")
-
-            inv_sub, ok_sub, _ = self.dbc.try_clustering_new(
-                Z=Zsub,
-                localid2vid=dict(
-                    enumerate([localid2vid[i] for i in sub_local_ids])),
-                buildings=buildings,
-                consumer_cat_df=consumer_cat_df,
-                transformer_capacities=np.asarray(
-                    transformer_capacities, dtype=float),
-                dist_cap_m=dist_cap,
-                homes_cap=homes_cap,
-                pf_planning=PF_PLANNING,
-            )
-
-            if ok_sub:
-                # append with new indices
-                for tpl in ok_sub.values():
-                    self.logger.info(f"New Valid cluster: {tpl}")
-                    valid_cluster_dict[len(valid_cluster_dict)] = tpl
-            if inv_sub:
-                # queue the remaining invalids
-                for vids in inv_sub.values():
-                    invalid_cluster_dict_global[len(
-                        invalid_cluster_dict_global)] = vids
-                invalid_cluster_dict_global = dict(
-                    enumerate(invalid_cluster_dict_global.values()))
-
-        # 5) Persist results
-        self.dbc.clear_lv_grid_result_in_kmean_cluster(
-            regional_identifier, kcid)
-        self.logger.info(
-            "Now updating the lv_grid_result table with the new valid clusters")
-        for bcid, (vids, kva) in valid_cluster_dict.items():
-            self.dbc.upsert_bcid(
-                regional_identifier,
-                kcid,
-                bcid,
-                vertices=vids,
-                transformer_rated_power=kva)
-
-        self.logger.info(
-            f"[NEW] Found {
-                len(valid_cluster_dict)} LV clusters for regional_identifier={regional_identifier}, KCID={kcid}"
-        )
+            self.logger.debug(f"kcid{kcid} has no included transformer")
+            # Create greenfield transformer clusters
+            self.create_bcid_for_kcid(self.regional_identifier, kcid)
+            self.logger.debug(f"kcid{kcid} building clusters finished")
 
     def create_bcid_for_kcid(
             self, regional_identifier: int, kcid: int) -> None:
         """
-        Compute electrical building clusters (bcids) and assign a transformer size per cluster for a given kcid.
 
-        What this does:
-        - Partitions buildings inside one k-means component (`kcid`) into electrically feasible clusters (bcids)
-          using hierarchical clustering (average linkage) guided by distances on the road graph and load constraints.
-        - Selects an appropriate transformer rated power for each resulting bcid (based on aggregated demand and
-          available standard sizes).
-        - Persists the bcids and their chosen transformer sizes to the database (but does NOT set the physical
-          transformer position yet).
-
-        Important distinction:
-        - This function determines “what clusters exist” and “how big the transformer should be” for each cluster.
-        - The spatial placement (which vertex to place the transformer at) is performed later in
-          `position_greenfield_transformers` during the "Process unfinished clusters" step in
-          `position_distributing_transformers`.
-
-        :param regional_identifier: Postal code / regional identifier
-        :param kcid: K-means cluster ID (street-network component identifier)
-        :return: None
+        Steps:
+        1) Use the unified infrastructure placement interface for LV transformer placement
+        2) Convert InfrastructureCluster results to the database format expected by downstream processes
         """
-        # Get data needed for clustering
-        # - buildings: candidate consumers inside this kcid
-        # - consumer_cat_df: category metadata (peak loads, simultaneity factors)
-        # - settlement_type: influences available transformer sizes
-        buildings = self.dbc.get_buildings_from_kcid(
-            kcid, grid_level_connection="LV")
-        consumer_cat_df = self.dbc.get_consumer_categories()
+        try:
+            self.logger.info(
+                f"Starting LV clustering for kcid {kcid}, regional_identifier {regional_identifier}")
+
+            # Get settlement type for this region
+            settlement_type = self.dbc.get_settlement_type_from_regional_identifier(
+                regional_identifier)
+
+            # Use the unified infrastructure placement interface for LV
+            # clustering
+            infrastructure_clusters = self.dbc.perform_infrastructure_placement(
+                kcid=kcid,
+                regional_identifier=regional_identifier,
+                grid_level="LV",
+                settlement_type=settlement_type,
+            )
+
+            if not infrastructure_clusters:
+                self.logger.warning(
+                    f"No LV infrastructure clusters created for kcid {kcid}")
+                return
+
+            # Clear previous clustering results for this kcid
+            self.dbc.clear_lv_grid_result_in_kmean_cluster(
+                regional_identifier, kcid)
+
+            # Convert InfrastructureCluster results to traditional bcid format
+            # Each infrastructure cluster becomes a building cluster (bcid)
+            self.logger.info(
+                "Converting infrastructure clusters to building clusters (bcids)")
+
+            # Save infrastructure placement results to database
+            grid_result_ids = self.dbc.save_infrastructure_placement_results(
+                infrastructure_clusters=infrastructure_clusters,
+                kcid=kcid,
+                regional_identifier=self.regional_identifier,
+                grid_level="LV",
+            )
+
+            # Create transformer position records
+            self.dbc.create_transformer_positions(
+                infrastructure_clusters=infrastructure_clusters,
+                grid_level="LV",
+                grid_result_ids=grid_result_ids
+            )
+
+            self.logger.info(
+                f"Successfully created {
+                    len(infrastructure_clusters)} LV building clusters "
+                f"for regional_identifier={regional_identifier}, kcid={kcid}"
+            )
+
+        except Exception as e:
+            self.logger.error(
+                f"Error in LV clustering for kcid {kcid}: {str(e)}"
+            )
+            raise
+
+    def position_mv_substations(self):
+        """
+        Positions all MV substations for each kcid cluster using the new infrastructure placement
+    engine.
+        FROM: buildings_tem, lv_grid_result
+        INTO: grid_result, transformer_positions
+        """
+        kcid_length = self.dbc.get_kcid_length()
+
+        # Get settlement type for this region
         settlement_type = self.dbc.get_settlement_type_from_regional_identifier(
-            regional_identifier)
-        transformer_capacities, _ = self.dbc.get_transformer_data(
-            settlement_type)
-        double_trans = np.multiply(transformer_capacities[2:4], 2)
+            self.regional_identifier)
 
-        # Get distance matrix and prepare for hierarchical clustering
-        # Distances are measured along the road graph between connection points; we flatten to a condensed
-        # distance vector required by scipy's linkage.
-        localid2vid, dist_mat, vid2localid = self.dbc.get_distance_matrix_from_kcid(
-            kcid)
-        dist_vector = squareform(dist_mat)
-
-        if len(dist_vector) == 0:
-            return
-
-        # Initialize hierarchical clustering
-        # Start with average linkage; we will iteratively adjust cluster counts
-        # below.
-        Z = linkage(dist_vector, method="average")
-        valid_cluster_dict = {}
-        invalid_trans_cluster_dict = {}
-        cluster_amount = 2
-        new_localid2vid = localid2vid
-
-        # Iterative clustering process
-        # Strategy:
-        # 1) Try a split into `cluster_amount` clusters; evaluate each cluster against transformer feasibility
-        #    (load limits and available transformer sizes).
-        # 2) Accept feasible clusters (append to valid_cluster_dict).
-        # 3) For the first infeasible cluster (too large), re-cluster only its members by rebuilding distance
-        # matrices and linkage, then repeat until no infeasible clusters
-        # remain.
-        while True:
-            # Try clustering with current parameters
-            invalid_cluster_dict, cluster_dict, _ = self.dbc.try_clustering(Z, cluster_amount, new_localid2vid, buildings,
-                                                                            consumer_cat_df, transformer_capacities,
-                                                                            double_trans)
-
-            # Process valid clusters
-            # Merge newly found valid clusters into the global dictionary,
-            # keeping indices compact.
-            if cluster_dict:
-                current_valid_amount = len(valid_cluster_dict)
-                valid_cluster_dict.update(
-                    {x + current_valid_amount: y for x, y in cluster_dict.items()})
-                # reindexing the dict with enumerate
-                valid_cluster_dict = dict(
-                    enumerate(valid_cluster_dict.values()))
-
-            # Process invalid clusters
-            # Keep track of clusters that violate transformer sizing
-            # constraints and need further splitting.
-            if invalid_cluster_dict:
-                current_invalid_amount = len(invalid_trans_cluster_dict)
-                invalid_trans_cluster_dict.update(
-                    {x + current_invalid_amount: y for x, y in invalid_cluster_dict.items()})
-                invalid_trans_cluster_dict = dict(
-                    enumerate(invalid_trans_cluster_dict.values()))
-
-            # Check if clustering is complete
-            if not invalid_trans_cluster_dict:
+        for _ in range(kcid_length):
+            try:
+                # Get next unfinished kcid for MV processing
+                kcid = self.dbc.get_next_unfinished_kcid(
+                    self.regional_identifier, "grid_result")
                 self.logger.info(
-                    f"Found {len(valid_cluster_dict)} single transformer clusters for regional_identifier: {regional_identifier}, KCID: {kcid}")
-                break
-            else:
-                # Process too large clusters by re-clustering them
-                # Take the first too-large cluster, restrict the problem to its buildings, rebuild distances
-                # and linkage, and try again with a fresh split.
+                    f"Working on MV substation placement for kcid {kcid}")
+
+                # Use the new unified infrastructure placement interface
+                infrastructure_clusters = self.dbc.perform_infrastructure_placement(
+                    kcid=kcid,
+                    regional_identifier=self.regional_identifier,
+                    grid_level="MV",
+                    settlement_type=settlement_type,
+                )
+
+                if not infrastructure_clusters:
+                    self.logger.info(
+                        f"No MV infrastructure clusters created for kcid {kcid}")
+                    continue
+
+                # Save infrastructure placement results to database
+                grid_result_ids = self.dbc.save_infrastructure_placement_results(
+                    infrastructure_clusters=infrastructure_clusters,
+                    kcid=kcid,
+                    regional_identifier=self.regional_identifier,
+                    grid_level="MV",
+                )
+
+                # Create transformer position records
+                self.dbc.create_transformer_positions(
+                    infrastructure_clusters=infrastructure_clusters,
+                    grid_level="MV",
+                    grid_result_ids=grid_result_ids
+                )
+
+                # Update LV transformers and buildings with scid and parent
+                # references
+                self.dbc.update_lv_mv_links(
+                    infrastructure_clusters=infrastructure_clusters,
+                    grid_result_ids=grid_result_ids,
+                    kcid=kcid,
+                    regional_identifier=self.regional_identifier
+                )
+
+                # Set model status to completed
+                self.dbc.finalize_mv_substation_placement(grid_result_ids)
+
                 self.logger.info(
-                    f"Found {len(invalid_trans_cluster_dict)} too_large clusters for regional_identifier: {regional_identifier}, KCID: {kcid}")
+                    f"Successfully positioned {
+                        len(infrastructure_clusters)} MV substations "
+                    f"for kcid {kcid}"
+                )
 
-                # Get buildings from the first too-large cluster for
-                # re-clustering
-                invalid_vertice_ids = list(invalid_trans_cluster_dict[0])
-                invalid_local_ids = [vid2localid[v]
-                                     for v in invalid_vertice_ids]
-
-                # Create new mappings and distance matrix for the subclustering
-                # Map global local IDs to the subproblem and slice the distance
-                # matrix accordingly.
-                new_localid2vid = {
-                    k: v for k, v in localid2vid.items() if k in invalid_local_ids}
-                new_localid2vid = dict(enumerate(new_localid2vid.values()))
-                new_dist_mat = dist_mat[invalid_local_ids][:,
-                                                           invalid_local_ids]
-                new_dist_vector = squareform(new_dist_mat)
-
-                # Prepare for next iteration
-                # Reset hierarchy and the number of desired clusters for the
-                # subproblem.
-                Z = linkage(new_dist_vector, method="average")
-                cluster_amount = 2
-                del invalid_trans_cluster_dict[0]
-                invalid_trans_cluster_dict = dict(
-                    enumerate(invalid_trans_cluster_dict.values()))
-
-        # At this point, we've successfully found a valid electrical clustering solution with the minimum
-        # number of clusters. Each cluster:
-        #   1. Contains buildings that can be served by a single transformer
-        #   2. Has an appropriately sized transformer assigned
-        # The valid_cluster_dict maps building cluster IDs to tuples of (building_vertices_list, optimal_transformer_size)
-        # We could calculate the total transformer cost by summing the costs of all selected transformers:
-        # total_transformer_cost = sum([transformer2cost[v[1]] for v in valid_cluster_dict.values()])
-
-        # Save results to database:
-        # - Clear any previous grid definitions for this kcid and regional identifier
-        # - Upsert each bcid with its member vertices and the chosen transformer rated power
-        self.dbc.clear_lv_grid_result_in_kmean_cluster(
-            regional_identifier, kcid)
-        for bcid, cluster_data in valid_cluster_dict.items():
-            self.dbc.upsert_bcid(regional_identifier, kcid, bcid, vertices=cluster_data[0],
-                                 transformer_rated_power=cluster_data[1])
-        self.logger.debug(
-            f"bcids for regional_identifier {regional_identifier} kcid {kcid} found...")
-
-    def position_brownfield_transformers(
-            self, regional_identifier: int, kcid: int, transformer_list: list) -> None:
-        """
-        Assign buildings to the existing transformers and store them as bcid in buildings_tem.
-        Args:
-            regional_identifier: Postal code
-            kcid: K-means cluster ID
-            transformer_list: List of transformer IDs
-        """
-        self.logger.debug(f"{len(transformer_list)} transformers found")
-
-        # Get cost dataframe between consumers and transformers
-        cost_df = self.dbc.get_consumer_to_transformer_df(
-            kcid, transformer_list)
-
-        # Filter out connections with distance >= 300 why?
-        cost_df = cost_df[cost_df["agg_cost"]
-                          < 300].sort_values(by=["agg_cost"])
-
-        # Initialize tracking variables
-        pre_result_dict = {transformer_id: []
-                           for transformer_id in transformer_list}
-        full_transformer_list = []
-        assigned_consumer_list = []
-
-        # Assign consumers to closest transformer
-        for _, row in cost_df.iterrows():
-            start_consumer_id = row["start_vid"]
-            end_transformer_id = row["end_vid"]
-
-            # Skip if consumer already assigned or transformer full
-            if start_consumer_id in assigned_consumer_list or end_transformer_id in full_transformer_list:
+            except Exception as e:
+                self.logger.error(
+                    f"Error positioning MV substations for kcid {kcid}: {
+                        str(e)}")
+                # Continue with next kcid rather than failing completely
                 continue
 
-            # Try to assign consumer to transformer
-            pre_result_dict[end_transformer_id].append(int(start_consumer_id))
-            sim_load = self.dbc.calculate_sim_load(
-                pre_result_dict[end_transformer_id])
+        self.logger.info("Completed MV substation positioning for all kcids")
 
-            # Check if transformer capacity exceeded
-            #  TODO: check with settlement_type approach 630 is standard here?
-            if float(sim_load) >= 630:
-                # Remove consumer and mark transformer as full
-                pre_result_dict[end_transformer_id].pop()
-                full_transformer_list.append(end_transformer_id)
+    # ------------------------------------------------------------
+    #  LINE INSTALLATION SECTION
+    # ------------------------------------------------------------
 
-                # Exit if all transformers are full
-                if len(full_transformer_list) == len(transformer_list):
-                    self.logger.info("All transformers full")
-                    break
-            else:
-                # Mark consumer as assigned
-                assigned_consumer_list.append(start_consumer_id)
+    def install_cables_parallel(self, max_workers: int = 4):
+        """
+        Parallelized version of install_cables using multiprocessing.
+        Installs electrical cables to connect buildings and transformers in power grid clusters.
 
-        self.logger.debug("Transformer selection finished")
+        This method creates a pandapower network for each building cluster (kcid, bcid) in the
+        postal code area and connects the buildings with appropriate electrical cables. It follows
+        a branch-by-branch approach, starting from the furthest nodes and working inward toward
+        the transformer.
 
-        # Create building clusters for each transformer
-        building_cluster_count = 0
-        for transformer_id in transformer_list:
-            # Skip empty transformers
-            if not pre_result_dict[transformer_id]:
+        The algorithm works as follows:
+        1. Retrieves all clusters (kcid, bcid) for the postal code area
+        2. For each cluster:
+           a. Prepares building and connection data
+           b. Creates an electrical network with pandapower
+           c. Adds buses, transformers, and loads to the network
+           d. Installs cables using a greedy algorithm that:
+              - Starts from the furthest nodes from the transformer
+              - Creates branches with maximum possible load
+              - Selects minimum size cables that can handle the current
+              - Connects branches back to transformer
+        3. Tracks progress and saves the network configurations
+
+        The cable installation prioritizes cost efficiency while ensuring the electrical
+        requirements are met for each branch of the distribution network.
+
+        Returns:
+            None
+
+        Args:
+            max_workers: Maximum number of worker processes. If None, uses CPU count.
+        """
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+
+        cluster_list = self.dbc.get_list_from_regional_identifier(
+            self.regional_identifier)
+        if not cluster_list:
+            self.logger.warning(
+                f"No clusters to process for regional_identifier {
+                    self.regional_identifier}")
+            return
+
+        self.logger.info(
+            f"Starting parallel cable installation for {len(cluster_list)} clusters using {max_workers} workers.")
+
+        # Create batches of clusters to process
+        def create_batches(items, batch_size):
+            for i in range(0, len(items), batch_size):
+                yield items[i:i + batch_size]
+
+        # Calculate batch size to distribute work evenly
+        batch_size = max(1, len(cluster_list) // max_workers)
+        cluster_batches = list(create_batches(cluster_list, batch_size))
+
+        with ProcessPoolExecutor(max_workers=max_workers, initializer=GridGenerator._init_worker, initargs=(self.regional_identifier,)) as executor:
+            future_to_batch = {
+                executor.submit(GridGenerator._process_cluster_batch, batch): batch
+                for batch in cluster_batches
+            }
+
+            for future in as_completed(future_to_batch):
+                batch = future_to_batch[future]
+                try:
+                    future.result()
+                    self.logger.debug(
+                        f"Successfully processed batch with {len(batch)} clusters")
+                except Exception as e:
+                    self.logger.error(
+                        f"Failed to process batch with {
+                            len(batch)} clusters: {e}",
+                        exc_info=True)
+
+        self.logger.info(
+            f"Parallel cable installation completed for regional_identifier {self.regional_identifier}")
+
+    @staticmethod
+    def _init_worker(regional_identifier):
+        """Initialize worker process with one GridGenerator per worker."""
+        global _worker_grid_generator
+        _worker_grid_generator = GridGenerator(
+            regional_identifier=regional_identifier)
+
+    @staticmethod
+    def _process_cluster_batch(cluster_batch):
+        """Process a batch of clusters using the worker's GridGenerator."""
+        global _worker_grid_generator
+        try:
+            for kcid, bcid in cluster_batch:
+                _worker_grid_generator._install_cables_for_cluster(kcid, bcid)
+        except Exception as e:
+            print(f"Error in worker batch processing: {e}")
+            raise
+
+    def _install_cables_for_cluster(self, kcid, bcid):
+        """
+        Installs electrical cables for a single building cluster (kcid, bcid).
+        """
+        self.logger.debug(f"working on kcid {kcid}, bcid {bcid}")
+
+        # Get data for this cluster
+        vertices_dict, transformer_vertice, vertices_list, buildings_df, consumer_df, consumer_list, connection_nodes = (
+            self.prepare_vertices_list(self.regional_identifier, kcid, bcid)
+        )
+        # PD is the simultaneous load of the consumer list
+        # load_units is the number of units of the consumer list: units per building
+        # load_type is the type of the consumer list [SFH, MFH, AB, TH,
+        # Commercial, Public]
+        Pd, load_units, load_type = self.get_consumer_simultaneous_load_dict(
+            consumer_list, buildings_df)
+        local_length_dict = {c: 0 for c in CABLE_COST_DICT.keys()}
+
+        # Create network and add components
+        net = pp.create_empty_network()
+        # Creates the standard cable types from the equipment_data table as
+        # pandapoewer objects
+        self.dbc.create_cable_std_type(net)
+        # Creates two buses LV and MV  and also defines external grid
+        self.create_lvmv_bus(self.regional_identifier, kcid, bcid, net)
+
+        # Defines the transformer between MV,LV
+        self.create_transformer(self.regional_identifier, kcid, bcid, net)
+
+        # Creates buses for all the conenction nodes
+        self.create_connection_bus(connection_nodes, net)
+        # Creates buses for all the consumers and also one load per unit in the
+        # building
+        self.create_consumer_bus_and_load(
+            consumer_list, load_units, net, load_type, buildings_df)
+
+        # Install cables branch by branch
+        branch_deviation = 0
+        connection_node_list = connection_nodes
+        main_street_available_cables = CABLE_COST_DICT.keys()
+
+        while connection_node_list:
+            # Handle single remaining node case
+            if len(connection_node_list) == 1:
+                sim_load = utils.simultaneousPeakLoad(
+                    buildings_df, consumer_df, connection_node_list)
+
+                #  Calculate the maximum current for the connection node
+                Imax = sim_load / (VN * V_BAND_LOW * np.sqrt(3))
+
+                # Install consumer cables
+                local_length_dict = self.install_consumer_cables(
+                    self.regional_identifier, bcid, kcid, branch_deviation, connection_node_list,
+                    transformer_vertice, vertices_dict, Pd, net, CONNECTION_AVAILABLE_CABLES, local_length_dict,
+                )
+
+                # Connect to transformer
+                if connection_node_list[0] == transformer_vertice:
+                    cable, count = self.find_minimal_available_cable(
+                        Imax, net, main_street_available_cables)
+                    self.create_line_transformer_to_lv_bus(
+                        self.regional_identifier, bcid, kcid, connection_node_list[
+                            0], branch_deviation, net, cable, count
+                    )
+                else:
+                    cable, count = self.find_minimal_available_cable(
+                        Imax, net, main_street_available_cables, vertices_dict[connection_nodes[0]]
+                    )
+                    length = self.create_line_start_to_lv_bus(
+                        self.regional_identifier, bcid, kcid, connection_node_list[
+                            0], branch_deviation,
+                        net, vertices_dict, cable, count, transformer_vertice
+                    )
+                    local_length_dict[cable] += length
+
+                self.deviate_bus_geodata(
+                    connection_node_list, branch_deviation, net)
                 self.logger.debug(
-                    f"Transformer {transformer_id} has no assigned consumer, deleted")
-                self.dbc.delete_transformers_from_buildings_tem(
-                    [transformer_id])
-                continue
+                    "main street cable installation finished")
+                break
 
-            # Create building cluster with sequential negative ID
-            building_cluster_count -= 1
+            # List of nodes until the furthest node from the transformer
+            furthest_node_path_list = self.find_furthest_node_path_list(
+                connection_node_list, vertices_dict, transformer_vertice
+            )
+            # Returns the list of nodes that can be connected with largest
+            # heavy-duty cables, given curren limitations
+            branch_node_list, Imax = self.determine_maximum_load_branch(
+                furthest_node_path_list, buildings_df, consumer_df
+            )
 
-            # Calculate the simulated load for all loads assigned to this
-            # transformer
-            sim_load = self.dbc.calculate_sim_load(
-                pre_result_dict[transformer_id])
+            # Install cables for this branch --> this is the main trunk of the
+            # cable installation
+            local_length_dict = self.install_consumer_cables(
+                self.regional_identifier, bcid, kcid, branch_deviation, branch_node_list,
+                transformer_vertice, vertices_dict, Pd, net, CONNECTION_AVAILABLE_CABLES, local_length_dict
+            )
 
-            # Define the available standard transformer sizes in kVA
-            # TODO: check with settlement_type approach 630 is standard here?
-            possible_transformers = np.array([100, 160, 250, 400, 630])
+            branch_distance = vertices_dict[branch_node_list[0]]
+            cable, count = self.find_minimal_available_cable(
+                Imax, net, main_street_available_cables, branch_distance
+            )
 
-            # Select the smallest transformer that is larger than the simulated
-            # load
-            transformer_rated_power = possible_transformers[possible_transformers > float(
-                sim_load)][0].item()
+            if len(branch_node_list) >= 2:
+                local_length_dict = self.create_line_node_to_node(
+                    self.regional_identifier, kcid, bcid, branch_node_list, branch_deviation,
+                    vertices_dict, local_length_dict, cable, transformer_vertice, count, net
+                )
 
-            # Update database with new building cluster
-            self.dbc.update_building_cluster(transformer_id, pre_result_dict[transformer_id], building_cluster_count, kcid,
-                                             regional_identifier, transformer_rated_power)
+            # Connect branch to transformer
+            branch_start_node = branch_node_list[-1]
+            if branch_start_node == transformer_vertice:
+                self.create_line_transformer_to_lv_bus(
+                    self.regional_identifier, bcid, kcid, branch_start_node, branch_deviation, net, cable, count
+                )
+            else:
+                length = self.create_line_start_to_lv_bus(
+                    self.regional_identifier, bcid, kcid, branch_start_node, branch_deviation,
+                    net, vertices_dict, cable, count, transformer_vertice
+                )
+                local_length_dict[cable] += length
 
-        self.logger.debug("Brownfield clusters completed")
+            # Update processed nodes and visualization
+            for vertice in branch_node_list:
+                connection_node_list.remove(vertice)
 
-    def position_greenfield_transformers(
-            self, regional_identifier, kcid, bcid):
-        """
-        Positions a transformer at the optimal location for a greenfield building cluster.
+            self.deviate_bus_geodata(
+                branch_node_list, branch_deviation, net)
+            branch_deviation += 1
 
-        The optimal location minimizes the sum of distance*load from each vertex to others.
-
-        Args:
-            regional_identifier: Postcode
-            kcid: Kmeans cluster ID
-            bcid: Building cluster ID
-        """
-        # Get all connection points in the building cluster
-        connection_points = self.dbc.get_building_connection_points_from_bc(
-            kcid, bcid)
-
-        # If there's only one connection point, use it
-        if len(connection_points) == 1:
-            self.dbc.upsert_transformer_selection(
-                regional_identifier, kcid, bcid, connection_points[0])
-            return
-
-        # Get distance matrix between all connection points
-        localid2vid, dist_mat, _ = self.dbc.get_distance_matrix_from_bcid(
-            kcid, bcid)
-
-        # Get load vector for each connection point
-        loads = self.dbc.generate_load_vector(kcid, bcid)
-
-        # Calculate weighted distance (distance * load) for each potential
-        # location
-        #  Relevant for the transformer placement
-        total_load_per_vertice = dist_mat.dot(loads)
-
-        # Select the point with minimum weighted distance as transformer
-        # location
-        min_localid = np.argmin(total_load_per_vertice)
-        transformer_connection_id = int(localid2vid[min_localid])
-
-        # Update the database with the selected transformer position
-        self.dbc.upsert_transformer_selection(
-            regional_identifier, kcid, bcid, transformer_connection_id)
+        self.save_net(net, kcid, bcid)
 
     def prepare_vertices_list(self, regional_identifier: int, kcid: int, bcid: int) -> tuple[
             dict, int, list, pd.DataFrame, pd.DataFrame, list, list]:
@@ -1262,227 +1129,139 @@ class GridGenerator:
 
         self.logger.info(f"Grid with kcid:{kcid} bcid:{bcid} is stored. ")
 
-    def install_cables_parallel(self, max_workers: int = 4):
-        """
-        Parallelized version of install_cables using multiprocessing.
-        Installs electrical cables to connect buildings and transformers in power grid clusters.
+# LEGACY:
 
-        This method creates a pandapower network for each building cluster (kcid, bcid) in the
-        postal code area and connects the buildings with appropriate electrical cables. It follows
-        a branch-by-branch approach, starting from the furthest nodes and working inward toward
-        the transformer.
+    # def position_brownfield_transformers(
+    #         self, regional_identifier: int, kcid: int, transformer_list: list) -> None:
+    #     """
+    #     Assign buildings to the existing transformers and store them as bcid in buildings_tem.
+    #     Args:
+    #         regional_identifier: Postal code
+    #         kcid: K-means cluster ID
+    #         transformer_list: List of transformer IDs
+    #     """
+    #     self.logger.debug(f"{len(transformer_list)} transformers found")
 
-        The algorithm works as follows:
-        1. Retrieves all clusters (kcid, bcid) for the postal code area
-        2. For each cluster:
-           a. Prepares building and connection data
-           b. Creates an electrical network with pandapower
-           c. Adds buses, transformers, and loads to the network
-           d. Installs cables using a greedy algorithm that:
-              - Starts from the furthest nodes from the transformer
-              - Creates branches with maximum possible load
-              - Selects minimum size cables that can handle the current
-              - Connects branches back to transformer
-        3. Tracks progress and saves the network configurations
+    #     # Get cost dataframe between consumers and transformers
+    #     cost_df = self.dbc.get_consumer_to_transformer_df(
+    #         kcid, transformer_list)
 
-        The cable installation prioritizes cost efficiency while ensuring the electrical
-        requirements are met for each branch of the distribution network.
+    #     # Filter out connections with distance >= 300 why?
+    #     cost_df = cost_df[cost_df["agg_cost"]
+    #                       < 300].sort_values(by=["agg_cost"])
 
-        Returns:
-            None
+    #     # Initialize tracking variables
+    #     pre_result_dict = {transformer_id: []
+    #                        for transformer_id in transformer_list}
+    #     full_transformer_list = []
+    #     assigned_consumer_list = []
 
-        Args:
-            max_workers: Maximum number of worker processes. If None, uses CPU count.
-        """
-        from concurrent.futures import ProcessPoolExecutor, as_completed
+    #     # Assign consumers to closest transformer
+    #     for _, row in cost_df.iterrows():
+    #         start_consumer_id = row["start_vid"]
+    #         end_transformer_id = row["end_vid"]
 
-        cluster_list = self.dbc.get_list_from_regional_identifier(
-            self.regional_identifier)
-        if not cluster_list:
-            self.logger.warning(
-                f"No clusters to process for regional_identifier {
-                    self.regional_identifier}")
-            return
+    #         # Skip if consumer already assigned or transformer full
+    #         if start_consumer_id in assigned_consumer_list or end_transformer_id in full_transformer_list:
+    #             continue
 
-        self.logger.info(
-            f"Starting parallel cable installation for {len(cluster_list)} clusters using {max_workers} workers.")
+    #         # Try to assign consumer to transformer
+    #         pre_result_dict[end_transformer_id].append(int(start_consumer_id))
+    #         sim_load = self.dbc.calculate_sim_load(
+    #             pre_result_dict[end_transformer_id])
 
-        # Create batches of clusters to process
-        def create_batches(items, batch_size):
-            for i in range(0, len(items), batch_size):
-                yield items[i:i + batch_size]
+    #         # Check if transformer capacity exceeded
+    #         #  TODO: check with settlement_type approach 630 is standard here?
+    #         if float(sim_load) >= 630:
+    #             # Remove consumer and mark transformer as full
+    #             pre_result_dict[end_transformer_id].pop()
+    #             full_transformer_list.append(end_transformer_id)
 
-        # Calculate batch size to distribute work evenly
-        batch_size = max(1, len(cluster_list) // max_workers)
-        cluster_batches = list(create_batches(cluster_list, batch_size))
+    #             # Exit if all transformers are full
+    #             if len(full_transformer_list) == len(transformer_list):
+    #                 self.logger.info("All transformers full")
+    #                 break
+    #         else:
+    #             # Mark consumer as assigned
+    #             assigned_consumer_list.append(start_consumer_id)
 
-        with ProcessPoolExecutor(max_workers=max_workers, initializer=GridGenerator._init_worker, initargs=(self.regional_identifier,)) as executor:
-            future_to_batch = {
-                executor.submit(GridGenerator._process_cluster_batch, batch): batch
-                for batch in cluster_batches
-            }
+    #     self.logger.debug("Transformer selection finished")
 
-            for future in as_completed(future_to_batch):
-                batch = future_to_batch[future]
-                try:
-                    future.result()
-                    self.logger.debug(
-                        f"Successfully processed batch with {len(batch)} clusters")
-                except Exception as e:
-                    self.logger.error(
-                        f"Failed to process batch with {
-                            len(batch)} clusters: {e}",
-                        exc_info=True)
+    #     # Create building clusters for each transformer
+    #     building_cluster_count = 0
+    #     for transformer_id in transformer_list:
+    #         # Skip empty transformers
+    #         if not pre_result_dict[transformer_id]:
+    #             self.logger.debug(
+    #                 f"Transformer {transformer_id} has no assigned consumer, deleted")
+    #             self.dbc.delete_transformers_from_buildings_tem(
+    #                 [transformer_id])
+    #             continue
 
-        self.logger.info(
-            f"Parallel cable installation completed for regional_identifier {self.regional_identifier}")
+    #         # Create building cluster with sequential negative ID
+    #         building_cluster_count -= 1
 
-    @staticmethod
-    def _init_worker(regional_identifier):
-        """Initialize worker process with one GridGenerator per worker."""
-        global _worker_grid_generator
-        _worker_grid_generator = GridGenerator(
-            regional_identifier=regional_identifier)
+    #         # Calculate the simulated load for all loads assigned to this
+    #         # transformer
+    #         sim_load = self.dbc.calculate_sim_load(
+    #             pre_result_dict[transformer_id])
 
-    @staticmethod
-    def _process_cluster_batch(cluster_batch):
-        """Process a batch of clusters using the worker's GridGenerator."""
-        global _worker_grid_generator
-        try:
-            for kcid, bcid in cluster_batch:
-                _worker_grid_generator._install_cables_for_cluster(kcid, bcid)
-        except Exception as e:
-            print(f"Error in worker batch processing: {e}")
-            raise
+    #         # Define the available standard transformer sizes in kVA
+    #         # TODO: check with settlement_type approach 630 is standard here?
+    #         possible_transformers = np.array([100, 160, 250, 400, 630])
 
-    def _install_cables_for_cluster(self, kcid, bcid):
-        """
-        Installs electrical cables for a single building cluster (kcid, bcid).
-        """
-        self.logger.debug(f"working on kcid {kcid}, bcid {bcid}")
+    #         # Select the smallest transformer that is larger than the simulated
+    #         # load
+    #         transformer_rated_power = possible_transformers[possible_transformers > float(
+    #             sim_load)][0].item()
 
-        # Get data for this cluster
-        vertices_dict, transformer_vertice, vertices_list, buildings_df, consumer_df, consumer_list, connection_nodes = (
-            self.prepare_vertices_list(self.regional_identifier, kcid, bcid)
-        )
-        # PD is the simultaneous load of the consumer list
-        # load_units is the number of units of the consumer list: units per building
-        # load_type is the type of the consumer list [SFH, MFH, AB, TH,
-        # Commercial, Public]
-        Pd, load_units, load_type = self.get_consumer_simultaneous_load_dict(
-            consumer_list, buildings_df)
-        local_length_dict = {c: 0 for c in CABLE_COST_DICT.keys()}
+    #         # Update database with new building cluster
+    #         self.dbc.update_building_cluster(transformer_id, pre_result_dict[transformer_id], building_cluster_count, kcid,
+    # regional_identifier, transformer_rated_power)
 
-        # Create network and add components
-        net = pp.create_empty_network()
-        # Creates the standard cable types from the equipment_data table as
-        # pandapoewer objects
-        self.dbc.create_cable_std_type(net)
-        # Creates two buses LV and MV  and also defines external grid
-        self.create_lvmv_bus(self.regional_identifier, kcid, bcid, net)
+    #     self.logger.debug("Brownfield clusters completed")
 
-        # Defines the transformer between MV,LV
-        self.create_transformer(self.regional_identifier, kcid, bcid, net)
+    # def position_greenfield_transformers(
+    #         self, regional_identifier, kcid, bcid):
+    #     """
+    # Positions a transformer at the optimal location for a greenfield
+    # building cluster.
 
-        # Creates buses for all the conenction nodes
-        self.create_connection_bus(connection_nodes, net)
-        # Creates buses for all the consumers and also one load per unit in the
-        # building
-        self.create_consumer_bus_and_load(
-            consumer_list, load_units, net, load_type, buildings_df)
+    # The optimal location minimizes the sum of distance*load from each vertex
+    # to others.
 
-        # Install cables branch by branch
-        branch_deviation = 0
-        connection_node_list = connection_nodes
-        main_street_available_cables = CABLE_COST_DICT.keys()
+    #     Args:
+    #         regional_identifier: Postcode
+    #         kcid: Kmeans cluster ID
+    #         bcid: Building cluster ID
+    #     """
+    #     # Get all connection points in the building cluster
+    #     connection_points = self.dbc.get_building_connection_points_from_bc(
+    #         kcid, bcid)
 
-        while connection_node_list:
-            # Handle single remaining node case
-            if len(connection_node_list) == 1:
-                sim_load = utils.simultaneousPeakLoad(
-                    buildings_df, consumer_df, connection_node_list)
+    #     # If there's only one connection point, use it
+    #     if len(connection_points) == 1:
+    #         self.dbc.upsert_transformer_selection(
+    #             regional_identifier, kcid, bcid, connection_points[0])
+    #         return
 
-                #  Calculate the maximum current for the connection node
-                Imax = sim_load / (VN * V_BAND_LOW * np.sqrt(3))
+    #     # Get distance matrix between all connection points
+    #     localid2vid, dist_mat, _ = self.dbc.get_distance_matrix_from_bcid(
+    #         kcid, bcid)
 
-                # Install consumer cables
-                local_length_dict = self.install_consumer_cables(
-                    self.regional_identifier, bcid, kcid, branch_deviation, connection_node_list,
-                    transformer_vertice, vertices_dict, Pd, net, CONNECTION_AVAILABLE_CABLES, local_length_dict,
-                )
+    #     # Get load vector for each connection point
+    #     loads = self.dbc.generate_load_vector(kcid, bcid)
 
-                # Connect to transformer
-                if connection_node_list[0] == transformer_vertice:
-                    cable, count = self.find_minimal_available_cable(
-                        Imax, net, main_street_available_cables)
-                    self.create_line_transformer_to_lv_bus(
-                        self.regional_identifier, bcid, kcid, connection_node_list[
-                            0], branch_deviation, net, cable, count
-                    )
-                else:
-                    cable, count = self.find_minimal_available_cable(
-                        Imax, net, main_street_available_cables, vertices_dict[connection_nodes[0]]
-                    )
-                    length = self.create_line_start_to_lv_bus(
-                        self.regional_identifier, bcid, kcid, connection_node_list[
-                            0], branch_deviation,
-                        net, vertices_dict, cable, count, transformer_vertice
-                    )
-                    local_length_dict[cable] += length
+    #     # Calculate weighted distance (distance * load) for each potential
+    #     # location
+    #     #  Relevant for the transformer placement
+    #     total_load_per_vertice = dist_mat.dot(loads)
 
-                self.deviate_bus_geodata(
-                    connection_node_list, branch_deviation, net)
-                self.logger.debug(
-                    "main street cable installation finished")
-                break
+    #     # Select the point with minimum weighted distance as transformer
+    #     # location
+    #     min_localid = np.argmin(total_load_per_vertice)
+    #     transformer_connection_id = int(localid2vid[min_localid])
 
-            # List of nodes until the furthest node from the transformer
-            furthest_node_path_list = self.find_furthest_node_path_list(
-                connection_node_list, vertices_dict, transformer_vertice
-            )
-            # Returns the list of nodes that can be connected with largest
-            # heavy-duty cables, given curren limitations
-            branch_node_list, Imax = self.determine_maximum_load_branch(
-                furthest_node_path_list, buildings_df, consumer_df
-            )
-
-            # Install cables for this branch --> this is the main trunk of the
-            # cable installation
-            local_length_dict = self.install_consumer_cables(
-                self.regional_identifier, bcid, kcid, branch_deviation, branch_node_list,
-                transformer_vertice, vertices_dict, Pd, net, CONNECTION_AVAILABLE_CABLES, local_length_dict
-            )
-
-            branch_distance = vertices_dict[branch_node_list[0]]
-            cable, count = self.find_minimal_available_cable(
-                Imax, net, main_street_available_cables, branch_distance
-            )
-
-            if len(branch_node_list) >= 2:
-                local_length_dict = self.create_line_node_to_node(
-                    self.regional_identifier, kcid, bcid, branch_node_list, branch_deviation,
-                    vertices_dict, local_length_dict, cable, transformer_vertice, count, net
-                )
-
-            # Connect branch to transformer
-            branch_start_node = branch_node_list[-1]
-            if branch_start_node == transformer_vertice:
-                self.create_line_transformer_to_lv_bus(
-                    self.regional_identifier, bcid, kcid, branch_start_node, branch_deviation, net, cable, count
-                )
-            else:
-                length = self.create_line_start_to_lv_bus(
-                    self.regional_identifier, bcid, kcid, branch_start_node, branch_deviation,
-                    net, vertices_dict, cable, count, transformer_vertice
-                )
-                local_length_dict[cable] += length
-
-            # Update processed nodes and visualization
-            for vertice in branch_node_list:
-                connection_node_list.remove(vertice)
-
-            self.deviate_bus_geodata(
-                branch_node_list, branch_deviation, net)
-            branch_deviation += 1
-
-        self.save_net(net, kcid, bcid)
+    #     # Update the database with the selected transformer position
+    #     self.dbc.upsert_transformer_selection(
+    #         regional_identifier, kcid, bcid, transformer_connection_id)
