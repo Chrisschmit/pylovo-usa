@@ -20,8 +20,8 @@ from scipy.spatial.distance import squareform
 from src import utils
 from src.config_loader import *
 from src.database.base_mixin import BaseMixin
-from src.equipment_data_schema import (InfrastructureCluster, LVLoadAggregator,
-                                       MVLoadAggregator, TransformerEquipment)
+from src.equipment_schema import (InfrastructureCluster, LVLoadAggregator,
+                                  MVLoadAggregator, TransformerEquipment)
 
 warnings.simplefilter(action='ignore', category=UserWarning)
 

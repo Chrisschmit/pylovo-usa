@@ -9,11 +9,10 @@ provides a clean interface for grid construction algorithms.
 import logging
 from typing import Any, Dict, Optional
 
-from ..specifications.component_specs import (BusSpec, ComponentSpec,
-                                              ExternalGridSpec, LineSpec,
-                                              LoadSpec, TransformerSpec)
 from .altdss_component_factory import AltDSSComponentFactory
 from .base_backend import IElectricalBackend
+from .component_specs import (BusSpec, ComponentSpec, ExternalGridSpec,
+                              LineSpec, LoadSpec, TransformerSpec)
 
 # Import AltDSS with fallback
 try:

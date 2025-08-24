@@ -22,7 +22,7 @@ Note:
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from ..equipment_data_schema import CableEquipment, TransformerEquipment
+from ..equipment_schema import CableEquipment, TransformerEquipment
 
 
 class AltDSSComponentFactory:

@@ -94,14 +94,17 @@ class DatabaseClient(
         # Save building results
         query = f"""
                     INSERT INTO buildings_result
-                    (version_id, osm_id, grid_result_id, area, type, geom, houses_per_building, center,
+                    (version_id, osm_id, grid_result_id, lv_grid_result_id, area, type, geom, houses_per_building, center,
                     peak_load_in_kw, vertice_id, floors, connection_point)
-                    SELECT '{VERSION_ID}' as version_id, osm_id, gr.grid_result_id, area, type, geom, houses_per_building,
-                    center, peak_load_in_kw, vertice_id, floors, bt.connection_point
+                    SELECT '{VERSION_ID}' as version_id, bt.osm_id, gr.grid_result_id, lv.lv_grid_result_id,
+                    bt.area, bt.type, bt.geom, bt.houses_per_building,
+                    bt.center, bt.peak_load_in_kw, bt.vertice_id, bt.floors, bt.connection_point
                     FROM buildings_tem bt
                     JOIN grid_result gr
-                    ON bt.regional_identifier = gr.regional_identifier AND bt.kcid = gr.kcid AND bt.scid = gr.scid and gr.version_id = '{VERSION_ID}'
-                    WHERE peak_load_in_kw != 0 AND peak_load_in_kw != -1;"""
+                    ON bt.regional_identifier = gr.regional_identifier AND bt.kcid = gr.kcid AND bt.scid = gr.scid AND gr.version_id = '{VERSION_ID}'
+                    LEFT JOIN lv_grid_result lv
+                    ON bt.regional_identifier = lv.regional_identifier AND bt.kcid = lv.kcid AND bt.bcid = lv.bcid AND lv.version_id = '{VERSION_ID}'
+                    WHERE bt.peak_load_in_kw != 0 AND bt.peak_load_in_kw != -1;"""
         self.cur.execute(query)
 
         # Save ways results

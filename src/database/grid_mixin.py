@@ -1,14 +1,14 @@
 import warnings
 from abc import ABC
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Union
 
 import pandapower as pp
 from shapely.geometry import LineString
 
 from src.config_loader import *
 from src.database.base_mixin import BaseMixin
-from src.equipment_data_schema import (CableEquipment, TransformerEquipment,
-                                       create_equipment_from_database_row)
+from src.equipment_schema import (CableEquipment, TransformerEquipment,
+                                  create_equipment_from_database_row)
 
 warnings.simplefilter(action='ignore', category=UserWarning)
 
@@ -491,105 +491,6 @@ class GridMixin(BaseMixin, ABC):
                 'equipment_id': result[2]  # Foreign key to equipment_data.name
             }
         return None
-
-    # ==== LINE RETRIEVAL METHODS FOR VISUALIZATION ====
-
-    def get_lines_by_voltage_level(self, voltage_level: str, kcid: Optional[int] = None,
-                                   scid: Optional[int] = None, bcid: Optional[int] = None) -> List[dict]:
-        """
-        Get lines filtered by voltage level for visualization.
-
-        Args:
-            voltage_level: 'MV' or 'LV'
-            kcid: Optional K-means cluster filter
-            scid: Optional substation cluster filter
-            bcid: Optional building cluster filter (LV only)
-
-        Returns:
-            List of line dictionaries with geometry and metadata
-        """
-        query = """
-        SELECT
-            lr.lines_result_id,
-            lr.line_name,
-            lr.equipment_id,
-            lr.length_km,
-            lr.grid_level,
-            lr.network_identifier,
-            ST_AsGeoJSON(lr.geom) as geometry,
-            lr.kcid,
-            lr.scid,
-            lr.bcid
-        FROM lines_result_with_grid lr
-        WHERE lr.grid_level = %s
-        """
-        params = [voltage_level]
-
-        if kcid is not None:
-            query += " AND lr.kcid = %s"
-            params.append(kcid)
-
-        if scid is not None:
-            query += " AND lr.scid = %s"
-            params.append(scid)
-
-        if bcid is not None and voltage_level == 'LV':
-            query += " AND lr.bcid = %s"
-            params.append(bcid)
-
-        query += " ORDER BY lr.kcid, lr.scid, lr.bcid, lr.line_name"
-
-        self.cur.execute(query, params)
-        results = self.cur.fetchall()
-
-        columns = [desc[0] for desc in self.cur.description]
-        return [dict(zip(columns, row)) for row in results]
-
-    def get_mv_lines_for_visualization(
-            self, kcid: Optional[int] = None, scid: Optional[int] = None) -> List[dict]:
-        """Get MV lines (20kV) for visualization."""
-        return self.get_lines_by_voltage_level('MV', kcid=kcid, scid=scid)
-
-    def get_lv_lines_for_visualization(self, kcid: Optional[int] = None,
-                                       scid: Optional[int] = None, bcid: Optional[int] = None) -> List[dict]:
-        """Get LV lines (400V) for visualization."""
-        return self.get_lines_by_voltage_level(
-            'LV', kcid=kcid, scid=scid, bcid=bcid)
-
-    def get_line_statistics_by_voltage_level(self) -> dict:
-        """
-        Get line statistics grouped by voltage level.
-
-        Returns:
-            Dictionary with statistics for MV and LV networks
-        """
-        query = """
-        SELECT
-            grid_level,
-            COUNT(*) as line_count,
-            COUNT(DISTINCT equipment_id) as unique_cables,
-            SUM(length_km) as total_length_km,
-            AVG(length_km) as avg_length_km
-        FROM lines_result
-        WHERE grid_level IN ('MV', 'LV')
-        GROUP BY grid_level
-        ORDER BY grid_level
-        """
-
-        self.cur.execute(query)
-        results = self.cur.fetchall()
-
-        stats = {}
-        for row in results:
-            grid_level, line_count, unique_cables, total_length, avg_length = row
-            stats[grid_level] = {
-                'line_count': line_count,
-                'unique_cable_types': unique_cables,
-                'total_length_km': float(total_length) if total_length else 0.0,
-                'average_length_km': float(avg_length) if avg_length else 0.0
-            }
-
-        return stats
 
     def save_grid_cluster(self, regional_identifier: int,
                           kcid: int, scid: int, grid_data: Dict[str, Any]) -> None:

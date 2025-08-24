@@ -9,7 +9,7 @@ serve as an intermediate format between grid construction algorithms and backend
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
-from ..equipment_data_schema import CableEquipment, TransformerEquipment
+from ..equipment_schema import CableEquipment, TransformerEquipment
 
 
 @dataclass

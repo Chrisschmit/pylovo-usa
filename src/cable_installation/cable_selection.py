@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 from ..database.database_client import DatabaseClient
-from ..equipment_data_schema import CableEquipment
+from ..equipment_schema import CableEquipment
 
 
 class VoltageAwareCableSelector:
@@ -73,7 +73,7 @@ class VoltageAwareCableSelector:
             for row in rows:
                 cable_dict = dict(zip(columns, row))
                 try:
-                    from ..equipment_data_schema import \
+                    from ..equipment_schema import \
                         create_equipment_from_database_row
                     cable = create_equipment_from_database_row(cable_dict)
                     if isinstance(cable, CableEquipment):

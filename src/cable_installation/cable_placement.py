@@ -16,8 +16,8 @@ import pandas as pd
 from .. import utils
 from ..config_loader import *
 from ..database.database_client import DatabaseClient
-from ..specifications.component_specs import (BusSpec, ComponentSpec, LineSpec,
-                                              LoadSpec)
+from ..electrical_backend.component_specs import (BusSpec, ComponentSpec,
+                                                  LineSpec, LoadSpec)
 from .cable_selection import VoltageAwareCableSelector
 
 

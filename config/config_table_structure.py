@@ -225,6 +225,7 @@ CREATE_QUERIES = {
         version_id varchar(10) NOT NULL,
         osm_id varchar NOT NULL,
         grid_result_id bigint NOT NULL,
+        lv_grid_result_id bigint NULL,  -- Reference to LV transformer cluster
         area numeric,
         type varchar(30),
         houses_per_building integer,
@@ -239,6 +240,10 @@ CREATE_QUERIES = {
             FOREIGN KEY (version_id, grid_result_id)
             REFERENCES grid_result (version_id, grid_result_id)
             ON DELETE CASCADE,
+        CONSTRAINT fk_buildings_result_lv_grid_result
+            FOREIGN KEY (lv_grid_result_id)
+            REFERENCES lv_grid_result (lv_grid_result_id)
+            ON DELETE SET NULL,
         CONSTRAINT fk_buildings_result_type
             FOREIGN KEY (type)
             REFERENCES consumer_categories (definition)
@@ -246,6 +251,8 @@ CREATE_QUERIES = {
     );
     CREATE INDEX idx_buildings_result_grid_result_id
     ON buildings_result (grid_result_id);
+    CREATE INDEX idx_buildings_result_lv_grid_result_id
+    ON buildings_result (lv_grid_result_id);
     """,
     "clustering_parameters": """CREATE TABLE IF NOT EXISTS clustering_parameters (
         grid_result_id bigint PRIMARY KEY,
@@ -423,9 +430,11 @@ CREATE_QUERIES = {
         SELECT
             (br.version_id || '_' || br.osm_id) AS id,
             br.*,
-            gr.kcid, gr.scid, gr.regional_identifier
+            gr.kcid, gr.scid, gr.regional_identifier,
+            lv.bcid  -- Now comes directly from the foreign key relationship
         FROM buildings_result br
         JOIN grid_result gr ON br.grid_result_id = gr.grid_result_id
+        LEFT JOIN lv_grid_result lv ON br.lv_grid_result_id = lv.lv_grid_result_id
     )
     """,
     "lines_result_with_grid": """

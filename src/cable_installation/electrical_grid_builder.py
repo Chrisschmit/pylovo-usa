@@ -11,16 +11,17 @@ Based on the architecture defined in decoupled_grid_architecture_merged.md
 import logging
 from typing import Any, Dict, List, Optional
 
-from .algorithms.cable_placement import CablePlacementAlgorithm
-from .backends.base_backend import IElectricalBackend
-from .database.database_client import DatabaseClient
-from .specifications.component_specs import (BusSpec, ComponentSpec,
-                                             ExternalGridSpec, TransformerSpec)
+from ..database.database_client import DatabaseClient
+from ..electrical_backend.base_backend import IElectricalBackend
+from ..electrical_backend.component_specs import (BusSpec, ComponentSpec,
+                                                  ExternalGridSpec,
+                                                  TransformerSpec)
+from .cable_placement import CablePlacementAlgorithm
 
 
-class UnifiedGridBuilder:
+class ElectricalGridBuilder:
     """
-    Unified orchestrator for complete grid construction using backend-agnostic approach.
+    Unified orchestrator for the electrical grid construction using backend-agnostic approach.
 
     This class coordinates the complete grid generation process:
     1. Infrastructure placement (already done by clustering algorithms)
@@ -393,7 +394,7 @@ class UnifiedGridBuilder:
                         spec, 'component_type') or spec.component_type != 'line':
                     continue
 
-                from .specifications.component_specs import LineSpec
+                from ..electrical_backend.component_specs import LineSpec
                 if not isinstance(spec, LineSpec):
                     continue
 
