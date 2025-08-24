@@ -154,11 +154,87 @@ class ClusteringMixin(BaseMixin, ABC):
 
         valid_cluster_dict = {}
         invalid_cluster_dict = {}
-        # Explore if we create multipel clusters first
-        cluster_amount = 2  # Start with 2 clusters
+        # CRITICAL: Use accumulator for ALL invalid clusters across iterations
+        invalid_trans_cluster_dict = {}
+
+        # # Calculate better initial cluster amount based on total load and transformer capacity
+        # # Get all building vertex IDs
+        # all_vertex_ids = list(localid2vid.values())
+
+        # # Debug: Check building count and average load
+        # building_count = len(buildings_df)
+        # avg_peak_load = buildings_df['peak_load_in_kw'].mean() if 'peak_load_in_kw' in buildings_df.columns else 0
+        # total_peak_load = buildings_df['peak_load_in_kw'].sum() if 'peak_load_in_kw' in buildings_df.columns else 0
+
+        # # Calculate total simultaneous peak load for all buildings
+        # # Note: simultaneousPeakLoad returns the load in kW
+        # total_sim_load_kw = utils.simultaneousPeakLoad(
+        #     buildings_df, consumer_df, all_vertex_ids
+        # )
+
+        # self.logger.debug(
+        #     f"Building load analysis: {building_count} buildings, "
+        #     f"avg peak={avg_peak_load:.1f}kW, total peak={total_peak_load:.0f}kW, "
+        #     f"simultaneous={total_sim_load_kw:.0f}kW"
+        # )
+
+        # # Use the largest standard transformer capacity as reference
+        # # (typically the most economical choice)
+        # if len(equipment_capacities) > 0:
+        #     # Use the largest single transformer capacity
+        #     reference_capacity = equipment_capacities[-1]
+        # else:
+        #     # Fallback to typical distribution transformer size
+        #     reference_capacity = 630  # kVA
+
+        # # Apply a safety factor (0.8) to account for voltage drops and losses
+        # usable_capacity = reference_capacity * 0.8
+
+        # # Calculate minimum number of clusters needed
+        # # Convert total load from kW to kVA (assuming 0.9 power factor)
+        # total_load_kva = total_sim_load_kw / 0.9
+
+        # # Initial cluster estimate with some headroom (1.2x) for better distribution
+        # estimated_clusters = max(2, int(np.ceil(total_load_kva / usable_capacity * 1.2)))
+
+        # # Cap at reasonable maximum based on building count
+        # # Rule of thumb: at least 5-10 buildings per cluster for economic viability
+        # max_reasonable_clusters = max(2, building_count // 5)
+
+        # if estimated_clusters > max_reasonable_clusters:
+        #     self.logger.warning(
+        #         f"Calculated {estimated_clusters} clusters seems excessive for {building_count} buildings. "
+        #         f"Capping at {max_reasonable_clusters} clusters."
+        #     )
+        #     estimated_clusters = max_reasonable_clusters
+
+        # # Log the calculation
+        # self.logger.info(
+        #     f"Initial cluster calculation: Total load={total_sim_load_kw:.0f}kW "
+        #     f"({total_load_kva:.0f}kVA), Reference capacity={reference_capacity}kVA, "
+        #     f"Starting with {estimated_clusters} clusters"
+        # )
+
+        cluster_amount = 2
         new_localid2vid = localid2vid
 
+        # Track total buildings to ensure none are lost
+        total_buildings_initial = len(localid2vid)
+        iteration_count = 0
+        max_iterations = 1000  # Prevent infinite loops
+
         while True:
+            iteration_count += 1
+            if iteration_count > max_iterations:
+                self.logger.error(
+                    f"Maximum iterations ({max_iterations}) reached in clustering!")
+                break
+
+            # Count buildings before clustering
+            buildings_in_current_iteration = len(new_localid2vid)
+            self.logger.info(
+                f"Iteration {iteration_count}: {buildings_in_current_iteration} buildings")
+
             # Try clustering with current cluster amount
             invalid_cluster_dict, cluster_dict, _ = self._try_clustering(
                 Z=Z,
@@ -180,27 +256,53 @@ class ClusteringMixin(BaseMixin, ABC):
                 valid_cluster_dict = dict(
                     enumerate(valid_cluster_dict.values()))
 
-            # Process invalid clusters
+            # Process invalid clusters - ADD them to accumulator
             if invalid_cluster_dict:
-                current_invalid_amount = len(invalid_cluster_dict)
-                invalid_cluster_dict_temp = {}
-                invalid_cluster_dict_temp.update(
+                current_invalid_amount = len(invalid_trans_cluster_dict)
+                invalid_trans_cluster_dict.update(
                     {x + current_invalid_amount: y for x, y in invalid_cluster_dict.items()})
-                invalid_cluster_dict = dict(
-                    enumerate(invalid_cluster_dict_temp.values()))
+                invalid_trans_cluster_dict = dict(
+                    enumerate(invalid_trans_cluster_dict.values()))
+
+            # Count buildings in valid and invalid clusters
+            buildings_in_valid = sum(
+                len(cluster[0]) for cluster in valid_cluster_dict.values())
+            buildings_in_invalid = sum(len(cluster) for cluster in invalid_trans_cluster_dict.values(
+            )) if invalid_trans_cluster_dict else 0
+            buildings_accounted_for = buildings_in_valid + buildings_in_invalid
+
+            self.logger.info(
+                f"Iteration {iteration_count}: "
+                f"Valid clusters={
+                    len(valid_cluster_dict)} ({buildings_in_valid} buildings), "
+                f"Invalid clusters={
+                    len(invalid_trans_cluster_dict)} ({buildings_in_invalid} buildings), "
+                f"Total accounted={buildings_accounted_for}/{total_buildings_initial}"
+            )
 
             # Check if clustering is complete
-            if not invalid_cluster_dict:
+            if not invalid_trans_cluster_dict:
                 self.logger.info(
-                    f"Found {len(valid_cluster_dict)} single transformer clusters for kcid: {kcid}")
+                    f"Clustering complete: {
+                        len(valid_cluster_dict)} clusters for kcid: {kcid}, "
+                    f"Total buildings assigned: {buildings_in_valid}/{total_buildings_initial}"
+                )
+
+                # Verify no buildings were lost
+                if buildings_in_valid < total_buildings_initial:
+                    self.logger.error(
+                        f"WARNING: Lost {
+                            total_buildings_initial -
+                            buildings_in_valid} buildings during clustering!"
+                    )
                 break
             else:
                 # Process first invalid cluster by increasing cluster amount
                 self.logger.info(
-                    f"Found {len(invalid_cluster_dict)} too_large clusters for kcid: {kcid}")
+                    f"Processing {len(invalid_trans_cluster_dict)} invalid clusters for kcid: {kcid}")
 
                 # Get first invalid cluster for re-clustering
-                invalid_vertice_ids = list(invalid_cluster_dict[0])
+                invalid_vertice_ids = list(invalid_trans_cluster_dict[0])
                 vid2localid = {v: k for k, v in localid2vid.items()}
                 invalid_local_ids = [vid2localid[v]
                                      for v in invalid_vertice_ids if v in vid2localid]
@@ -216,9 +318,47 @@ class ClusteringMixin(BaseMixin, ABC):
                 # Prepare for next iteration
                 Z = linkage(new_dist_vector, method="average")
                 cluster_amount = 2
-                del invalid_cluster_dict[0]
-                invalid_cluster_dict = dict(
-                    enumerate(invalid_cluster_dict.values()))
+
+                # Delete the processed invalid cluster (just like old
+                # implementation)
+                del invalid_trans_cluster_dict[0]
+                invalid_trans_cluster_dict = dict(
+                    enumerate(invalid_trans_cluster_dict.values()))
+
+                # Log what we're carrying forward
+                remaining_buildings = sum(
+                    len(cluster) for cluster in invalid_trans_cluster_dict.values())
+                self.logger.debug(
+                    f"After processing 1 invalid cluster, "
+                    f"{len(invalid_trans_cluster_dict)} invalid clusters remain "
+                    f"with {remaining_buildings} buildings"
+                )
+
+        # Final verification: Check all buildings are assigned
+        final_assigned_buildings = sum(
+            len(cluster[0]) for cluster in valid_cluster_dict.values())
+        if final_assigned_buildings != total_buildings_initial:
+            self.logger.error(
+                f"CRITICAL: Building assignment mismatch! "
+                f"Started with {total_buildings_initial} buildings, "
+                f"ended with {final_assigned_buildings} assigned. "
+                f"Lost {
+                    total_buildings_initial -
+                    final_assigned_buildings} buildings!"
+            )
+
+            # Debug: Show which vertex IDs were lost
+            all_assigned_vids = set()
+            for cluster_nodes, _ in valid_cluster_dict.values():
+                all_assigned_vids.update(cluster_nodes)
+
+            original_vids = set(localid2vid.values())
+            lost_vids = original_vids - all_assigned_vids
+            if lost_vids:
+                self.logger.error(
+                    f"Lost vertex IDs: {
+                        list(lost_vids)[
+                            :10]}...")  # Show first 10
 
         # Convert valid clusters to InfrastructureCluster objects
         infrastructure_clusters = []
@@ -900,15 +1040,21 @@ class ClusteringMixin(BaseMixin, ABC):
         return bcid_list
 
     def get_buildings_from_bcid(
-            self, regional_identifier: int, kcid: int, bcid: int) -> pd.DataFrame:
+            self, regional_identifier: int, kcid: int, bcid: int, scid: int = None) -> pd.DataFrame:
 
-        buildings_query = """SELECT *
+        # Build query with optional scid filter for hierarchical structure
+        scid_filter = " AND scid = %(s)s" if scid is not None else ""
+
+        buildings_query = f"""SELECT *
                              FROM buildings_tem
                              WHERE type != 'Transformer'
                                AND regional_identifier = %(p)s
                                AND bcid = %(b)s
-                               AND kcid = %(k)s;"""
+                               AND kcid = %(k)s{scid_filter};"""
+
         params = {"p": regional_identifier, "b": bcid, "k": kcid}
+        if scid is not None:
+            params["s"] = scid
 
         buildings_df = pd.read_sql_query(
             buildings_query, con=self.conn, params=params)
@@ -1158,8 +1304,9 @@ class ClusteringMixin(BaseMixin, ABC):
                     INSERT INTO lv_grid_result (
                         version_id, regional_identifier, kcid, bcid,
                         parent_grid_result_id, dist_transformer_rated_power,
-                        dist_transformer_vertice_id, lv_model_status
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        dist_transformer_vertice_id, equipment_id,
+                        lv_model_status
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING lv_grid_result_id
                     """
 
@@ -1171,9 +1318,10 @@ class ClusteringMixin(BaseMixin, ABC):
                         None,
                         int(cluster.equipment.s_max_kva),
                         int(cluster.optimal_vertex),
+                        cluster.equipment.name,  # Add equipment ID reference
                         0  # Initial model status
                     ))
-                    
+
                     result_id = self.cur.fetchone()[0]
                     created_ids.append(result_id)
 
@@ -1191,8 +1339,8 @@ class ClusteringMixin(BaseMixin, ABC):
                     INSERT INTO grid_result (
                         version_id, regional_identifier, kcid, scid,
                         substation_rated_power, substation_vertice_id,
-                        model_status, grid
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        equipment_id, model_status, grid
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING grid_result_id
                     """
 
@@ -1203,6 +1351,7 @@ class ClusteringMixin(BaseMixin, ABC):
                         int(cluster.cluster_id),
                         int(cluster.equipment.s_max_kva),
                         int(cluster.optimal_vertex),
+                        cluster.equipment.name,  # Add equipment ID reference
                         0,  # Initial model status
                         None  # Grid JSON will be populated later
                     ))

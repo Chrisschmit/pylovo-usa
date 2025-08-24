@@ -61,8 +61,6 @@ CREATE_QUERIES = {
         version_comment varchar, 
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         consumer_categories varchar,
-        cable_cost_dict varchar,
-        connection_available_cables varchar,   
         other_parameters varchar
     )
     """,
@@ -110,6 +108,7 @@ CREATE_QUERIES = {
         scid integer NOT NULL,
         substation_rated_power bigint,
         substation_vertice_id bigint,
+        equipment_id varchar(100),
         model_status integer,
         grid json,
         CONSTRAINT uq_grid_result
@@ -121,7 +120,11 @@ CREATE_QUERIES = {
             REFERENCES postcode_result(
                 version_id, postcode_result_regional_identifier
             )
-            ON DELETE CASCADE
+            ON DELETE CASCADE,
+        CONSTRAINT fk_grid_result_equipment
+            FOREIGN KEY (equipment_id)
+            REFERENCES equipment_data(name)
+            ON DELETE SET NULL
     );
 
     CREATE INDEX idx_grid_result_v_reg_kcid_scid
@@ -139,6 +142,7 @@ CREATE_QUERIES = {
         parent_grid_result_id integer NULL,
         dist_transformer_rated_power bigint,
         dist_transformer_vertice_id bigint,
+        equipment_id varchar(100),
         lv_model_status integer,
         CONSTRAINT uq_lv_grid_result
             UNIQUE (version_id, regional_identifier, kcid, bcid),
@@ -153,7 +157,11 @@ CREATE_QUERIES = {
         CONSTRAINT fk_lv_parent
             FOREIGN KEY (parent_grid_result_id)
             REFERENCES grid_result(grid_result_id)
-            ON DELETE CASCADE
+            ON DELETE CASCADE,
+        CONSTRAINT fk_lv_grid_result_equipment
+            FOREIGN KEY (equipment_id)
+            REFERENCES equipment_data(name)
+            ON DELETE SET NULL
     );
     CREATE INDEX idx_lv_grid_result_v_reg_kcid_bcid
         ON lv_grid_result(version_id, regional_identifier, kcid, bcid);
@@ -167,8 +175,11 @@ CREATE_QUERIES = {
     CREATE TABLE IF NOT EXISTS lines_result (
         lines_result_id SERIAL PRIMARY KEY,
         grid_result_id bigint NOT NULL,
-        line_name varchar(15),
-        std_type varchar(15),
+        lv_grid_result_id bigint NULL,
+        grid_level varchar(8) NOT NULL,
+        line_name varchar(50),
+        std_type varchar(50),
+        equipment_id varchar(100),
         from_bus integer,
         to_bus integer,
         length_km numeric,
@@ -176,8 +187,27 @@ CREATE_QUERIES = {
         CONSTRAINT fk_lines_result_grid_result
             FOREIGN KEY (grid_result_id)
             REFERENCES grid_result (grid_result_id)
-            ON DELETE CASCADE
-    )
+            ON DELETE CASCADE,
+        CONSTRAINT fk_lines_result_lv_grid_result
+            FOREIGN KEY (lv_grid_result_id)
+            REFERENCES lv_grid_result (lv_grid_result_id)
+            ON DELETE CASCADE,
+        CONSTRAINT fk_lines_result_equipment
+            FOREIGN KEY (equipment_id)
+            REFERENCES equipment_data(name)
+            ON DELETE SET NULL,
+        CONSTRAINT ck_lines_result_grid_level
+            CHECK (grid_level IN ('MV', 'LV')),
+        CONSTRAINT ck_lines_result_level_consistency
+            CHECK (
+                (grid_level = 'MV' AND lv_grid_result_id IS NULL) OR
+                (grid_level = 'LV' AND lv_grid_result_id IS NOT NULL)
+            )
+    );
+    CREATE INDEX idx_lines_result_grid_level 
+        ON lines_result(grid_level);
+    CREATE INDEX idx_lines_result_equipment_id
+        ON lines_result(equipment_id)
     """,
     "consumer_categories": """
     CREATE TABLE IF NOT EXISTS consumer_categories (
@@ -403,15 +433,28 @@ CREATE_QUERIES = {
         SELECT
             lr.lines_result_id as id,
             lr.grid_result_id,
+            lr.lv_grid_result_id,
+            lr.grid_level,
             lr.geom,
             lr.line_name,
             lr.std_type,
+            lr.equipment_id,
             lr.from_bus,
             lr.to_bus,
             lr.length_km,
-            gr.version_id, gr.kcid, gr.scid, gr.regional_identifier
+            gr.version_id, 
+            gr.kcid, 
+            gr.scid, 
+            gr.regional_identifier,
+            lv.bcid,
+            CASE 
+                WHEN lr.grid_level = 'MV' THEN CONCAT('MV_K', gr.kcid, '_S', gr.scid)
+                WHEN lr.grid_level = 'LV' THEN CONCAT('LV_K', gr.kcid, '_S', gr.scid, '_B', lv.bcid)
+                ELSE 'Unknown'
+            END as network_identifier
         FROM lines_result lr
         JOIN grid_result gr ON lr.grid_result_id = gr.grid_result_id
+        LEFT JOIN lv_grid_result lv ON lr.lv_grid_result_id = lv.lv_grid_result_id
     )
     """
 }
