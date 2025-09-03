@@ -49,6 +49,8 @@ class AltDSSComponentFactory:
         self._buses_created: set = set()  # Track created buses
         # Store coordinates for later
         self._pending_coordinates: Dict[str, Tuple[float, float]] = {}
+        # Store bus voltage bases for tracking
+        self._bus_voltage_bases: Dict[str, float] = {}
         self._components_created: Dict[str, List[Any]] = {
             'buses': [],
             'transformers': [],
@@ -62,165 +64,11 @@ class AltDSSComponentFactory:
 
     # ===== COMPONENT CREATION UTILITIES =====
 
-    def calculate_voltage_bases(self) -> None:
-        """Calculate voltage bases after all transformers are defined."""
-        self.dss("CalcVoltageBases")
-        self.logger.debug("Calculated voltage bases")
-
-    def _try_set_coordinates(self, bus_name: str) -> bool:
-        """Try to set coordinates for a bus if it exists and has pending coordinates.
-
-        Returns:
-            True if coordinates were set, False otherwise
-        """
-        if bus_name not in self._pending_coordinates:
-            return False
-
-        try:
-            x, y = self._pending_coordinates[bus_name]
-            bus = self.dss.Bus[bus_name]
-            if bus.Name:  # Bus exists
-                bus.X = x
-                bus.Y = y
-                self.logger.debug(
-                    f"Set coordinates for bus {bus_name}: ({x}, {y})")
-                # Remove from pending since it's now set
-                del self._pending_coordinates[bus_name]
-                return True
-        except Exception:
-            # Bus doesn't exist yet, keep coordinates pending
-            pass
-        return False
-
-    def apply_pending_coordinates(self) -> Dict[str, bool]:
-        """
-        Apply all pending coordinates after the circuit has been solved.
-        This should be called after solve() to ensure all buses exist.
-
-        Returns:
-            Dictionary mapping bus names to whether coordinates were successfully set
-        """
-        results = {}
-        # Make a copy of keys since we'll be modifying the dict
-        pending_buses = list(self._pending_coordinates.keys())
-
-        for bus_name in pending_buses:
-            results[bus_name] = self._try_set_coordinates(bus_name)
-
-        remaining = len(self._pending_coordinates)
-        if remaining > 0:
-            self.logger.warning(
-                f"{remaining} buses still have pending coordinates after solve")
-        else:
-            self.logger.info("All pending coordinates have been applied")
-
-        return results
-
-    # ===== BUS CREATION AND COORDINATES =====
-
-    def set_bus_coordinates(self, bus_name: str, x: float, y: float) -> None:
-        """
-        Set coordinates for a bus (for visualization).
-        Note: Coordinates are stored and applied after buses are created by components.
-
-        Args:
-            bus_name: Name of the bus
-            x: X coordinate
-            y: Y coordinate
-        """
-        # Store coordinates for later application
-        self._pending_coordinates[bus_name] = (x, y)
-
-        if bus_name not in self._buses_created:
-            self._buses_created.add(bus_name)
-            self._components_created['buses'].append(bus_name)
-
-    def create_bus(self, name: str,
-                   coordinates: Optional[Tuple[float, float]] = None) -> str:
-        """
-        Create/register a bus and optionally set its coordinates.
-
-        Note: In AltDSS, buses are implicitly created when referenced by components.
-        This method primarily tracks bus creation and sets coordinates if provided.
-
-        Args:
-            name: Bus name
-            coordinates: Optional (x, y) coordinates
-
-        Returns:
-            Bus name for chaining
-        """
-        if name not in self._buses_created:
-            self._buses_created.add(name)
-            self._components_created['buses'].append(name)
-            self.logger.debug(f"Registered bus: {name}")
-
-        if coordinates:
-            self.set_bus_coordinates(name, coordinates[0], coordinates[1])
-
-        return name
-
-    def create_mv_bus(
-            self, name: str, coordinates: Optional[Tuple[float, float]] = None) -> str:
-        """
-        Create a medium voltage (20kV) bus.
-
-        Args:
-            name: Bus name
-            coordinates: Optional (x, y) coordinates
-
-        Returns:
-            Bus name
-        """
-        return self.create_bus(name, coordinates)
-
-    def create_lv_bus(
-            self, name: str, coordinates: Optional[Tuple[float, float]] = None) -> str:
-        """
-        Create a low voltage (0.4kV) bus.
-
-        Args:
-            name: Bus name
-            coordinates: Optional (x, y) coordinates
-
-        Returns:
-            Bus name
-        """
-        return self.create_bus(name, coordinates)
-
-    # ===== EXTERNAL GRID/SOURCE =====
-
-    def create_external_grid(self, bus: str, voltage_pu: float = 1.0,
-                             mva_sc3: float = 1000.0, mva_sc1: float = 1000.0,
-                             name: str = "Source") -> Any:
-        """
-        Create or modify an external grid connection (voltage source).
-
-        Args:
-            bus: Bus name to connect to
-            voltage_pu: Voltage in per unit
-            mva_sc3: 3-phase short circuit MVA
-            mva_sc1: 1-phase short circuit MVA
-            name: Source name
-
-        Returns:
-            Created/modified source object
-        """
-        # Always modify the default source (simplest approach)
-        self.dss(
-            f"Edit Vsource.Source bus1={bus} pu={voltage_pu} MVAsc3={mva_sc3} MVAsc1={mva_sc1}")
-        source = self.dss.Vsource["Source"]
-
-        self._components_created['sources'].append(source)
-        self.logger.info(f"Created external grid '{name}' at {bus}")
-        return source
-
     # ===== TRANSFORMER CREATION =====
 
     def create_transformer_from_equipment(self, name: str, equipment: TransformerEquipment,
                                           bus1: str, bus2: str,
-                                          kva: Optional[float] = None,
-                                          conns: Optional[List[str]] = None) -> Any:
+                                          conns: List[str]) -> Any:
         """
         Create a transformer using equipment data.
 
@@ -229,17 +77,11 @@ class AltDSSComponentFactory:
             equipment: TransformerEquipment object from database
             bus1: Primary side bus
             bus2: Secondary side bus
-            kva: Optional kVA rating (uses equipment rating if None)
-            conns: Optional connection types (default ["delta", "wye"])
+            conns: Connection types
 
         Returns:
             Created transformer object
         """
-        kva_rating = kva or equipment.s_max_kva
-
-        # Default connections if not specified
-        if conns is None:
-            conns = ["delta", "wye"]  # Typical US distribution
 
         # Create transformer using pythonic interface
         transformer = self.dss.Transformer.new(
@@ -249,40 +91,40 @@ class AltDSSComponentFactory:
             Buses=[bus1, bus2],
             Conns=conns,
             kVs=[equipment.primary_voltage_kv, equipment.secondary_voltage_kv],
-            kVAs=[kva_rating, kva_rating],
+            kVAs=[equipment.s_max_kva, equipment.s_max_kva],
             pctRs=[0.5, 0.5],  # Default resistances
             XHL=equipment.reactance_pu * 100 if equipment.reactance_pu else 7.0
             # Skip no-load losses for now - can be set later if needed
         )
 
         self._components_created['transformers'].append(transformer)
-        self.logger.info(
+        self.logger.debug(
             f"Created transformer {name}: {
                 equipment.primary_voltage_kv}kV -> {
-                equipment.secondary_voltage_kv}kV, {kva_rating}kVA")
+                equipment.secondary_voltage_kv}kV, {equipment.s_max_kva}kVA")
         return transformer
 
     def create_mv_lv_transformer(self, name: str, equipment: TransformerEquipment,
-                                 mv_bus: str, lv_bus: str) -> Any:
+                                 bus1: str, bus2: str) -> Any:
         """
-        Create an MV-LV transformer (20kV -> 0.4kV).
+        Create an MV-LV transformer (12.47kV -> 0.4kV).
 
         Args:
             name: Transformer name
             equipment: TransformerEquipment object
-            mv_bus: MV side bus
-            lv_bus: LV side bus
+            bus1: MV side bus
+            bus2: LV side bus
 
         Returns:
             Created transformer object
         """
         return self.create_transformer_from_equipment(
-            name, equipment, mv_bus, lv_bus,
-            conns=["wye", "wye"]  # Typical for MV-LV
+            name, equipment, bus1, bus2,
+            conns=["delta", "wye"]
         )
 
     def create_substation_transformer(self, name: str, equipment: TransformerEquipment,
-                                      hv_bus: str, mv_bus: str) -> Any:
+                                      bus1: str, bus2: str) -> Any:
         """
         Create a substation transformer (69kV -> 20kV).
 
@@ -296,7 +138,7 @@ class AltDSSComponentFactory:
             Created transformer object
         """
         return self.create_transformer_from_equipment(
-            name, equipment, hv_bus, mv_bus,
+            name, equipment, bus1, bus2,
             conns=["delta", "wye"]  # Typical for substation
         )
 
@@ -325,10 +167,8 @@ class AltDSSComponentFactory:
             X1=cable.x_ohm_per_km,
             R0=cable.r_ohm_per_km * 3,  # Zero sequence approximation
             X0=cable.x_ohm_per_km * 3,
-            C1=cable.capacitance_nf_per_km /
-            1000 if cable.capacitance_nf_per_km else 10,  # Convert to uF
-            C0=cable.capacitance_nf_per_km / 1000 *
-            0.5 if cable.capacitance_nf_per_km else 5,
+            C1=cable.capacitance_nf_per_km,
+            C0=0.5 * cable.capacitance_nf_per_km,
             Units="km",
             NormAmps=cable.max_i_a,
             EmergAmps=cable.max_i_a * 1.25

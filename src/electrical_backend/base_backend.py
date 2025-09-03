@@ -21,13 +21,15 @@ class IElectricalBackend(ABC):
 
     @abstractmethod
     def initialize_circuit(self, name: str,
-                           source_bus: str = "Source") -> None:
+                           source_bus: str,
+                           primary_kv: float) -> None:
         """
         Initialize a new electrical circuit.
 
         Args:
             name: Circuit name
             source_bus: Name of the source bus
+            primary_kv: Primary voltage level
         """
 
     @abstractmethod
@@ -86,20 +88,3 @@ class IElectricalBackend(ABC):
         Returns:
             Created bus name
         """
-
-    @abstractmethod
-    def create_external_grid(self, source_bus: str, **kwargs) -> Any:
-        """
-        Create external grid connection at source bus.
-
-        Args:
-            source_bus: Name of the source bus
-            **kwargs: Backend-specific parameters
-
-        Returns:
-            Backend-specific external grid object
-        """
-
-    @abstractmethod
-    def apply_pending_coordinates(self) -> None:
-        """Apply any pending coordinate assignments to components."""

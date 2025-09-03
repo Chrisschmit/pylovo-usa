@@ -11,8 +11,7 @@ from typing import Any, Dict, Optional
 
 from .altdss_component_factory import AltDSSComponentFactory
 from .base_backend import IElectricalBackend
-from .component_specs import (BusSpec, ComponentSpec, ExternalGridSpec,
-                              LineSpec, LoadSpec, TransformerSpec)
+from .component_specs import BusSpec, ComponentSpec, LineSpec, LoadSpec, TransformerSpec
 
 # Import AltDSS with fallback
 try:
@@ -52,8 +51,7 @@ class AltDSSBackend(IElectricalBackend):
                 "AltDSS not available. Please install altdss package."
             )
 
-    def initialize_circuit(self, name: str,
-                           source_bus: str = "Source") -> None:
+    def initialize_circuit(self, name: str, source_bus: str, primary_kv: float) -> None:
         """
         Initialize AltDSS circuit with US distribution standards.
 
@@ -62,21 +60,26 @@ class AltDSSBackend(IElectricalBackend):
         Args:
             name: Circuit name
             source_bus: Name of the source bus
+            primary_kv: Primary voltage level
         """
         try:
             # Clear any existing circuit state
             altdss.altdss("Clear")
 
-            # Create new circuit with US standard 69kV transmission level
+            # Create new circuit with specified primary voltage level
             altdss.altdss(
-                f"New Circuit.{name} basekv=69 pu=1.0 phases=3 bus1={source_bus}"
+                f"New Circuit.{name} basekv={primary_kv} pu=1.0 phases=3 bus1={source_bus}"
             )
 
             # Set US distribution voltage bases
-            # Transmission, MV, LV line-to-line, LV line-to-neutral
-            voltage_bases = [69, 20, 0.4, 0.208]
-            bases_str = ','.join(str(v) for v in voltage_bases)
+            # Primary, MV, LV line-to-line, LV line-to-neutral
+            voltage_bases = [primary_kv, 12.47, 0.416, 0.208]
+            bases_str = ",".join(str(v) for v in voltage_bases)
             altdss.altdss(f"Set VoltageBases=[{bases_str}]")
+
+            # CRITICAL: Calculate voltage bases after setting them
+            # This ensures proper kVBase assignment to all buses
+            altdss.altdss("CalcVoltageBases")
 
             # Set US standard frequency
             altdss.altdss("Set DefaultBaseFrequency=60")
@@ -86,8 +89,7 @@ class AltDSSBackend(IElectricalBackend):
             self._circuit_name = name
 
             # Initialize component factory
-            self.component_factory = AltDSSComponentFactory(
-                self.dss, self.logger)
+            self.component_factory = AltDSSComponentFactory(self.dss, self.logger)
 
             self.logger.info(f"✓ Initialized AltDSS circuit: {name}")
             self.logger.debug(f"Voltage bases: {voltage_bases} kV")
@@ -96,7 +98,8 @@ class AltDSSBackend(IElectricalBackend):
             self.logger.error(f"Failed to initialize AltDSS circuit: {str(e)}")
             raise AltDSSBackendError(
                 f"AltDSS initialization failed: {
-                    str(e)}") from e
+                    str(e)}"
+            ) from e
 
     def create_component(self, spec: ComponentSpec) -> Any:
         """
@@ -112,24 +115,33 @@ class AltDSSBackend(IElectricalBackend):
         """
         if self.component_factory is None:
             raise AltDSSBackendError(
-                "Backend not initialized. Call initialize_circuit() first.")
+                "Backend not initialized. Call initialize_circuit() first."
+            )
 
         try:
             if isinstance(spec, TransformerSpec):
-                return self.component_factory.create_transformer_from_equipment(
-                    name=spec.name,
-                    equipment=spec.equipment,
-                    bus1=spec.bus1,
-                    bus2=spec.bus2,
-                    kva=spec.kva or spec.equipment.s_max_kva
-                )
+                if spec.equipment.secondary_voltage_kv > 1:
+                    return self.component_factory.create_substation_transformer(
+                        name=spec.name,
+                        equipment=spec.equipment,
+                        bus1=spec.bus1,
+                        bus2=spec.bus2,
+                    )
+                else:
+                    return self.component_factory.create_mv_lv_transformer(
+                        name=spec.name,
+                        equipment=spec.equipment,
+                        bus1=spec.bus1,
+                        bus2=spec.bus2,
+                    )
+
             elif isinstance(spec, LineSpec):
                 return self.component_factory.create_line_from_equipment(
                     name=spec.name,
                     cable=spec.cable_equipment,
                     bus1=spec.bus1,
                     bus2=spec.bus2,
-                    length_km=spec.length_km
+                    length_km=spec.length_km,
                 )
             elif isinstance(spec, LoadSpec):
                 return self.component_factory.create_load(
@@ -139,35 +151,27 @@ class AltDSSBackend(IElectricalBackend):
                     kvar=spec.kvar,
                     kv=spec.kv,
                     n_phases=spec.n_phases,
-                    conn=spec.conn
+                    conn=spec.conn,
                 )
             elif isinstance(spec, BusSpec):
-                # Buses are created implicitly by AltDSS when components reference them
-                # Store coordinates for later application
-                if spec.coordinates:
-                    self._pending_coordinates[spec.name] = spec.coordinates
+                # No need to create a bus, AltDSS will create it implicitly
                 return spec.name
-            elif isinstance(spec, ExternalGridSpec):
-                return self.component_factory.create_external_grid(
-                    bus=spec.bus,
-                    voltage_pu=spec.voltage_pu,
-                    mva_sc3=spec.mva_sc3,
-                    mva_sc1=spec.mva_sc1,
-                    name=spec.name
-                )
             else:
                 raise AltDSSBackendError(
                     f"Unknown component spec type: {
-                        type(spec)}")
+                        type(spec)}"
+                )
 
         except Exception as e:
             self.logger.error(
                 f"Failed to create component {
                     spec.name}: {
-                    str(e)}")
+                    str(e)}"
+            )
             raise AltDSSBackendError(
                 f"Component creation failed: {
-                    str(e)}") from e
+                    str(e)}"
+            ) from e
 
     def solve_power_flow(self) -> bool:
         """
@@ -179,10 +183,14 @@ class AltDSSBackend(IElectricalBackend):
             True if power flow converged, False otherwise
         """
         if self.dss is None:
-            raise AltDSSBackendError(
-                "No AltDSS instance available for analysis")
+            raise AltDSSBackendError("No AltDSS instance available for analysis")
 
         try:
+            # CRITICAL: Calculate voltage bases before solving
+            # This assigns proper kVBase to all buses based on connectivity
+            self.logger.info("Calculating voltage bases...")
+            self.dss("CalcVoltageBases")
+
             self.logger.debug("Solving power flow...")
             self.dss.Solution.Solve()
 
@@ -214,31 +222,7 @@ class AltDSSBackend(IElectricalBackend):
             # Export using AltDSS built-in JSON functionality
             json_str = self.dss.to_json()
 
-            # Add metadata
-            metrics = self.get_circuit_metrics()
-            self.logger.info(f"Metrics: {metrics}")
-
-            # altdss_json["metadata"] = {
-            #     "circuit_name": self._circuit_name,
-            #     "pylovo_version": "usa-altdss",
-            #     "backend": "altdss",
-            #     "validation": {
-            #         "converged": metrics.get("converged", False),
-            #         "total_power_kw": metrics.get("total_power_kw", 0),
-            #         "total_losses_kw": metrics.get("total_losses_kw", 0),
-            #         "min_voltage_pu": metrics.get("min_voltage_pu"),
-            #         "max_voltage_pu": metrics.get("max_voltage_pu"),
-            #         "avg_voltage_pu": metrics.get("avg_voltage_pu")
-            #     },
-            #     "components": {
-            #         "num_buses": metrics.get("num_buses", 0),
-            #         "num_elements": metrics.get("num_elements", 0)
-            #     }
-            # }
-
             self.logger.info(f"✓ Exported circuit to JSON format")
-            self.logger.debug(f"Export size: {len(json_str)} characters")
-
             return json_str
 
         except Exception as e:
@@ -267,7 +251,8 @@ class AltDSSBackend(IElectricalBackend):
             except Exception as e:
                 self.logger.warning(
                     f"Error resetting component factory: {
-                        str(e)}")
+                        str(e)}"
+                )
             finally:
                 self.component_factory = None
 
@@ -299,7 +284,7 @@ class AltDSSBackend(IElectricalBackend):
                 "total_power_kw": total_power.real if total_power else 0,
                 "total_losses_kw": total_losses.real if total_losses else 0,
                 "num_buses": self.dss.NumBuses,
-                "num_elements": self.dss.NumCircuitElements
+                "num_elements": self.dss.NumCircuitElements,
             }
 
             # Get voltage statistics
@@ -307,19 +292,24 @@ class AltDSSBackend(IElectricalBackend):
             if bus_voltages is not None and len(bus_voltages) > 0:
                 metrics["min_voltage_pu"] = min(bus_voltages)
                 metrics["max_voltage_pu"] = max(bus_voltages)
-                metrics["avg_voltage_pu"] = sum(
-                    bus_voltages) / len(bus_voltages)
+                metrics["avg_voltage_pu"] = sum(bus_voltages) / len(bus_voltages)
 
                 # Log voltage validation info
-                min_v, max_v, avg_v = metrics["min_voltage_pu"], metrics["max_voltage_pu"], metrics["avg_voltage_pu"]
+                min_v, max_v, avg_v = (
+                    metrics["min_voltage_pu"],
+                    metrics["max_voltage_pu"],
+                    metrics["avg_voltage_pu"],
+                )
                 self.logger.info(
-                    f"Voltage range: {min_v:.3f} - {max_v:.3f} pu (avg: {avg_v:.3f})")
+                    f"Voltage range: {min_v:.3f} - {max_v:.3f} pu (avg: {avg_v:.3f})"
+                )
 
                 if min_v < 0.95 or max_v > 1.05:
                     self.logger.warning(
                         f"Voltage violations detected: min={
                             min_v:.3f}pu, max={
-                            max_v:.3f}pu")
+                            max_v:.3f}pu"
+                    )
 
             return metrics
 
@@ -327,8 +317,7 @@ class AltDSSBackend(IElectricalBackend):
             self.logger.warning(f"Error getting circuit metrics: {str(e)}")
             return {}
 
-    def create_source_bus(self, name: str,
-                          coordinates: Optional[tuple] = None) -> str:
+    def create_source_bus(self, name: str, coordinates: Optional[tuple] = None) -> str:
         """
         Create source bus for external grid connection.
 
@@ -344,34 +333,189 @@ class AltDSSBackend(IElectricalBackend):
             self._pending_coordinates[name] = coordinates
         return name
 
-    def create_external_grid(self, source_bus: str, **kwargs) -> Any:
+    def quick_postsolve_sanity(self, lv_prefix: str = "lv_bus_") -> dict:
         """
-        Create external grid connection at source bus.
-
-        Args:
-            source_bus: Name of the source bus
-            **kwargs: AltDSS-specific parameters
-
-        Returns:
-            AltDSS external grid object
+        Run after CalcVoltageBases + successful solve.
+        Returns a dict and logs concise warnings.
         """
-        if self.component_factory is None:
-            raise AltDSSBackendError("Backend not initialized")
+        dss = self.dss
+        out = {
+            "isolated_buses": [],
+            "zero_voltage_buses": [],
+            "dangling_lv_buses": [],
+            "missing_tx_bus_refs": [],
+            "pu_outliers": {"under_0p95": [], "over_1p05": []},
+            "source_count": 0,
+        }
 
-        return self.component_factory.create_external_grid(
-            bus=source_bus,
-            voltage_pu=kwargs.get('voltage_pu', 1.0),
-            mva_sc3=kwargs.get('mva_sc3', 1000.0),
-            mva_sc1=kwargs.get('mva_sc1', 900.0),
-            name=kwargs.get('name', f"Source_{source_bus}")
-        )
+        def _allnames(obj):
+            try:
+                # Some wrappers expose AllNames as method, some as property
+                return (
+                    list(obj.AllNames())
+                    if callable(getattr(obj, "AllNames", None))
+                    else list(obj.AllNames or [])
+                )
+            except Exception:
+                return []
 
-    def apply_pending_coordinates(self) -> None:
-        """Apply any pending coordinate assignments to components."""
-        # TODO: Implement coordinate application to AltDSS components
-        # This would set bus coordinates in AltDSS for visualization
-        if self._pending_coordinates:
-            self.logger.debug(
-                f"Applying coordinates to {len(self._pending_coordinates)} buses")
-            # For now, just clear them
-            self._pending_coordinates.clear()
+        def _bus_base(name: str) -> str:
+            return (name or "").split(".")[0].lower()
+
+        try:
+            dss("CalcVoltageBases")
+        except Exception:
+            pass
+
+        # 1) Isolated buses (Text API is robust)
+        try:
+            iso_txt = dss("? Buslists.Isolated") or ""
+            out["isolated_buses"] = [
+                b.strip() for b in iso_txt.replace(",", " ").split() if b.strip()
+            ]
+        except Exception:
+            pass
+
+        # Gather bus list once
+        try:
+            bus_names = list(dss.BusNames())
+        except Exception:
+            bus_names = []
+        bus_name_set = set(bus_names)
+
+        # 2) Zero-voltage buses
+        zero = []
+        try:
+            for i, name in enumerate(bus_names):
+                try:
+                    bus = dss.Bus[i]
+                    mags = getattr(bus, "VMagAngle", []) or []
+                    mags = mags[::2]  # take magnitudes only
+                    if (not mags) or all(abs(m) < 1e-6 for m in mags):
+                        zero.append(name)
+                except Exception:
+                    continue
+            out["zero_voltage_buses"] = zero
+        except Exception:
+            pass
+
+        # 3) Dangling LV buses: consider Lines, Loads, and Transformers
+        try:
+            lv_buses = [b for b in bus_names if b.lower().startswith(lv_prefix)]
+            refs = set()
+
+            # Lines
+            try:
+                for ln in _allnames(dss.Line):
+                    try:
+                        dss.Line.Name = ln
+                        for b in [dss.Line.Bus1 or "", dss.Line.Bus2 or ""]:
+                            refs.add(_bus_base(b))
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+
+            # Loads
+            try:
+                for ld in _allnames(dss.Load):
+                    try:
+                        dss.Load.Name = ld
+                        refs.add(_bus_base(dss.Load.Bus1 or ""))
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+
+            # Transformers (this was missing before)
+            try:
+                for tx in _allnames(dss.Transformer):
+                    try:
+                        dss.Transformer.Name = tx
+                        for b in list(getattr(dss.Transformer, "Buses", [])) or []:
+                            refs.add(_bus_base(b))
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+
+            out["dangling_lv_buses"] = [b for b in lv_buses if b.lower() not in refs]
+        except Exception:
+            pass
+
+        # 4) Transformer bus references that don’t exist in circuit
+        try:
+            missing = []
+            for tx in _allnames(dss.Transformer):
+                dss.Transformer.Name = tx
+                for b in list(getattr(dss.Transformer, "Buses", [])) or []:
+                    base = b.split(".")[0]
+                    if base and base not in bus_name_set:
+                        missing.append((tx, b))
+            out["missing_tx_bus_refs"] = missing
+        except Exception:
+            pass
+
+        # 5) PU voltage outliers
+        try:
+            under, over = [], []
+            for i, name in enumerate(bus_names):
+                bus = dss.Bus[i]
+                kvbase = getattr(bus, "kVBase", 0.0)
+                mags = getattr(bus, "VMagAngle", [])[::2] or []
+                if kvbase and mags:
+                    pu = [m / (kvbase * 1000.0) for m in mags]
+                    mmin, mmax = min(pu), max(pu)
+                    if mmin < 0.95:
+                        under.append((name, round(mmin, 3)))
+                    if mmax > 1.05:
+                        over.append((name, round(mmax, 3)))
+            out["pu_outliers"]["under_0p95"] = under[:50]
+            out["pu_outliers"]["over_1p05"] = over[:50]
+        except Exception:
+            pass
+
+        # 6) Source count — iterate First/Next (works across wrappers)
+        try:
+            nsrc = 0
+            i = getattr(dss.Vsource, "First", 0)
+            i = i() if callable(i) else i
+            while i > 0:
+                nsrc += 1
+                nxt = getattr(dss.Vsource, "Next", 0)
+                i = nxt() if callable(nxt) else nxt
+            out["source_count"] = nsrc
+        except Exception:
+            # Fall back to AllNames if First/Next not available
+            out["source_count"] = len(_allnames(dss.Vsource))
+
+        # ---- Logging summary
+        log = getattr(self, "logger", None)
+        if log:
+            if out["isolated_buses"]:
+                log.warning(
+                    f"Isolated buses: {len(out['isolated_buses'])} (e.g., {out['isolated_buses'][:5]})"
+                )
+            if out["zero_voltage_buses"]:
+                log.warning(
+                    f"Zero-voltage buses: {len(out['zero_voltage_buses'])} (e.g., {out['zero_voltage_buses'][:5]})"
+                )
+            if out["dangling_lv_buses"]:
+                log.warning(
+                    f"Dangling LV buses: {len(out['dangling_lv_buses'])} (e.g., {out['dangling_lv_buses'][:5]})"
+                )
+            if out["missing_tx_bus_refs"]:
+                log.error(
+                    f"Transformers with missing bus refs: {len(out['missing_tx_bus_refs'])} "
+                    f"(e.g., {out['missing_tx_bus_refs'][:3]})"
+                )
+            u, o = out["pu_outliers"]["under_0p95"], out["pu_outliers"]["over_1p05"]
+            if u or o:
+                log.warning(
+                    f"Voltage PU outliers — under: {
+                        len(u)}, over: {
+                        len(o)}"
+                )
+            log.info(f"Source count: {out['source_count']}")
+
+        return out

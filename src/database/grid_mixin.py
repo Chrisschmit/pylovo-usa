@@ -1,6 +1,6 @@
 import warnings
 from abc import ABC
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import pandapower as pp
 from shapely.geometry import LineString
@@ -224,6 +224,56 @@ class GridMixin(BaseMixin, ABC):
         way_list = [t[0] for t in data]
 
         return way_list
+
+    def get_path_to_bus_with_length(
+        self,
+        load_vertex: int,
+        substation_vertex_id: int,
+        geom_col: str = "geom",   # set to "geom" if that's your column
+    ) -> Tuple[List[int], float]:
+        """
+        Returns (path_nodes, length_meters) for the shortest path between two vertices.
+        Length is computed on WGS84 geography (meters). Works even if ways_tem is projected.
+        """
+        sql = f"""
+        WITH route AS (
+        SELECT seq, node, edge
+        FROM pgr_dijkstra(
+            'SELECT way_id AS id, source, target, cost, reverse_cost FROM ways_tem',
+            %(start)s, %(goal)s, false
+        )
+        ORDER BY seq
+        ),
+        nodes AS (
+        SELECT array_agg(node ORDER BY seq) AS nodes
+        FROM route
+        ),
+        edges AS (
+        SELECT
+            CASE
+            WHEN r.node = w.source THEN w.{geom_col}
+            ELSE ST_Reverse(w.{geom_col})
+            END AS geom
+        FROM route r
+        JOIN ways_tem w ON w.way_id = r.edge
+        WHERE r.edge <> -1
+        )
+        SELECT
+        (SELECT nodes FROM nodes) AS nodes,
+        COALESCE(
+            (SELECT SUM(ST_Length(ST_Transform(geom, 4326)::geography)) FROM edges),
+            0.0
+        ) AS meters;
+        """
+        self.cur.execute(
+            sql, {
+                "start": load_vertex, "goal": substation_vertex_id})
+        row = self.cur.fetchone()
+        if not row:
+            return [], 0.0
+
+        nodes, meters = row
+        return (nodes or []), float(meters)
 
     def insert_mv_line(self, geom: list, kcid: int, scid: int, line_name: str,
                        equipment_id: str, from_bus: int, to_bus: int, length_km: float) -> None:

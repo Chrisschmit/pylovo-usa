@@ -35,7 +35,6 @@ class TransformerSpec(ComponentSpec):
     """Transformer specification with pre-selected equipment."""
     bus1: str = ""  # Primary side bus
     bus2: str = ""  # Secondary side bus
-    # From equipment_data (already selected!)
     equipment: Optional[TransformerEquipment] = None
     kva: Optional[float] = None  # Override equipment rating if needed
     coordinates: Optional[Tuple[float, float]] = None
@@ -73,15 +72,3 @@ class LoadSpec(ComponentSpec):
 
     def __post_init__(self):
         self.component_type = "load"
-
-
-@dataclass
-class ExternalGridSpec(ComponentSpec):
-    """External grid source specification."""
-    bus: str = ""
-    voltage_pu: float = 1.0
-    mva_sc3: float = 1000.0  # 3-phase short circuit MVA
-    mva_sc1: float = 900.0   # 1-phase short circuit MVA
-
-    def __post_init__(self):
-        self.component_type = "external_grid"
