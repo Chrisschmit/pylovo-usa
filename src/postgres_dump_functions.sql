@@ -1,3 +1,23 @@
+CREATE OR REPLACE FUNCTION setup_connection_infrastructure() RETURNS void AS $$
+BEGIN
+    -- Drop existing indexes to prevent errors on re-run, not strictly necessary
+    -- but good for idempotency.
+    DROP INDEX IF EXISTS ways_tem_geom_idx;
+    DROP INDEX IF EXISTS buildings_tem_center_idx;
+
+    -- Create spatial GiST indexes.
+    -- The planner will use these for ST_DWithin, ST_Intersects, and nearest neighbor (<->) searches.
+    CREATE INDEX ways_tem_geom_idx ON ways_tem USING GIST (geom);
+    CREATE INDEX buildings_tem_center_idx ON buildings_tem USING GIST (center);
+
+    -- Analyze the tables to update statistics for the query planner.
+    ANALYZE ways_tem;
+    ANALYZE buildings_tem;
+
+    RAISE NOTICE 'Infrastructure setup complete: Sequence created and spatial indexes are in place.';
+END;
+$$ LANGUAGE plpgsql;
+
 --
 -- Name: draw_home_connections(); Type: FUNCTION; Schema: public; Owner: postgres
 --
