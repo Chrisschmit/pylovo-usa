@@ -232,7 +232,7 @@ class ClusteringMixin(BaseMixin, ABC):
 
             # Count buildings before clustering
             buildings_in_current_iteration = len(new_localid2vid)
-            self.logger.info(
+            self.logger.debug(
                 f"Iteration {iteration_count}: {buildings_in_current_iteration} buildings")
 
             # Try clustering with current cluster amount
@@ -271,7 +271,7 @@ class ClusteringMixin(BaseMixin, ABC):
             )) if invalid_trans_cluster_dict else 0
             buildings_accounted_for = buildings_in_valid + buildings_in_invalid
 
-            self.logger.info(
+            self.logger.debug(
                 f"Iteration {iteration_count}: "
                 f"Valid clusters={
                     len(valid_cluster_dict)} ({buildings_in_valid} buildings), "
@@ -298,7 +298,7 @@ class ClusteringMixin(BaseMixin, ABC):
                 break
             else:
                 # Process first invalid cluster by increasing cluster amount
-                self.logger.info(
+                self.logger.debug(
                     f"Processing {len(invalid_trans_cluster_dict)} invalid clusters for kcid: {kcid}")
 
                 # Get first invalid cluster for re-clustering

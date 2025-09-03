@@ -3,15 +3,12 @@ This script creates a src database and fills with raw data from referenced files
 Do not use DatabaseConstructor class unless you want to create a new database.
 """
 
-
 from src import utils
 from src.config_loader import CSV_FILE_LIST, LOG_FILE, LOG_LEVEL
 from src.database.database_constructor import DatabaseConstructor
 
 logger = utils.create_logger(
-    name="main_constructor",
-    log_level=LOG_LEVEL,
-    log_file=LOG_FILE
+    name="main_constructor", log_level=LOG_LEVEL, log_file=LOG_FILE
 )
 
 
@@ -37,7 +34,8 @@ def main():
 
     # Add transformer data from geojson to the database
     logger.info(
-        "### QUERY TRANSFORMERS AND INSERT THEM INTO DB (~50 min if processing new trafo data) ###")
+        "### QUERY TRANSFORMERS AND INSERT THEM INTO DB (~50 min if processing new trafo data) ###"
+    )
     sgc.transformers_to_db()
 
     # Create table with data from osm

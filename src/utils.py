@@ -79,7 +79,6 @@ def simultaneousPeakLoad(buildings_df, consumer_cat_df, vertice_ids):
 
     # Calculate total sim load (Kiefer S. 142)
     total_sim_load = sum(category_load_dict.values())
-    print(f"Total sim load: {total_sim_load}")
 
     return total_sim_load
 
