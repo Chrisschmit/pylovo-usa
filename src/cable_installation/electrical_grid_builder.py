@@ -81,6 +81,7 @@ class ElectricalGridBuilder:
             # Phase 1: Build MV substation and feeders
             self.logger.debug(f"Building MV substation network for K{kcid}_S{scid}")
             mv_specs = self._build_mv_substation_network(kcid, scid)
+
             all_component_specs.extend(mv_specs)
 
             # Create MV components and extract MV-only parameters
@@ -95,6 +96,7 @@ class ElectricalGridBuilder:
             # Phase 2: Build all LV networks under this MV substation
             self.logger.debug(f"Building LV networks for K{kcid}_S{scid}")
             lv_specs = self._build_lv_networks_top_down(kcid, scid)
+
             all_component_specs.extend(lv_specs)
 
             # Create remaining LV components in the backend
@@ -211,7 +213,6 @@ class ElectricalGridBuilder:
             mv_main_bus=mv_main_bus,
             lv_transformers=lv_transformers,
             mv_buildings=mv_buildings,
-            equipment_lookup=self.database.get_equipment_by_id,
             substation_vertex_id=substation_data.get("substation_vertice_id"),
         )
 
@@ -305,7 +306,6 @@ class ElectricalGridBuilder:
                 buildings_df=buildings_df,
                 consumer_df=consumer_df,
                 connection_nodes=connection_nodes,
-                equipment_lookup=self.database.get_equipment_by_id,
             )
 
             component_specs.extend(lv_network_specs)

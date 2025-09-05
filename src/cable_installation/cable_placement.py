@@ -22,7 +22,8 @@ from ..electrical_backend.component_specs import (
     LineSpec,
     LoadSpec,
 )
-from .cable_selection import VoltageAwareCableSelector
+from .cable_selection import CableSelector
+from ..equipment_schema import CableEquipment
 
 
 class CablePlacementAlgorithm:
@@ -46,9 +47,7 @@ class CablePlacementAlgorithm:
 
         # Initialize voltage-aware cable selector if database is available
         if database:
-            self.cable_selector = VoltageAwareCableSelector(
-                database, logger=self.logger
-            )
+            self.cable_selector = CableSelector(database, logger=self.logger)
             self.use_voltage_aware_selection = True
         else:
             self.cable_selector = None
@@ -57,41 +56,53 @@ class CablePlacementAlgorithm:
                 "No database provided - falling back to static cable selection"
             )
 
-    def _generate_line_coordinates(
-        self, from_vertex: int, to_vertex: int
-    ) -> Optional[List[Tuple[float, float]]]:
+    def route_or_fallback(
+        self, a: int, b: int, stub_m: float = 5.0
+    ) -> List[Tuple[float, float]]:
         """
-        Generate coordinate list for a line between two vertices using database routing.
+        Return a polyline between vertices a and b with robust fallbacks.
 
-        Args:
-            from_vertex: Source vertex ID
-            to_vertex: Destination vertex ID
-
-        Returns:
-            List of (x, y) coordinate tuples or None if database unavailable
+        Order of attempts:
+        1) Routed path via DB, converted to coordinates (if len>=2)
+        2) Straight segment between endpoints if both coords exist and a!=b
+        3) Short stub from whichever endpoint exists (or origin as last resort)
+        Always returns at least 2 points.
         """
-        if not self.database:
-            return None
+        # 1) Try routed polyline
+        nodes = None
+        if self.database and a != b:
+            try:
+                nodes = self.database.get_path_to_bus(a, b)
+            except Exception:
+                nodes = None
 
-        try:
-            # Get shortest path between vertices
-            path_nodes = self.database.get_path_to_bus(from_vertex, to_vertex)
+        if nodes and len(nodes) >= 2:
+            coords: List[Tuple[float, float]] = []
+            for nid in nodes:
+                c = self.database.get_node_geom(nid)
+                if c:
+                    coords.append((float(c[0]), float(c[1])))
+            if len(coords) >= 2:
+                return coords
 
-            # Convert path nodes to coordinates
-            coordinates = []
-            if path_nodes:
-                for node_id in path_nodes:
-                    coord = self.database.get_node_geom(node_id)
-                    if coord:
-                        coordinates.append((float(coord[0]), float(coord[1])))
+        # 2) Straight segment if both endpoints exist and are distinct
+        a_c = self.database.get_node_geom(a) if self.database else None
+        b_c = self.database.get_node_geom(b) if self.database else None
+        if a_c and b_c and a != b:
+            return [(float(a_c[0]), float(a_c[1])), (float(b_c[0]), float(b_c[1]))]
 
-            return coordinates if len(coordinates) >= 2 else None
+        # 3) Stub from whichever endpoint exists (or both if equal)
+        m_per_deg_lat = 111_320.0
+        dlat = stub_m / m_per_deg_lat
+        if a_c:
+            lon, lat = float(a_c[0]), float(a_c[1])
+            return [(lon, lat), (lon, lat + dlat)]
+        if b_c:
+            lon, lat = float(b_c[0]), float(b_c[1])
+            return [(lon, lat), (lon, lat + dlat)]
 
-        except Exception as e:
-            self.logger.debug(
-                f"Failed to generate coordinates for line {from_vertex}->{to_vertex}: {e}"
-            )
-            return None
+        # Last resort: origin stub
+        return [(0.0, 0.0), (0.0, dlat)]
 
     def create_lv_network_components(
         self,
@@ -102,7 +113,6 @@ class CablePlacementAlgorithm:
         buildings_df: pd.DataFrame,
         consumer_df: pd.DataFrame,
         connection_nodes: List[int],
-        equipment_lookup: callable,
     ) -> List[ComponentSpec]:
         """
         Create component specifications for LV network using branch-by-branch algorithm.
@@ -117,7 +127,6 @@ class CablePlacementAlgorithm:
             buildings_df: DataFrame with building information
             consumer_df: DataFrame with consumer categories
             connection_nodes: List of connection point vertices (excluding buildings)
-            equipment_lookup: Function to get cable equipment by name
 
         Returns:
             List of ComponentSpec objects for buses, lines, and loads
@@ -176,7 +185,6 @@ class CablePlacementAlgorithm:
             vertices_dict=vertices_dict,
             Pd=Pd,
             buildings_df=buildings_df,
-            equipment_lookup=equipment_lookup,
         )
         component_specs.extend(consumer_specs)
 
@@ -196,7 +204,6 @@ class CablePlacementAlgorithm:
                     vertices_dict,
                     buildings_df,
                     consumer_df,
-                    equipment_lookup,
                 )
                 component_specs.extend(line_specs)
                 self._update_cable_usage(local_cable_usage, cable_usage)
@@ -220,7 +227,6 @@ class CablePlacementAlgorithm:
                 vertices_dict,
                 Pd,
                 max_current,
-                equipment_lookup,
                 branch_counter,
             )
 
@@ -249,7 +255,6 @@ class CablePlacementAlgorithm:
         mv_main_bus: str,
         lv_transformers: List[dict],
         mv_buildings: List[dict],
-        equipment_lookup: callable,
         substation_vertex_id: Optional[int] = None,
     ) -> List[ComponentSpec]:
         """
@@ -263,7 +268,6 @@ class CablePlacementAlgorithm:
             mv_main_bus: Name of the MV main bus (12.47kV)
             lv_transformers: List of distribution transformers with capacity and location
             mv_buildings: List of direct MV connections with load and location
-            equipment_lookup: Function to get cable equipment by name
 
         Returns:
             List of ComponentSpec objects for MV buses, lines, and loads
@@ -348,7 +352,6 @@ class CablePlacementAlgorithm:
             mv_load_points,
             mv_main_bus,
             cluster_id,
-            equipment_lookup,
             substation_vertex_id,
         )
 
@@ -360,7 +363,6 @@ class CablePlacementAlgorithm:
             mv_building_specs = self._install_mv_consumer_cables(
                 cluster_id=cluster_id,
                 mv_buildings=mv_buildings,
-                equipment_lookup=equipment_lookup,
             )
             component_specs.extend(mv_building_specs)
 
@@ -378,7 +380,6 @@ class CablePlacementAlgorithm:
         mv_load_points: List[dict],
         mv_main_bus: str,
         cluster_id: str,
-        equipment_lookup: callable,
         substation_vertex_id: Optional[int] = None,
     ) -> List[ComponentSpec]:
         """
@@ -391,7 +392,6 @@ class CablePlacementAlgorithm:
             mv_load_points: List of MV load points (transformers + buildings)
             mv_main_bus: MV main bus name
             cluster_id: Network identifier
-            equipment_lookup: Equipment lookup function
             substation_vertex_id: Substation location for routing
 
         Returns:
@@ -429,7 +429,6 @@ class CablePlacementAlgorithm:
                     cluster_id,
                     substation_vertex_id,
                     mv_vertices_dict,
-                    equipment_lookup,
                 )
                 line_specs.extend(final_specs)
                 self._update_cable_usage(local_cable_usage, cable_usage)
@@ -443,7 +442,7 @@ class CablePlacementAlgorithm:
             # Step 4: Determine maximum MV branch (limited by MV cable
             # capacity)
             branch_load_points, max_current = self._determine_maximum_mv_branch(
-                furthest_path, equipment_lookup
+                furthest_path
             )
 
             # Step 5: Install MV branch trunk + connections
@@ -454,7 +453,6 @@ class CablePlacementAlgorithm:
                 substation_vertex_id,
                 mv_vertices_dict,
                 max_current,
-                equipment_lookup,
                 branch_counter,
             )
             line_specs.extend(branch_specs)
@@ -592,7 +590,7 @@ class CablePlacementAlgorithm:
         return [furthest_load_point]
 
     def _determine_maximum_mv_branch(
-        self, furthest_path: List[dict], equipment_lookup: callable
+        self, furthest_path: List[dict]
     ) -> Tuple[List[dict], float]:
         """
         Determine maximum MV branch that can be served by available MV cables.
@@ -603,7 +601,6 @@ class CablePlacementAlgorithm:
 
         Args:
             furthest_path: Path from substation to furthest MV load point
-            equipment_lookup: Function to get cable equipment specs
 
         Returns:
             Tuple of (branch_load_points, max_current)
@@ -611,8 +608,10 @@ class CablePlacementAlgorithm:
         if not furthest_path:
             return [], 0.0
 
-        # Get maximum available MV cable capacity using equipment_lookup
-        mv_max_current_a = self._get_maximum_mv_cable_capacity(equipment_lookup)
+        # Get maximum available MV cable capacity from selector
+        max_cable = self.cable_selector.get_available_cables("MV")[0]
+
+        mv_max_current_a = max_cable.max_i_a
 
         if mv_max_current_a == 0:
             self.logger.error("No MV cables found in equipment database")
@@ -673,122 +672,6 @@ class CablePlacementAlgorithm:
 
         return branch_load_points, max_current
 
-    def _get_maximum_mv_cable_capacity(self, equipment_lookup: callable) -> float:
-        """
-        Get the maximum current capacity of available MV cables using equipment_lookup.
-
-        Args:
-            equipment_lookup: Function to get cable equipment by name
-
-        Returns:
-            Maximum current capacity in Amperes
-        """
-        try:
-            # Get all available MV cable names from database
-            available_mv_cable_names = self._get_available_cables_by_voltage_level("MV")
-
-            max_capacity = 0.0
-            max_cable_name = None
-            cable_capacities = []
-
-            # Check each MV cable's capacity using equipment_lookup
-            for cable_name in available_mv_cable_names:
-                try:
-                    cable_eq = equipment_lookup(cable_name)
-
-                    # Get current capacity (handle both max_i_a and max_i_ka
-                    # attributes)
-                    current_capacity = None
-                    if hasattr(cable_eq, "max_i_a"):
-                        current_capacity = float(cable_eq.max_i_a)
-                    elif hasattr(cable_eq, "max_i_ka"):
-                        current_capacity = (
-                            float(cable_eq.max_i_ka) * 1000
-                        )  # Convert kA to A
-
-                    if current_capacity and current_capacity > max_capacity:
-                        max_capacity = current_capacity
-                        max_cable_name = cable_name
-
-                    if current_capacity:
-                        cable_capacities.append(int(current_capacity))
-
-                except (AttributeError, TypeError, KeyError, ValueError) as e:
-                    self.logger.debug(f"Error checking MV cable {cable_name}: {e}")
-                    continue
-
-            if max_capacity > 0:
-                self.logger.debug(
-                    f"Maximum MV cable capacity: {max_capacity:.0f}A (cable: {max_cable_name})"
-                )
-                self.logger.debug(
-                    f"Available MV cables: {
-                        len(available_mv_cable_names)} cables with capacities: "
-                    f"{sorted(set(cable_capacities))}A"
-                )
-                return max_capacity
-            else:
-                self.logger.warning(
-                    "No MV cables with valid current ratings found, using conservative 200A"
-                )
-                return 200.0
-
-        except Exception as e:
-            self.logger.debug(
-                f"Error getting MV cable capacities: {e}, using conservative 200A"
-            )
-            raise e
-
-    def _coords_or_stub(
-        self, a: int, b: int, stub_m: float = 5.0
-    ) -> List[Tuple[float, float]]:
-        """
-        Try routed polyline a->b. If routing fails:
-        - if both endpoints have coords and a!=b: straight segment
-        - else: synthesize a small stub (≈stub_m) from whichever endpoint exists
-        Always returns at least 2 points.
-        """
-        # 1) Try routed psath
-        nodes = None
-        if self.database:
-            try:
-                if a != b:
-                    nodes = self.database.get_path_to_bus(a, b)
-            except Exception:
-                nodes = None
-
-        if nodes and len(nodes) >= 2:
-            coords: List[Tuple[float, float]] = []
-            for nid in nodes:
-                c = self.database.get_node_geom(nid)  # (lon, lat) EPSG:4326
-                if c:
-                    coords.append((float(c[0]), float(c[1])))
-            if len(coords) >= 2:
-                return coords
-
-        # 2) Straight segment fallback if both endpoints exist and are distinct
-        a_c = self.database.get_node_geom(a) if self.database else None
-        b_c = self.database.get_node_geom(b) if self.database else None
-
-        if a_c and b_c and a != b:
-            a_xy = (float(a_c[0]), float(a_c[1]))
-            b_xy = (float(b_c[0]), float(b_c[1]))
-            return [a_xy, b_xy]
-
-        # 3) Synthesize a stub from whichever endpoint exists (or both if equal)
-        # Convert stub_m meters to ~degrees latitude (simple, OK for small
-        # offsets)
-        m_per_deg_lat = 111_320.0
-        dlat = stub_m / m_per_deg_lat
-        if a_c:
-            lon, lat = float(a_c[0]), float(a_c[1])
-            return [(lon, lat), (lon, lat + dlat)]
-        if b_c:
-            lon, lat = float(b_c[0]), float(b_c[1])
-            return [(lon, lat), (lon, lat + dlat)]
-        # Last resort: origin stub (shouldn't happen if DB is wired)
-        return [(0.0, 0.0), (0.0, dlat)]
-
     def _install_mv_branch_trunk(
         self,
         branch_load_points: List[dict],
@@ -797,7 +680,6 @@ class CablePlacementAlgorithm:
         substation_vertex_id: int,
         mv_vertices_dict: Dict[int, float],
         max_current: float,
-        equipment_lookup: callable,
         branch_id: int,
     ) -> Tuple[List[ComponentSpec], Dict[str, float]]:
         line_specs: List[ComponentSpec] = []
@@ -808,11 +690,10 @@ class CablePlacementAlgorithm:
             return line_specs, cable_usage
 
         # Trunk cable selection (unchanged logic)
-        trunk_cable_name, trunk_parallel = self.find_optimal_mv_cable(
+        trunk_eq, trunk_parallel = self.find_optimal_mv_cable(
             required_current_a=max_current,
             distance_km=max(mv_vertices_dict.values()) / 1000.0,
         )
-        trunk_eq = equipment_lookup(trunk_cable_name)
 
         # Order by distance from substation
         pts = sorted(
@@ -833,12 +714,12 @@ class CablePlacementAlgorithm:
                     bus2=f"mv_node_{first['connection_point']}_{cluster_id}",
                     length_km=max(d_first_km, 1e-6),
                     parallel=trunk_parallel,
-                    coordinates=self._coords_or_stub(substation_vertex_id, v_first),
+                    coordinates=self.route_or_fallback(substation_vertex_id, v_first),
                 )
             )
-            cable_usage[trunk_cable_name] = cable_usage.get(
-                trunk_cable_name, 0.0
-            ) + max(d_first_km, 1e-6)
+            cable_usage[trunk_eq.name] = cable_usage.get(trunk_eq.name, 0.0) + max(
+                d_first_km, 1e-6
+            )
 
         # ---- Trunk between consecutive nodes ----
         for i in range(1, len(pts)):
@@ -861,12 +742,10 @@ class CablePlacementAlgorithm:
                     bus2=f"mv_node_{curr['connection_point']}_{cluster_id}",
                     length_km=seg_km,
                     parallel=trunk_parallel,
-                    coordinates=self._coords_or_stub(v_prev, v_curr),
+                    coordinates=self.route_or_fallback(v_prev, v_curr),
                 )
             )
-            cable_usage[trunk_cable_name] = (
-                cable_usage.get(trunk_cable_name, 0.0) + seg_km
-            )
+            cable_usage[trunk_eq.name] = cable_usage.get(trunk_eq.name, 0.0) + seg_km
 
         # ---- Transformer service drops (fixed 5 m) ----
         for lp in pts:
@@ -877,8 +756,8 @@ class CablePlacementAlgorithm:
             load_kw = float(lp.get("load_kw", 400))
             service_current_a = (load_kw * 1000.0) / (np.sqrt(3) * 12470 * POWER_FACTOR)
 
-            svc_name, svc_eq = self._select_smallest_mv_cable(
-                required_current_a=service_current_a, equipment_lookup=equipment_lookup
+            svc_eq, svc_eq = self._select_smallest_mv_cable(
+                required_current_a=service_current_a
             )
 
             # trunk node vertex
@@ -886,7 +765,7 @@ class CablePlacementAlgorithm:
             trafo_vid = int(
                 lp.get("vertex_id", lp["connection_point"])
             )  # transformer vertex
-            svc_coords = self._coords_or_stub(
+            svc_coords = self.route_or_fallback(
                 conn_vid, trafo_vid, stub_m=5.0
             )  # <-- always yields 2 points
 
@@ -908,7 +787,7 @@ class CablePlacementAlgorithm:
             "MV branch %s: %d lines, trunk %s, total %.3f km",
             branch_id,
             len(line_specs),
-            trunk_cable_name,
+            trunk_eq.name,
             sum(cable_usage.values()),
         )
         return line_specs, cable_usage
@@ -920,7 +799,6 @@ class CablePlacementAlgorithm:
         cluster_id: str,
         substation_vertex_id: int,
         mv_vertices_dict: Dict[int, float],
-        equipment_lookup: callable,
     ) -> Tuple[List[ComponentSpec], Dict[str, float]]:
         """
         Install cables for the final remaining MV load point.
@@ -934,7 +812,6 @@ class CablePlacementAlgorithm:
             cluster_id: Cluster identifier for naming
             substation_vertex_id: Vertex ID of substation connection
             mv_vertices_dict: Distance mapping from substation
-            equipment_lookup: Function to get equipment specifications
 
         Returns:
             Tuple of (line_specs, cable_usage)
@@ -954,16 +831,13 @@ class CablePlacementAlgorithm:
         distance_km = mv_vertices_dict.get(vertex_id) / 1000.0
 
         # Select appropriate MV cable for this load
-        cable_name, parallel_count = self.find_optimal_mv_cable(
+        cable_eq, parallel_count = self.find_optimal_mv_cable(
             required_current_a=required_current_a, distance_km=distance_km
         )
-
-        cable_equipment = equipment_lookup(cable_name)
+        cable_equipment = cable_eq
 
         # Create direct connection from substation to final load point
-        coordinates = self._generate_line_coordinates(
-            substation_vertex_id, connection_point
-        )
+        coordinates = self.route_or_fallback(substation_vertex_id, connection_point)
 
         final_line_spec = LineSpec(
             name=f"MV_Final_{connection_point}_{cluster_id}",
@@ -977,7 +851,9 @@ class CablePlacementAlgorithm:
         line_specs.append(final_line_spec)
 
         # Track cable usage
-        cable_usage[cable_name] = cable_usage.get(cable_name, 0) + distance_km
+        cable_usage[cable_equipment.name] = (
+            cable_usage.get(cable_equipment.name, 0) + distance_km
+        )
 
         # Handle the actual load connection (transformer or MV building)
         if load_type == "transformer":
@@ -996,15 +872,12 @@ class CablePlacementAlgorithm:
 
             # Select appropriate service cable
             service_cable_name, service_cable_equipment = (
-                self._select_smallest_mv_cable(
-                    required_current_a=service_current_a,
-                    equipment_lookup=equipment_lookup,
-                )
+                self._select_smallest_mv_cable(required_current_a=service_current_a)
             )
 
             # Generate coordinates for transformer service
             transformer_vertex_id = final_load_point.get("vertex_id", connection_point)
-            coordinates = self._generate_line_coordinates(
+            coordinates = self.route_or_fallback(
                 connection_point, transformer_vertex_id
             )
 
@@ -1034,14 +907,14 @@ class CablePlacementAlgorithm:
             f"Final MV load point installed: {
                 load_kw:.0f}kW, {
                 required_current_a:.1f}A, "
-            f"cable: {cable_name}, distance: {distance_km:.3f}km"
+            f"cable: {cable_equipment.name}, distance: {distance_km:.3f}km"
         )
 
         return line_specs, cable_usage
 
     def _select_smallest_mv_cable(
-        self, required_current_a: float, equipment_lookup: callable
-    ) -> Tuple[str, object]:
+        self, required_current_a: float
+    ) -> Tuple[CableEquipment, int]:
         """
         Select the smallest available MV cable that can handle the required current.
 
@@ -1050,28 +923,20 @@ class CablePlacementAlgorithm:
 
         Args:
             required_current_a: Required current capacity in Amperes
-            equipment_lookup: Function to get equipment specifications
 
         Returns:
             Tuple of (cable_name, cable_equipment)
         """
         # Use the standard MV cable selection which already handles fallbacks
-        cable_name, parallel_count = self.find_optimal_mv_cable(
+        cable_equipment, parallel_count = self.find_optimal_mv_cable(
             required_current_a=required_current_a,
             distance_km=0.005,  # Short service connection
         )
 
-        if cable_name:
-            return cable_name, equipment_lookup(cable_name)
+        if cable_equipment:
+            return cable_equipment, parallel_count
 
-        # If the MV cable selection fails, this indicates a configuration issue
-        # since find_optimal_mv_cable should have robust fallbacks
-        self.logger.error(
-            f"MV cable selection failed for {required_current_a}A service connection"
-        )
-        raise ValueError(
-            f"No suitable MV cable available from equipment_data table for {required_current_a}A current requirement"
-        )
+        return None, 0
 
     def _get_consumer_simultaneous_load_dict(
         self,
@@ -1144,7 +1009,6 @@ class CablePlacementAlgorithm:
         vertices_dict: Dict[int, float],
         buildings_df: pd.DataFrame,
         consumer_df: pd.DataFrame,
-        equipment_lookup: callable,
     ) -> Tuple[List[ComponentSpec], Dict[str, float]]:
         """Install cables for the final remaining node."""
         # Load and current
@@ -1152,10 +1016,7 @@ class CablePlacementAlgorithm:
         max_current = sim_load / (VN * V_BAND_LOW * np.sqrt(3))
 
         # Cable selection
-        cable_name, parallel_count = self._find_minimal_cable(
-            max_current, equipment_lookup
-        )
-        cable_equipment = equipment_lookup(cable_name)
+        cable_equipment, parallel_count = self._find_minimal_cable(max_current)
 
         # Length (km)
         if final_node == transformer_vertex:
@@ -1168,7 +1029,7 @@ class CablePlacementAlgorithm:
             distance_km = max(distance_km, 0.001)  # avoid exact zero
 
         # Geometry: GUARANTEED coordinates (routed, straight, or 5 m stub)
-        coordinates = self._coords_or_stub(final_node, transformer_vertex, stub_m=5.0)
+        coordinates = self.route_or_fallback(final_node, transformer_vertex, stub_m=5.0)
 
         # Line spec
         line_spec = LineSpec(
@@ -1181,7 +1042,7 @@ class CablePlacementAlgorithm:
             coordinates=coordinates,
         )
 
-        return [line_spec], {cable_name: distance_km}
+        return [line_spec], {cable_equipment.name: distance_km}
 
     def _install_branch_cables(
         self,
@@ -1192,7 +1053,6 @@ class CablePlacementAlgorithm:
         vertices_dict: Dict[int, float],
         load_dict: Dict[int, float],
         max_current: float,
-        equipment_lookup: callable,
         branch_id: int,
     ) -> Tuple[List[ComponentSpec], Dict[str, float]]:
         """Install cables for a branch of nodes."""
@@ -1200,10 +1060,8 @@ class CablePlacementAlgorithm:
         cable_usage = {}
 
         # Select cable for main branch
-        cable_name, parallel_count = self._find_minimal_cable(
-            max_current, equipment_lookup
-        )
-        cable_equipment = equipment_lookup(cable_name)
+        cable_eq, parallel_count = self._find_minimal_cable(max_current)
+        cable_equipment = cable_eq
 
         # Connect branch nodes in sequence
         for i, node in enumerate(branch_nodes[:-1]):
@@ -1212,7 +1070,7 @@ class CablePlacementAlgorithm:
             distance = self._calculate_node_distance(node, next_node, vertices_dict)
 
             # Generate coordinates for the line segment
-            coordinates = self._generate_line_coordinates(node, next_node)
+            coordinates = self.route_or_fallback(node, next_node)
 
             line_spec = LineSpec(
                 name=f"Line_Branch{branch_id}_Seg{i}_{cluster_id}",
@@ -1225,7 +1083,9 @@ class CablePlacementAlgorithm:
             )
             line_specs.append(line_spec)
 
-            cable_usage[cable_name] = cable_usage.get(cable_name, 0) + distance
+            cable_usage[cable_equipment.name] = (
+                cable_usage.get(cable_equipment.name, 0) + distance
+            )
 
         # Connect branch start to LV bus
         if branch_nodes:
@@ -1239,9 +1099,7 @@ class CablePlacementAlgorithm:
                 )
 
             # Generate coordinates for the line
-            coordinates = self._generate_line_coordinates(
-                start_node, transformer_vertex
-            )
+            coordinates = self.route_or_fallback(start_node, transformer_vertex)
 
             line_spec = LineSpec(
                 name=f"Line_Branch{branch_id}_Main_{cluster_id}",
@@ -1253,67 +1111,32 @@ class CablePlacementAlgorithm:
                 coordinates=coordinates,
             )
             line_specs.append(line_spec)
-            cable_usage[cable_name] = cable_usage.get(cable_name, 0) + distance
+            cable_usage[cable_equipment.name] = (
+                cable_usage.get(cable_equipment.name, 0) + distance
+            )
 
         return line_specs, cable_usage
 
     def _find_minimal_cable(
-        self, max_current: float, equipment_lookup: callable, distance_km: float = 0
-    ) -> Tuple[str, int]:
+        self, max_current: float, distance_km: float = 0
+    ) -> Tuple[object, int]:
         """Find the minimum cable that can handle the given current using voltage-aware selection."""
 
-        if self.use_voltage_aware_selection and self.cable_selector:
-            # Use enhanced voltage-aware cable selection
-            cable, parallel_count = self.cable_selector.find_optimal_cable(
-                required_current_a=max_current,
-                voltage_level="LV",  # LV networks in this context
-                distance_km=distance_km,
-                application_area=None,  # Could be enhanced with settlement type detection
-                voltage_drop_limit_pct=4.5,
-                base_voltage_v=400,
-            )
+        cable, parallel_count = self.cable_selector.find_optimal_cable(
+            required_current_a=max_current,
+            voltage_level="LV",  # LV networks in this context
+            distance_km=distance_km,
+            application_area=None,  # Could be enhanced with settlement type detection
+        )
 
-            if cable:
-                return cable.name, parallel_count
-
-        # Fallback to equipment database query for LV cables
-        available_lv_cables = self._get_available_cables_by_voltage_level("LV")
-        for cable_name in available_lv_cables:
-            try:
-                cable_eq = equipment_lookup(cable_name)
-                # Check current capacity (handle both max_i_a and max_i_ka
-                # attributes like MV method)
-                max_current_a = None
-                if hasattr(cable_eq, "max_i_a"):
-                    max_current_a = cable_eq.max_i_a
-                elif hasattr(cable_eq, "max_i_ka"):
-                    max_current_a = cable_eq.max_i_ka * 1000  # Convert kA to A
-
-                if max_current_a and max_current_a >= max_current:
-                    return cable_name, 1
-            except (AttributeError, TypeError, KeyError, ValueError) as e:
-                self.logger.debug(f"Error checking LV cable {cable_name}: {e}")
-                continue
-
-        # Final fallback - use first available LV cable
-        if available_lv_cables:
-            self.logger.warning(
-                f"Using fallback LV cable: {
-                    available_lv_cables[0]} for {max_current}A requirement"
-            )
-            return available_lv_cables[0], 1
-        else:
-            self.logger.error("No LV cables found in equipment_data table")
-            raise ValueError(
-                "No LV cables available in equipment_data table. Cannot build LV network without LV cables."
-            )
+        return cable, parallel_count
 
     def find_optimal_mv_cable(
         self,
         required_current_a: float,
         distance_km: float = 0,
         application_area: Optional[int] = None,
-    ) -> Tuple[Optional[str], int]:
+    ) -> Tuple[Optional[CableEquipment], int]:
         """
         Find optimal MV cable using voltage-aware selection.
 
@@ -1333,57 +1156,9 @@ class CablePlacementAlgorithm:
             voltage_level="MV",  # MV networks
             distance_km=distance_km,
             application_area=application_area,
-            voltage_drop_limit_pct=2.5,  # Stricter for MV
-            base_voltage_v=12470,  # 12.47kV MV
         )
 
-        return cable.name, parallel_count
-
-    def _get_available_cables_by_voltage_level(self, voltage_level: str) -> List[str]:
-        """
-        Get available cable names from equipment_data table by voltage level.
-
-        Args:
-            voltage_level: 'MV' or 'LV'
-
-        Returns:
-            List of cable names available for the specified voltage level
-        """
-        if not self.database:
-            return []
-
-        try:
-            # Query equipment_data table for cables of specified voltage level
-            query = """
-            SELECT name
-            FROM equipment_data
-            WHERE type = 'Cable'
-            AND voltage_level = %s
-            ORDER BY name
-            """
-
-            self.database.cur.execute(query, (voltage_level,))
-            rows = self.database.cur.fetchall()
-
-            cable_names = [row[0] for row in rows]
-
-            if not cable_names:
-                self.logger.error(
-                    f"No {voltage_level} cables found in equipment_data table"
-                )
-            else:
-                self.logger.debug(
-                    f"Found {
-                        len(cable_names)} {voltage_level} cables in equipment_data"
-                )
-
-            return cable_names
-
-        except Exception as e:
-            self.logger.warning(
-                f"Error querying {voltage_level} cables from equipment_data: {e}"
-            )
-            return []
+        return cable, parallel_count
 
     def _get_node_coordinates(self, node_id: int) -> Optional[Tuple[float, float]]:
         """Get coordinates for a node from database."""
@@ -1408,7 +1183,6 @@ class CablePlacementAlgorithm:
         vertices_dict: Dict,
         Pd: Dict,
         buildings_df: pd.DataFrame,
-        equipment_lookup: callable,
     ) -> List[ComponentSpec]:
         """
         Install cables from connection points to consumer buildings (house connections).
@@ -1423,7 +1197,6 @@ class CablePlacementAlgorithm:
             vertices_dict: Mapping of vertex to distance from transformer
             Pd: Power demand dictionary for each consumer
             buildings_df: Building data
-            equipment_lookup: Function to get cable equipment
 
         Returns:
             List of LineSpec for consumer connections
@@ -1471,19 +1244,15 @@ class CablePlacementAlgorithm:
                 current_a = (sim_load_mw * 1000) / (VN * np.sqrt(3))  # Convert MW to A
 
                 # Select appropriate cable for house connection
-                cable_name, parallel_count = self._find_minimal_cable(
+                cable_eq, parallel_count = self._find_minimal_cable(
                     max_current=current_a,
-                    equipment_lookup=equipment_lookup,
                     distance_km=distance_km,
                 )
 
-                # Get cable equipment
-                cable_equipment = equipment_lookup(cable_name)
+                cable_equipment = cable_eq
 
                 # Generate coordinates for the consumer connection line
-                coordinates = self._generate_line_coordinates(
-                    consumer_vertex, connection_point
-                )
+                coordinates = self.route_or_fallback(consumer_vertex, connection_point)
 
                 # Create line specification from connection point to consumer
                 line_spec = LineSpec(
@@ -1499,13 +1268,13 @@ class CablePlacementAlgorithm:
 
                 self.logger.debug(
                     f"Connected consumer {consumer_vertex} to connection point {connection_point} "
-                    f"with {cable_name} cable ({distance_km:.3f}km)"
+                    f"with {cable_equipment.name} cable ({distance_km:.3f}km)"
                 )
 
         return line_specs
 
     def _install_mv_consumer_cables(
-        self, cluster_id: str, mv_buildings: List[dict], equipment_lookup: callable
+        self, cluster_id: str, mv_buildings: List[dict]
     ) -> List[ComponentSpec]:
         """
         Install MV consumer cables from trunk connection points to MV building buses.
@@ -1587,13 +1356,11 @@ class CablePlacementAlgorithm:
             # MV sizing at 12.47 kV,
             current_a = (peak_kw * 1000.0) / (np.sqrt(3) * 12470 * POWER_FACTOR)
 
-            cable_name, parallel = self.find_optimal_mv_cable(
+            cable_eq, parallel = self.find_optimal_mv_cable(
                 required_current_a=current_a, distance_km=distance_km
             )
-            if not cable_name:
+            if not cable_eq:
                 continue
-
-            cable_eq = equipment_lookup(cable_name)
 
             # Build coordinates from the routed node sequence; if missing, skip
             # coords
@@ -1603,8 +1370,8 @@ class CablePlacementAlgorithm:
                 LineSpec(
                     name=f"MV_Consumer_{osm_id}_{cluster_id}",
                     cable_equipment=cable_eq,
-                    bus1=f"MV_Node_{conn_pt}_{cluster_id}",
-                    bus2=f"MV_Building_{osm_id}_{cluster_id}",
+                    bus1=f"mv_node_{conn_pt}_{cluster_id}",
+                    bus2=f"mv_building_{osm_id}_{cluster_id}",
                     length_km=distance_km,
                     parallel=parallel,
                     coordinates=coordinates,

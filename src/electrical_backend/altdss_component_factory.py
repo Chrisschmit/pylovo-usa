@@ -33,8 +33,7 @@ class AltDSSComponentFactory:
     directly on the provided AltDSS instance using the pythonic interface.
     """
 
-    def __init__(self, dss_instance: Any,
-                 logger: Optional[logging.Logger] = None):
+    def __init__(self, dss_instance: Any, logger: Optional[logging.Logger] = None):
         """
         Initialize the AltDSS component factory with an AltDSS instance.
 
@@ -46,29 +45,30 @@ class AltDSSComponentFactory:
         self.logger = logger or logging.getLogger(__name__)
         # Cache for created line code objects
         self.line_codes: Dict[str, Any] = {}
-        self._buses_created: set = set()  # Track created buses
-        # Store coordinates for later
-        self._pending_coordinates: Dict[str, Tuple[float, float]] = {}
         # Store bus voltage bases for tracking
-        self._bus_voltage_bases: Dict[str, float] = {}
         self._components_created: Dict[str, List[Any]] = {
-            'buses': [],
-            'transformers': [],
-            'lines': [],
-            'loads': [],
-            'sources': [],
-            'linecodes': [],
-            'capacitors': [],
-            'meters': []
+            "buses": [],
+            "transformers": [],
+            "lines": [],
+            "loads": [],
+            "sources": [],
+            "linecodes": [],
+            "capacitors": [],
+            "meters": [],
         }
 
     # ===== COMPONENT CREATION UTILITIES =====
 
     # ===== TRANSFORMER CREATION =====
 
-    def create_transformer_from_equipment(self, name: str, equipment: TransformerEquipment,
-                                          bus1: str, bus2: str,
-                                          conns: List[str]) -> Any:
+    def create_transformer_from_equipment(
+        self,
+        name: str,
+        equipment: TransformerEquipment,
+        bus1: str,
+        bus2: str,
+        conns: List[str],
+    ) -> Any:
         """
         Create a transformer using equipment data.
 
@@ -93,19 +93,21 @@ class AltDSSComponentFactory:
             kVs=[equipment.primary_voltage_kv, equipment.secondary_voltage_kv],
             kVAs=[equipment.s_max_kva, equipment.s_max_kva],
             pctRs=[0.5, 0.5],  # Default resistances
-            XHL=equipment.reactance_pu * 100 if equipment.reactance_pu else 7.0
+            XHL=equipment.reactance_pu * 100 if equipment.reactance_pu else 7.0,
             # Skip no-load losses for now - can be set later if needed
         )
 
-        self._components_created['transformers'].append(transformer)
+        self._components_created["transformers"].append(transformer)
         self.logger.debug(
             f"Created transformer {name}: {
                 equipment.primary_voltage_kv}kV -> {
-                equipment.secondary_voltage_kv}kV, {equipment.s_max_kva}kVA")
+                equipment.secondary_voltage_kv}kV, {equipment.s_max_kva}kVA"
+        )
         return transformer
 
-    def create_mv_lv_transformer(self, name: str, equipment: TransformerEquipment,
-                                 bus1: str, bus2: str) -> Any:
+    def create_mv_lv_transformer(
+        self, name: str, equipment: TransformerEquipment, bus1: str, bus2: str
+    ) -> Any:
         """
         Create an MV-LV transformer (12.47kV -> 0.4kV).
 
@@ -119,12 +121,12 @@ class AltDSSComponentFactory:
             Created transformer object
         """
         return self.create_transformer_from_equipment(
-            name, equipment, bus1, bus2,
-            conns=["delta", "wye"]
+            name, equipment, bus1, bus2, conns=["delta", "wye"]
         )
 
-    def create_substation_transformer(self, name: str, equipment: TransformerEquipment,
-                                      bus1: str, bus2: str) -> Any:
+    def create_substation_transformer(
+        self, name: str, equipment: TransformerEquipment, bus1: str, bus2: str
+    ) -> Any:
         """
         Create a substation transformer (69kV -> 20kV).
 
@@ -138,8 +140,11 @@ class AltDSSComponentFactory:
             Created transformer object
         """
         return self.create_transformer_from_equipment(
-            name, equipment, bus1, bus2,
-            conns=["delta", "wye"]  # Typical for substation
+            name,
+            equipment,
+            bus1,
+            bus2,
+            conns=["delta", "wye"],  # Typical for substation
         )
 
     # ===== LINE/CABLE CREATION =====
@@ -171,17 +176,23 @@ class AltDSSComponentFactory:
             C0=0.5 * cable.capacitance_nf_per_km,
             Units="km",
             NormAmps=cable.max_i_a,
-            EmergAmps=cable.max_i_a * 1.25
+            EmergAmps=cable.max_i_a * 1.25,
         )
 
         self.line_codes[code_name] = line_code
-        self._components_created['linecodes'].append(line_code)
+        self._components_created["linecodes"].append(line_code)
         self.logger.debug(f"Created line code: {code_name}")
         return line_code
 
-    def create_line_from_equipment(self, name: str, cable: CableEquipment,
-                                   bus1: str, bus2: str, length_km: float,
-                                   units: str = "km") -> Any:
+    def create_line_from_equipment(
+        self,
+        name: str,
+        cable: CableEquipment,
+        bus1: str,
+        bus2: str,
+        length_km: float,
+        units: str = "km",
+    ) -> Any:
         """
         Create a line/cable using equipment data.
 
@@ -207,16 +218,21 @@ class AltDSSComponentFactory:
             LineCode=line_code,
             Length=length_km,
             Units=units,
-            Phases=cable.n_phases
+            Phases=cable.n_phases,
         )
 
-        self._components_created['lines'].append(line)
-        self.logger.debug(
-            f"Created line {name}: {bus1} -> {bus2}, {length_km}km")
+        self._components_created["lines"].append(line)
+        self.logger.debug(f"Created line {name}: {bus1} -> {bus2}, {length_km}km")
         return line
 
-    def create_mv_line(self, name: str, cable: CableEquipment,
-                       from_bus: str, to_bus: str, length_km: float) -> Any:
+    def create_mv_line(
+        self,
+        name: str,
+        cable: CableEquipment,
+        from_bus: str,
+        to_bus: str,
+        length_km: float,
+    ) -> Any:
         """
         Create an MV distribution line.
 
@@ -230,16 +246,22 @@ class AltDSSComponentFactory:
         Returns:
             Created line object
         """
-        if cable.voltage_level not in ['MV', 'MV-LV']:
+        if cable.voltage_level not in ["MV", "MV-LV"]:
             self.logger.warning(
                 f"Cable {
-                    cable.name} may not be suitable for MV application")
+                    cable.name} may not be suitable for MV application"
+            )
 
-        return self.create_line_from_equipment(
-            name, cable, from_bus, to_bus, length_km)
+        return self.create_line_from_equipment(name, cable, from_bus, to_bus, length_km)
 
-    def create_lv_line(self, name: str, cable: CableEquipment,
-                       from_bus: str, to_bus: str, length_km: float) -> Any:
+    def create_lv_line(
+        self,
+        name: str,
+        cable: CableEquipment,
+        from_bus: str,
+        to_bus: str,
+        length_km: float,
+    ) -> Any:
         """
         Create an LV distribution line.
 
@@ -253,19 +275,28 @@ class AltDSSComponentFactory:
         Returns:
             Created line object
         """
-        if cable.voltage_level != 'LV':
+        if cable.voltage_level != "LV":
             self.logger.warning(
                 f"Cable {
-                    cable.name} may not be suitable for LV application")
+                    cable.name} may not be suitable for LV application"
+            )
 
-        return self.create_line_from_equipment(
-            name, cable, from_bus, to_bus, length_km)
+        return self.create_line_from_equipment(name, cable, from_bus, to_bus, length_km)
 
     # ===== LOAD CREATION =====
 
-    def create_load(self, name: str, bus: str, kw: float, kvar: float,
-                    kv: float, n_phases: int = 3, conn: str = "wye",
-                    model: int = 1, pf: Optional[float] = None) -> Any:
+    def create_load(
+        self,
+        name: str,
+        bus: str,
+        kw: float,
+        kvar: float,
+        kv: float,
+        n_phases: int = 3,
+        conn: str = "wye",
+        model: int = 1,
+        pf: Optional[float] = None,
+    ) -> Any:
         """
         Create an AltDSS load.
 
@@ -290,7 +321,7 @@ class AltDSSComponentFactory:
             "kV": kv,
             "kW": kw,
             "Conn": conn,
-            "Model": model
+            "Model": model,
         }
 
         if pf is not None:
@@ -301,12 +332,11 @@ class AltDSSComponentFactory:
         # Create load using pythonic interface
         load = self.dss.Load.new(name, **load_params)
 
-        self._components_created['loads'].append(load)
+        self._components_created["loads"].append(load)
         self.logger.debug(f"Created load {name}: {kw}kW at {bus}")
         return load
 
-    def create_mv_load(self, name: str, bus: str, kw: float,
-                       pf: float = 0.9) -> Any:
+    def create_mv_load(self, name: str, bus: str, kw: float, pf: float = 0.9) -> Any:
         """
         Create an MV-connected load (for buildings >100kW).
 
@@ -325,13 +355,15 @@ class AltDSSComponentFactory:
         if abs(pf - 1.0) < 1e-6:  # Essentially unity power factor
             kvar = 0
         else:
-            kvar = kw * ((1 - pf**2)**0.5) / pf
+            kvar = kw * ((1 - pf**2) ** 0.5) / pf
 
-        return self.create_load(name, bus, kw, kvar, kv=20.0, n_phases=3,
-                                conn="delta", model=1)
+        return self.create_load(
+            name, bus, kw, kvar, kv=20.0, n_phases=3, conn="delta", model=1
+        )
 
-    def create_lv_load(self, name: str, bus: str, kw: float,
-                       pf: float = 0.95, n_phases: int = 3) -> Any:
+    def create_lv_load(
+        self, name: str, bus: str, kw: float, pf: float = 0.95, n_phases: int = 3
+    ) -> Any:
         """
         Create an LV-connected load.
 
@@ -351,16 +383,22 @@ class AltDSSComponentFactory:
         if abs(pf - 1.0) < 1e-6:  # Essentially unity power factor
             kvar = 0
         else:
-            kvar = kw * ((1 - pf**2)**0.5) / pf
+            kvar = kw * ((1 - pf**2) ** 0.5) / pf
 
         kv = 0.4 if n_phases == 3 else 0.23  # Line-to-line or line-to-neutral
 
-        return self.create_load(name, bus, kw, kvar, kv=kv, n_phases=n_phases,
-                                conn="wye", model=1)
+        return self.create_load(
+            name, bus, kw, kvar, kv=kv, n_phases=n_phases, conn="wye", model=1
+        )
 
-    def create_building_load(self, building_id: int, bus: str,
-                             peak_load_kw: float, load_type: str = "residential",
-                             voltage_level: str = "LV") -> Any:
+    def create_building_load(
+        self,
+        building_id: int,
+        bus: str,
+        peak_load_kw: float,
+        load_type: str = "residential",
+        voltage_level: str = "LV",
+    ) -> Any:
         """
         Create a load for a building based on its characteristics.
 
@@ -377,11 +415,7 @@ class AltDSSComponentFactory:
         name = f"Load_B{building_id}"
 
         # Set power factor based on load type
-        pf_map = {
-            'residential': 0.95,
-            'commercial': 0.90,
-            'industrial': 0.85
-        }
+        pf_map = {"residential": 0.95, "commercial": 0.90, "industrial": 0.85}
         pf = pf_map.get(load_type, 0.90)
 
         if voltage_level == "MV":
@@ -393,8 +427,9 @@ class AltDSSComponentFactory:
 
     # ===== ADDITIONAL COMPONENTS =====
 
-    def create_capacitor(self, name: str, bus: str, kvar: float,
-                         kv: float, n_phases: int = 3) -> Any:
+    def create_capacitor(
+        self, name: str, bus: str, kvar: float, kv: float, n_phases: int = 3
+    ) -> Any:
         """
         Create a capacitor bank for power factor correction.
 
@@ -409,19 +444,14 @@ class AltDSSComponentFactory:
             Created capacitor object
         """
         capacitor = self.dss.Capacitor.new(
-            name,
-            Bus1=bus,
-            Phases=n_phases,
-            kV=kv,
-            kvar=kvar
+            name, Bus1=bus, Phases=n_phases, kV=kv, kvar=kvar
         )
 
-        self._components_created['capacitors'].append(capacitor)
+        self._components_created["capacitors"].append(capacitor)
         self.logger.debug(f"Created capacitor {name}: {kvar}kvar at {bus}")
         return capacitor
 
-    def create_energy_meter(self, name: str, element: str,
-                            terminal: int = 1) -> Any:
+    def create_energy_meter(self, name: str, element: str, terminal: int = 1) -> Any:
         """
         Create an energy meter for monitoring.
 
@@ -433,13 +463,9 @@ class AltDSSComponentFactory:
         Returns:
             Created meter object
         """
-        meter = self.dss.EnergyMeter.new(
-            name,
-            Element=element,
-            Terminal=terminal
-        )
+        meter = self.dss.EnergyMeter.new(name, Element=element, Terminal=terminal)
 
-        self._components_created['meters'].append(meter)
+        self._components_created["meters"].append(meter)
         self.logger.debug(f"Created energy meter {name} monitoring {element}")
         return meter
 
@@ -459,17 +485,15 @@ class AltDSSComponentFactory:
 
     def reset(self):
         """Reset the factory state for a new circuit."""
-        self._buses_created.clear()
-        self._pending_coordinates.clear()
         self._components_created = {
-            'buses': [],
-            'transformers': [],
-            'lines': [],
-            'loads': [],
-            'sources': [],
-            'linecodes': [],
-            'capacitors': [],
-            'meters': []
+            "buses": [],
+            "transformers": [],
+            "lines": [],
+            "loads": [],
+            "sources": [],
+            "linecodes": [],
+            "capacitors": [],
+            "meters": [],
         }
         self.line_codes.clear()
         self.logger.info("Factory reset for new circuit")

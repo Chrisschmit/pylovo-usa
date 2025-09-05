@@ -20,9 +20,7 @@ class IElectricalBackend(ABC):
     """
 
     @abstractmethod
-    def initialize_circuit(self, name: str,
-                           source_bus: str,
-                           primary_kv: float) -> None:
+    def initialize_circuit(self, name: str, source_bus: str, primary_kv: float) -> None:
         """
         Initialize a new electrical circuit.
 
@@ -33,7 +31,7 @@ class IElectricalBackend(ABC):
         """
 
     @abstractmethod
-    def create_component(self, spec: 'ComponentSpec') -> Any:
+    def create_component(self, spec: "ComponentSpec") -> Any:
         """
         Create electrical component from specification.
 
@@ -73,18 +71,4 @@ class IElectricalBackend(ABC):
 
         Returns:
             Dictionary with circuit performance metrics
-        """
-
-    @abstractmethod
-    def create_source_bus(self, name: str,
-                          coordinates: Optional[tuple] = None) -> str:
-        """
-        Create source bus for external grid connection.
-
-        Args:
-            name: Bus name
-            coordinates: Optional (x, y) coordinates
-
-        Returns:
-            Created bus name
         """

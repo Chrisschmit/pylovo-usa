@@ -12,9 +12,10 @@ import numpy as np
 
 from ..database.database_client import DatabaseClient
 from ..equipment_schema import CableEquipment, create_equipment_from_database_row
+from ..config_loader import BASE_VOLTAGE_V, VOLTAGE_DROP_LIMIT_PCT
 
 
-class VoltageAwareCableSelector:
+class CableSelector:
     """
     Enhanced cable selection that considers voltage levels, settlement types,
     and integrates with equipment_data table instead of static config.
@@ -38,7 +39,10 @@ class VoltageAwareCableSelector:
 
     # Currently default only 3 phase cables are supported
     def get_available_cables(
-        self, voltage_level: str, application_area: Optional[int] = None
+        self,
+        voltage_level: str,
+        application_area: Optional[int] = None,
+        n_phases: int = 3,
     ) -> List[CableEquipment]:
         """
         Get available cables filtered by voltage level and optional settlement type.
@@ -57,15 +61,15 @@ class VoltageAwareCableSelector:
             SELECT * FROM equipment_data
             WHERE type = 'Cable'
               AND voltage_level = %s
-              AND n_phases = 3
+              AND n_phases = %s
             """
-            params = [voltage_level]
+            params = [voltage_level, n_phases]
 
             if application_area is not None:
                 query += " AND (application_area IS NULL OR application_area = %s)"
                 params.append(application_area)
 
-            query += " ORDER BY max_i_a, name"
+            query += " ORDER BY max_i_a DESC, name"
 
             self.database.cur.execute(query, params)
             rows = self.database.cur.fetchall()
@@ -102,8 +106,6 @@ class VoltageAwareCableSelector:
         voltage_level: str,
         distance_km: float = 0,
         application_area: Optional[int] = None,
-        voltage_drop_limit_pct: float = 4.5,
-        base_voltage_v: float = 400,
     ) -> Tuple[Optional[CableEquipment], int]:
         """
         Find optimal cable considering voltage level, current capacity, and voltage drop.
@@ -113,8 +115,6 @@ class VoltageAwareCableSelector:
             voltage_level: 'MV' or 'LV'
             distance_km: Cable length in kilometers (for voltage drop check)
             application_area: Optional settlement type (1=rural, 2=suburban, 3=urban)
-            voltage_drop_limit_pct: Maximum allowed voltage drop percentage
-            base_voltage_v: Base voltage for voltage drop calculation
 
         Returns:
             Tuple of (selected_cable, parallel_count) or (None, 0) if no suitable cable found
@@ -125,14 +125,17 @@ class VoltageAwareCableSelector:
             self.logger.warning(f"No cables available for {voltage_level} level")
             return None, 0
 
-        # Set appropriate base voltage for voltage level
-        if voltage_level == "MV":
-            base_voltage_v = 12470  # 12.47kV for MV
-        elif voltage_level == "LV":
-            base_voltage_v = 416  # 416V for LV
+        # Resolve defaults from configuration if not provided
+        if base_voltage_v is None:
+            base_voltage_v = float(BASE_VOLTAGE_V.get(voltage_level, 416))
+        if voltage_drop_limit_pct is None:
+            voltage_drop_limit_pct = float(
+                VOLTAGE_DROP_LIMIT_PCT.get(voltage_level, 4.5)
+            )
 
-        # Try increasing numbers of parallel cables
-        for parallel_count in range(1, 6):  # Max 5 parallel cables
+        # Try increasing numbers of parallel cables until a suitable cable is found
+        parallel_count = 1
+        while True:
             current_per_cable = required_current_a / parallel_count
 
             # Filter cables by current capacity
@@ -143,6 +146,7 @@ class VoltageAwareCableSelector:
             ]
 
             if not suitable_cables:
+                parallel_count += 1
                 continue
 
             # Apply voltage drop constraint if distance is specified
@@ -174,31 +178,3 @@ class VoltageAwareCableSelector:
                 optimal_cable = min(suitable_cables, key=lambda c: c.max_i_a)
 
                 return optimal_cable, parallel_count
-
-        self.logger.warning(
-            f"No suitable cable found for {voltage_level} level "
-            f"({required_current_a}A, {distance_km}km)"
-        )
-        return None, 0
-
-    def get_cable_cost(
-        self, cable: CableEquipment, length_km: float, parallel_count: int = 1
-    ) -> float:
-        """
-        Calculate total cable cost including parallel installation.
-
-        Note: parallel_count is used for cost calculation but not stored in database.
-
-        Args:
-            cable: Selected cable equipment
-            length_km: Cable length in kilometers
-            parallel_count: Number of parallel cables (for cost calculation only)
-
-        Returns:
-            Total installation cost
-        """
-        if cable.cost is None:
-            self.logger.warning(f"No cost data for cable {cable.name}")
-            return 0.0
-
-        return float(cable.cost) * length_km * parallel_count
