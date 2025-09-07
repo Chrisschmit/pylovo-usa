@@ -37,7 +37,8 @@ class AnalysisMixin(BaseMixin, ABC):
         )
         self.logger.debug("basic parameter count finished")
 
-    def insert_cable_length(self, regional_identifier: int, cable_length_string: str):
+    def insert_cable_length(self, regional_identifier: int,
+                            cable_length_string: str):
         update_query = """UPDATE regional_identifier_parameters
                           SET cable_length = %(c)s
                           WHERE version_id = %(v)s
@@ -119,7 +120,9 @@ class AnalysisMixin(BaseMixin, ABC):
                         FROM regional_identifier_parameters
                         WHERE version_id = %(v)s
                           AND regional_identifier = %(p)s;"""
-        self.cur.execute(read_query, {"v": VERSION_ID, "p": regional_identifier})
+        self.cur.execute(
+            read_query, {
+                "v": VERSION_ID, "p": regional_identifier})
         result = self.cur.fetchall()
 
         # Sort all parameters according to transformer size
@@ -166,7 +169,13 @@ class AnalysisMixin(BaseMixin, ABC):
             ValueError: If the requested grid does not exist in the database
         """
         read_query = "SELECT grid FROM grid_result WHERE version_id = %s AND regional_identifier = %s AND kcid = %s AND bcid = %s LIMIT 1"
-        self.cur.execute(read_query, vars=(VERSION_ID, regional_identifier, kcid, bcid))
+        self.cur.execute(
+            read_query,
+            vars=(
+                VERSION_ID,
+                regional_identifier,
+                kcid,
+                bcid))
 
         result = self.cur.fetchall()
         if not result:
@@ -334,7 +343,9 @@ class AnalysisMixin(BaseMixin, ABC):
                         FROM regional_identifier_parameters
                         WHERE version_id = %(v)s
                           AND regional_identifier = %(p)s;"""
-        self.cur.execute(read_query, {"v": VERSION_ID, "p": regional_identifier})
+        self.cur.execute(
+            read_query, {
+                "v": VERSION_ID, "p": regional_identifier})
         trafo_num_dict = self.cur.fetchall()[0][0]
 
         return trafo_num_dict
@@ -344,7 +355,9 @@ class AnalysisMixin(BaseMixin, ABC):
                         FROM regional_identifier_parameters
                         WHERE version_id = %(v)s
                           AND regional_identifier = %(p)s;"""
-        self.cur.execute(read_query, {"v": VERSION_ID, "p": regional_identifier})
+        self.cur.execute(
+            read_query, {
+                "v": VERSION_ID, "p": regional_identifier})
         cable_length = self.cur.fetchall()[0][0]
 
         return cable_length

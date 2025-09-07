@@ -7,7 +7,7 @@ algorithms from the specific electrical simulation software.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 
 class IElectricalBackend(ABC):
@@ -20,7 +20,8 @@ class IElectricalBackend(ABC):
     """
 
     @abstractmethod
-    def initialize_circuit(self, name: str, source_bus: str, primary_kv: float) -> None:
+    def initialize_circuit(self, name: str, source_bus: str,
+                           primary_kv: float) -> None:
         """
         Initialize a new electrical circuit.
 

@@ -20,7 +20,7 @@ Note:
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from ..equipment_schema import CableEquipment, TransformerEquipment
 
@@ -33,7 +33,8 @@ class AltDSSComponentFactory:
     directly on the provided AltDSS instance using the pythonic interface.
     """
 
-    def __init__(self, dss_instance: Any, logger: Optional[logging.Logger] = None):
+    def __init__(self, dss_instance: Any,
+                 logger: Optional[logging.Logger] = None):
         """
         Initialize the AltDSS component factory with an AltDSS instance.
 
@@ -222,7 +223,8 @@ class AltDSSComponentFactory:
         )
 
         self._components_created["lines"].append(line)
-        self.logger.debug(f"Created line {name}: {bus1} -> {bus2}, {length_km}km")
+        self.logger.debug(
+            f"Created line {name}: {bus1} -> {bus2}, {length_km}km")
         return line
 
     def create_mv_line(
@@ -252,7 +254,8 @@ class AltDSSComponentFactory:
                     cable.name} may not be suitable for MV application"
             )
 
-        return self.create_line_from_equipment(name, cable, from_bus, to_bus, length_km)
+        return self.create_line_from_equipment(
+            name, cable, from_bus, to_bus, length_km)
 
     def create_lv_line(
         self,
@@ -281,7 +284,8 @@ class AltDSSComponentFactory:
                     cable.name} may not be suitable for LV application"
             )
 
-        return self.create_line_from_equipment(name, cable, from_bus, to_bus, length_km)
+        return self.create_line_from_equipment(
+            name, cable, from_bus, to_bus, length_km)
 
     # ===== LOAD CREATION =====
 
@@ -336,7 +340,8 @@ class AltDSSComponentFactory:
         self.logger.debug(f"Created load {name}: {kw}kW at {bus}")
         return load
 
-    def create_mv_load(self, name: str, bus: str, kw: float, pf: float = 0.9) -> Any:
+    def create_mv_load(self, name: str, bus: str, kw: float,
+                       pf: float = 0.9) -> Any:
         """
         Create an MV-connected load (for buildings >100kW).
 
@@ -451,7 +456,8 @@ class AltDSSComponentFactory:
         self.logger.debug(f"Created capacitor {name}: {kvar}kvar at {bus}")
         return capacitor
 
-    def create_energy_meter(self, name: str, element: str, terminal: int = 1) -> Any:
+    def create_energy_meter(self, name: str, element: str,
+                            terminal: int = 1) -> Any:
         """
         Create an energy meter for monitoring.
 
@@ -463,7 +469,8 @@ class AltDSSComponentFactory:
         Returns:
             Created meter object
         """
-        meter = self.dss.EnergyMeter.new(name, Element=element, Terminal=terminal)
+        meter = self.dss.EnergyMeter.new(
+            name, Element=element, Terminal=terminal)
 
         self._components_created["meters"].append(meter)
         self.logger.debug(f"Created energy meter {name} monitoring {element}")

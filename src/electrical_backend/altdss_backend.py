@@ -11,7 +11,8 @@ from typing import Any, Dict, Optional
 
 from .altdss_component_factory import AltDSSComponentFactory
 from .base_backend import IElectricalBackend
-from .component_specs import BusSpec, ComponentSpec, LineSpec, LoadSpec, TransformerSpec
+from .component_specs import (BusSpec, ComponentSpec, LineSpec, LoadSpec,
+                              TransformerSpec)
 
 # Import AltDSS with fallback
 try:
@@ -50,7 +51,8 @@ class AltDSSBackend(IElectricalBackend):
                 "AltDSS not available. Please install altdss package."
             )
 
-    def initialize_circuit(self, name: str, source_bus: str, primary_kv: float) -> None:
+    def initialize_circuit(self, name: str, source_bus: str,
+                           primary_kv: float) -> None:
         """
         Initialize AltDSS circuit with US distribution standards.
 
@@ -88,8 +90,15 @@ class AltDSSBackend(IElectricalBackend):
             self._circuit_name = name
 
             # Initialize component factory
-            self.component_factory = AltDSSComponentFactory(self.dss, self.logger)
+            self.component_factory = AltDSSComponentFactory(
+                self.dss, self.logger)
 
+            # Edit the existing Vsource (created by initialize_circuit) to set MVA levels
+            # This avoids creating duplicate sources
+            self.dss(
+                f"Edit Vsource.source basekv={primary_kv} pu=1.0 phases=3 bus1={source_bus} "
+                f"MVASC3=1000 MVASC1=900"
+            )
             self.logger.info(f"✓ Initialized AltDSS circuit: {name}")
             self.logger.debug(f"Voltage bases: {voltage_bases} kV")
 
@@ -182,7 +191,8 @@ class AltDSSBackend(IElectricalBackend):
             True if power flow converged, False otherwise
         """
         if self.dss is None:
-            raise AltDSSBackendError("No AltDSS instance available for analysis")
+            raise AltDSSBackendError(
+                "No AltDSS instance available for analysis")
 
         try:
             # CRITICAL: Calculate voltage bases before solving
@@ -290,7 +300,8 @@ class AltDSSBackend(IElectricalBackend):
             if bus_voltages is not None and len(bus_voltages) > 0:
                 metrics["min_voltage_pu"] = min(bus_voltages)
                 metrics["max_voltage_pu"] = max(bus_voltages)
-                metrics["avg_voltage_pu"] = sum(bus_voltages) / len(bus_voltages)
+                metrics["avg_voltage_pu"] = sum(
+                    bus_voltages) / len(bus_voltages)
 
                 # Log voltage validation info
                 min_v, max_v, avg_v = (
@@ -299,7 +310,10 @@ class AltDSSBackend(IElectricalBackend):
                     metrics["avg_voltage_pu"],
                 )
                 self.logger.info(
-                    f"Voltage range: {min_v:.3f} - {max_v:.3f} pu (avg: {avg_v:.3f})"
+                    f"Voltage range: {
+                        min_v:.3f} - {
+                        max_v:.3f} pu (avg: {
+                        avg_v:.3f})"
                 )
 
                 if min_v < 0.95 or max_v > 1.05:
