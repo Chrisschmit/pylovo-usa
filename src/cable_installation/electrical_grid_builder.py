@@ -14,7 +14,9 @@ from typing import Any, Dict, List, Optional
 from ..database.database_client import DatabaseClient
 from ..electrical_backend.base_backend import IElectricalBackend
 from ..electrical_backend.component_specs import (BusSpec, ComponentSpec,
+                                                  LineSpec, LoadSpec,
                                                   TransformerSpec)
+from ..electrical_backend.phase_allocator import PhaseAllocator
 from .cable_placement import CablePlacementAlgorithm
 
 
@@ -22,18 +24,13 @@ class ElectricalGridBuilder:
     """
     Unified orchestrator for the electrical grid construction using backend-agnostic approach.
 
-    This class coordinates the complete grid generation process:
-    1. Infrastructure placement (already done by clustering algorithms)
-    2. MV substation network construction
-    3. MV-LV distribution transformers
-    4. LV network construction using cable placement algorithms
-    5. Backend-agnostic electrical simulation
+    This class coordinates the generation of the electrical representation of the grid process:
     """
 
     def __init__(
         self,
         backend: IElectricalBackend,
-        database: DatabaseClient,
+        dbc: DatabaseClient,
         logger: Optional[logging.Logger] = None,
     ):
         """
@@ -41,18 +38,17 @@ class ElectricalGridBuilder:
 
         Args:
             backend: Electrical simulation backend (e.g., AltDSSBackend)
-            database: Database client for grid data access
+            dbc: Database client for grid data access
             logger: Optional logger instance
         """
         self.backend = backend
-        self.database = database
+        self.dbc = dbc
         self.logger = logger or logging.getLogger(__name__)
 
-        # Initialize cable placement algorithm with database for voltage-aware
+        # Initialize cable placement algorithm with dbc for voltage-aware
         # selection<
         self.cable_algorithm = CablePlacementAlgorithm(
-            database=database, logger=self.logger
-        )
+            dbc=dbc, logger=self.logger)
 
     def build_complete_grid_for_cluster(
         self, kcid: int, scid: int, regional_identifier: int = 1
@@ -102,6 +98,30 @@ class ElectricalGridBuilder:
 
             all_component_specs.extend(lv_specs)
 
+            # NEW PHASE 3: Phase allocation at spec stage
+            self.logger.info("Starting phase allocation optimization...")
+            # Use BFS allocator with relaxed imbalance handling for production
+            # runs
+            phase_allocator = PhaseAllocator(
+                logger=self.logger,
+                max_imbalance_pct=15.0,  # tolerate higher imbalance on sparse split-phase territories
+                raise_on_imbalance=False,  # log warning instead of raising
+                optimize_retries=6,  # try multiple greedy starts per territory when above threshold
+                retry_threshold_pct=20.0,  # start retrying above this level
+            )
+            all_component_specs = phase_allocator.allocate(all_component_specs)
+
+            # Report LV and MV balance summaries
+            lv_imbalance = phase_allocator.get_phase_imbalance()
+            mv_report = phase_allocator.get_mv_balance()
+            self.logger.info(
+                f"Phase allocation completed. LV imbalance: {
+                    lv_imbalance:.1f}% | MV imbalance: {
+                    mv_report.get(
+                        'imbalance_pct',
+                        0.0):.1f}%"
+            )
+
             # Create remaining LV components in the backend
             self.logger.info(
                 f"Creating {
@@ -127,13 +147,13 @@ class ElectricalGridBuilder:
                     f"✓ Grid construction and power flow successful for K{kcid}_S{scid}"
                 )
 
-                # Export results and save to database
+                # Export results and save to dbc
                 grid_data = self.backend.export_to_format()
                 self._save_cluster_results(
                     regional_identifier, kcid, scid, grid_data)
 
-                # Save line components to database for visualization
-                self._save_line_components_to_database(
+                # Save line components to dbc for visualization
+                self._save_line_components_to_dbc(
                     all_component_specs, kcid, scid)
 
                 return True
@@ -168,9 +188,8 @@ class ElectricalGridBuilder:
         component_specs = []
 
         # Get substation data with pre-selected equipment
-        substation, substation_vertice_id = self.database.get_substation_for_scid(
-            kcid, scid
-        )
+        substation, substation_vertice_id = self.dbc.get_substation_for_scid(
+            kcid, scid)
 
         if not substation:
             raise ValueError(f"No substation found for K{kcid}_S{scid}")
@@ -197,13 +216,13 @@ class ElectricalGridBuilder:
             equipment=substation,
             # Pre-selected during placement, contains number of phases
             kva=substation.s_max_kva if substation else None,
+            vertex_id=substation_vertice_id,
         )
         component_specs.append(substation_tx_spec)
 
         # Get LV transformers and MV buildings under this substation
-        lv_transformers = self.database.get_lv_transformers_for_scid(
-            kcid, scid)
-        mv_buildings = self.database.get_mv_buildings_for_scid(kcid, scid)
+        lv_transformers = self.dbc.get_lv_transformers_for_scid(kcid, scid)
+        mv_buildings = self.dbc.get_mv_buildings_for_scid(kcid, scid)
 
         # Create complete MV network using cable placement algorithm
         self.logger.debug(
@@ -250,14 +269,13 @@ class ElectricalGridBuilder:
             return f"lv_bus_b{bcid_int}"
 
         # Get all bcid clusters under this scid
-        bcid_clusters = self.database.get_bcids_for_scid(kcid, scid)
+        bcid_clusters = self.dbc.get_bcids_for_scid(kcid, scid)
 
         for bcid in bcid_clusters:
             self.logger.debug(f"Building LV network for bcid {bcid}")
 
             # Get LV transformer data with pre-selected equipment
-            lv_tx_data = self.database.get_lv_transformer_for_bcid(
-                kcid, scid, bcid)
+            lv_tx_data = self.dbc.get_lv_transformer_for_bcid(kcid, scid, bcid)
 
             if not lv_tx_data:
                 self.logger.warning(f"No LV transformer found for bcid {bcid}")
@@ -267,9 +285,16 @@ class ElectricalGridBuilder:
             # directly)
             lv_equipment = lv_tx_data["equipment"]
 
-            # Create LV bus (400V side of transformer) using canonical name
+            # Get transformer vertex from lv_tx_data
+            transformer_vertex = lv_tx_data.get("transformer_vertice_id")
+
+            # Create LV bus using canonical name
             lv_bus = lv_bus_name(bcid)
-            lv_bus_spec = BusSpec(name=lv_bus, voltage_kv=0.4)
+            lv_bus_spec = BusSpec(
+                name=lv_bus,
+                voltage_kv=0.24,
+                vertex_id=transformer_vertex,
+            )
             component_specs.append(lv_bus_spec)
 
             # Create MV-LV distribution transformer
@@ -277,10 +302,13 @@ class ElectricalGridBuilder:
             mv_bus = f"trafo_{bcid}_{mv_cluster_id}_mv"
             lv_tx_spec = TransformerSpec(
                 name=f"DistTx_B{bcid}",
-                bus1=mv_bus,  # 20kV side
-                bus2=lv_bus,  # 400V side
+                bus1=mv_bus,  # MV side bus
+                bus2=lv_bus,  # LV side bus
                 equipment=lv_equipment,  # Pre-selected during LV placement!
                 kva=lv_equipment.s_max_kva if lv_equipment else None,
+                primary_phases="ABC",
+                secondary_phases="split_phase",
+                vertex_id=transformer_vertex,
             )
             component_specs.append(lv_tx_spec)
 
@@ -297,10 +325,23 @@ class ElectricalGridBuilder:
             # Apply cable placement algorithm to create LV network
             cluster_id = f"K{kcid}_S{scid}_B{bcid}"
 
+            (
+                vertex_distance_mapping,
+                transformer_vertex,
+                buildings_df,
+                consumer_df,
+                connection_nodes,
+            ) = network_data
+
             lv_network_specs = self.cable_algorithm.create_lv_network_components(
                 cluster_id=cluster_id,
                 lv_bus=lv_bus,
-                *network_data,
+                vertex_distance_mapping=vertex_distance_mapping,
+                transformer_vertex=transformer_vertex,
+                buildings_df=buildings_df,
+                consumer_df=consumer_df,
+                connection_nodes=connection_nodes,
+                n_phases=lv_equipment.n_phases,
             )
 
             component_specs.extend(lv_network_specs)
@@ -318,7 +359,7 @@ class ElectricalGridBuilder:
         Prepare network data for LV cable placement algorithm.
 
         This replicates the data preparation from GridGenerator.prepare_vertices_list
-        but uses the new database interface.
+        but uses the new dbc interface.
 
         Returns:
             Tuple of (vertex_distance_mapping, transformer_vertex, buildings_df, consumer_df, connection_nodes)
@@ -327,7 +368,7 @@ class ElectricalGridBuilder:
         try:
             # Get vertices and distance information
             vertex_distance_mapping, transformer_vertex = (
-                self.database.get_vertices_from_bcid(
+                self.dbc.get_vertices_from_bcid(
                     regional_identifier=regional_identifier,
                     kcid=kcid,
                     bcid=bcid,
@@ -336,12 +377,12 @@ class ElectricalGridBuilder:
             )
 
             # Get building information
-            buildings_df = self.database.get_buildings_from_bcid(
+            buildings_df = self.dbc.get_buildings_from_bcid(
                 regional_identifier=regional_identifier, kcid=kcid, bcid=bcid, scid=scid
             )
 
             # Get consumer categories
-            consumer_df = self.database.get_consumer_categories()
+            consumer_df = self.dbc.get_consumer_categories()
 
             # Calculate connection nodes (non-building vertices)
             vertices_list = list(vertex_distance_mapping.keys())
@@ -370,7 +411,7 @@ class ElectricalGridBuilder:
         self, regional_identifier: int, kcid: int, scid: int, grid_data: Dict[str, Any]
     ) -> None:
         """
-        Save grid construction results for a single cluster to database.
+        Save grid construction results for a single cluster to dbc.
 
         Args:
             kcid: K-means cluster ID
@@ -379,7 +420,7 @@ class ElectricalGridBuilder:
         """
         try:
 
-            self.database.save_grid_cluster(
+            self.dbc.save_grid_cluster(
                 regional_identifier=regional_identifier,
                 kcid=kcid,
                 scid=scid,
@@ -389,11 +430,11 @@ class ElectricalGridBuilder:
         except Exception as e:
             self.logger.error(f"Failed to save cluster grid results: {str(e)}")
 
-    def _save_line_components_to_database(
+    def _save_line_components_to_dbc(
         self, component_specs: List[ComponentSpec], kcid: int, scid: int
     ) -> None:
         """
-        Save line components to database for visualization with MV/LV distinction.
+        Save line components to dbc for visualization with MV/LV distinction.
 
         Args:
             component_specs: All component specifications from grid construction
@@ -446,7 +487,7 @@ class ElectricalGridBuilder:
                             spec.name}, from {from_bus} to {to_bus}, {
                             spec.length_km:.3f}km"
                     )
-                    self.database.insert_mv_line(
+                    self.dbc.insert_mv_line(
                         geom=spec.coordinates,
                         kcid=kcid,
                         scid=scid,
@@ -465,7 +506,7 @@ class ElectricalGridBuilder:
                                 spec.name}, from {from_bus} to {to_bus}, {
                                 spec.length_km:.3f}km"
                         )
-                        self.database.insert_lv_line(
+                        self.dbc.insert_lv_line(
                             geom=spec.coordinates,
                             kcid=kcid,
                             scid=scid,
@@ -484,8 +525,7 @@ class ElectricalGridBuilder:
 
                 line_count += 1
 
-            self.logger.info(
-                f"✓ Saved {line_count} line components to database")
+            self.logger.info(f"✓ Saved {line_count} line components to dbc")
 
         except Exception as e:
             self.logger.error(
