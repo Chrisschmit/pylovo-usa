@@ -32,18 +32,18 @@ class CablePlacementAlgorithm:
 
     def __init__(
         self,
-        database: Optional[DatabaseClient] = None,
+        dbc: Optional[DatabaseClient] = None,
         logger: Optional[logging.Logger] = None,
     ):
         """Initialize cable placement algorithm with voltage-aware cable selection."""
         self.logger = logger or logging.getLogger(__name__)
 
         # Store database reference for coordinate generation
-        self.database = database
+        self.dbc = dbc
 
         # Initialize voltage-aware cable selector if database is available
-        if database:
-            self.cable_selector = CableSelector(database, logger=self.logger)
+        if dbc:
+            self.cable_selector = CableSelector(dbc, logger=self.logger)
             self.use_voltage_aware_selection = True
         else:
             self.cable_selector = None
@@ -66,24 +66,24 @@ class CablePlacementAlgorithm:
         """
         # 1) Try routed polyline
         nodes = None
-        if self.database and a != b:
+        if self.dbc and a != b:
             try:
-                nodes = self.database.get_path_to_bus(a, b)
+                nodes = self.dbc.get_path_to_bus(a, b)
             except Exception:
                 nodes = None
 
         if nodes and len(nodes) >= 2:
             coords: List[Tuple[float, float]] = []
             for nid in nodes:
-                c = self.database.get_node_geom(nid)
+                c = self.dbc.get_node_geom(nid)
                 if c:
                     coords.append((float(c[0]), float(c[1])))
             if len(coords) >= 2:
                 return coords
 
         # 2) Straight segment if both endpoints exist and are distinct
-        a_c = self.database.get_node_geom(a) if self.database else None
-        b_c = self.database.get_node_geom(b) if self.database else None
+        a_c = self.dbc.get_node_geom(a) if self.dbc else None
+        b_c = self.dbc.get_node_geom(b) if self.dbc else None
         if a_c and b_c and a != b:
             return [(float(a_c[0]), float(a_c[1])),
                     (float(b_c[0]), float(b_c[1]))]
@@ -254,6 +254,7 @@ class CablePlacementAlgorithm:
         buildings_df: pd.DataFrame,
         consumer_df: pd.DataFrame,
         connection_nodes: List[int],
+        n_phases: int = 3,
     ) -> List[ComponentSpec]:
         """
         Create component specifications for LV network using branch-by-branch algorithm.
@@ -268,11 +269,18 @@ class CablePlacementAlgorithm:
             buildings_df: DataFrame with building information
             consumer_df: DataFrame with consumer categories
             connection_nodes: List of connection point vertices (excluding buildings)
+            n_phases: Number of phases (1 or 3) based on transformer configuration
 
         Returns:
             List of ComponentSpec objects for buses, lines, and loads
         """
         component_specs = []
+
+        # Determine phase configuration based on transformer type
+        if n_phases == 1:
+            line_phases = "A"  # Single-phase on phase A
+        else:
+            line_phases = "ABC"  # 3-phase
 
         # Calculate load data for all consumers
         consumer_list = buildings_df.vertice_id.to_list()
@@ -287,6 +295,7 @@ class CablePlacementAlgorithm:
             bus_spec = BusSpec(
                 name=f"Bus_Node_{node_id}_{cluster_id}",
                 coordinates=self._get_node_coordinates(node_id),
+                vertex_id=node_id,
             )
             component_specs.append(bus_spec)
 
@@ -296,22 +305,34 @@ class CablePlacementAlgorithm:
             bus_spec = BusSpec(
                 name=f"Bus_Consumer_{consumer_id}_{cluster_id}",
                 coordinates=self._get_node_coordinates(consumer_id),
+                vertex_id=consumer_id,
             )
             component_specs.append(bus_spec)
 
-            # Compute proper LV load parameters for 3φ wye: use L-N base
-            # voltage
+            # Compute proper LV load parameters based on transformer
+            # configuration
             kw_val = simultaneous_load_kw[consumer_id]
             kvar_val = float(kw_val) * float(np.tan(np.arccos(POWER_FACTOR)))
 
+            # Set voltage and connection based on phase configuration
+            if n_phases == 1:
+                # Single-phase: use L-N voltage for wye connection
+                load_kv = 0.120
+                conn_type = "wye"
+            else:
+                # 3-phase: use L-N voltage for wye connection
+                load_kv = 0.208
+                conn_type = "wye"
+
             load_spec = LoadSpec(
-                name=f"Load_{consumer_id}_{cluster_id}",
+                name=f"lv_load_{consumer_id}_{cluster_id}",
                 bus=f"Bus_Consumer_{consumer_id}_{cluster_id}",
                 kw=kw_val,
                 kvar=kvar_val,
-                kv=VN / 1000.0,
-                n_phases=3,
-                conn="wye",
+                kv=load_kv,
+                n_phases=n_phases,
+                conn=conn_type,
+                vertex_id=consumer_id,
             )
             component_specs.append(load_spec)
 
@@ -323,7 +344,7 @@ class CablePlacementAlgorithm:
             transformer_vertex=transformer_vertex,
             vertex_distance_mapping=vertex_distance_mapping,
             power_demand=simultaneous_load_kw,
-            buildings_df=buildings_df,
+            n_phases=n_phases,
         )
         component_specs.extend(consumer_specs)
 
@@ -332,10 +353,10 @@ class CablePlacementAlgorithm:
             return float(vertex_distance_mapping.get(int(vid), 0.0))
 
         def lv_path_to_hub(vid: int, hub: int) -> List[int]:
-            if not self.database:
+            if not self.dbc:
                 return [vid, hub]
             try:
-                return self.database.get_path_to_bus(int(vid), int(hub))
+                return self.dbc.get_path_to_bus(int(vid), int(hub))
             except Exception:
                 return [vid, hub]
 
@@ -360,6 +381,7 @@ class CablePlacementAlgorithm:
                 required_current_a=float(I_req or 0.0),
                 voltage_level="LV",
                 distance_km=float(distance_km or 0.0),
+                n_phases=n_phases,
             )
 
         def lv_select_service(
@@ -368,6 +390,7 @@ class CablePlacementAlgorithm:
                 required_current_a=float(I_req or 0.0),
                 voltage_level="LV",
                 distance_km=0.005,
+                n_phases=n_phases,
             )
 
         lv_load_points = [{"vertex_id": v} for v in connection_nodes]
@@ -438,6 +461,9 @@ class CablePlacementAlgorithm:
                     length_km=d_first_km,
                     parallel=trunk_par,
                     coordinates=coords,
+                    phases=line_phases,
+                    from_vertex_id=transformer_vertex,
+                    to_vertex_id=first_vid,
                 )
             )
 
@@ -462,6 +488,9 @@ class CablePlacementAlgorithm:
                         length_km=seg_km,
                         parallel=trunk_par,
                         coordinates=coords,
+                        phases=line_phases,
+                        from_vertex_id=v_prev,
+                        to_vertex_id=v_curr,
                     )
                 )
 
@@ -547,9 +576,9 @@ class CablePlacementAlgorithm:
         for load_point in mv_load_points:
             # Get coordinates for the load point vertex
             coordinates = None
-            if self.database:
+            if self.dbc:
                 try:
-                    coord = self.database.get_node_geom(
+                    coord = self.dbc.get_node_geom(
                         load_point["vertex_id"]
                     )  # transfomerposition or for mv_buildings: connection_point
                     if coord:
@@ -564,6 +593,7 @@ class CablePlacementAlgorithm:
                 name=f"mv_node_{load_point['vertex_id']}_{cluster_id}",
                 coordinates=coordinates,
                 voltage_kv=12.47,  # MV voltage level
+                vertex_id=load_point["vertex_id"],
             )
             component_specs.append(bus_spec)
 
@@ -580,10 +610,10 @@ class CablePlacementAlgorithm:
             return float(mv_distance_mapping.get(int(vid), 0.0))
 
         def mv_path_to_hub(vid: int, hub: int) -> List[int]:
-            if not self.database:
+            if not self.dbc:
                 return [vid, hub]
             try:
-                return self.database.get_path_to_bus(int(vid), int(hub))
+                return self.dbc.get_path_to_bus(int(vid), int(hub))
             except Exception:
                 return [vid, hub]
 
@@ -688,6 +718,9 @@ class CablePlacementAlgorithm:
                     length_km=d_first_km,
                     parallel=trunk_par,
                     coordinates=coords,
+                    phases="ABC",  # Will be updated by phase allocator
+                    from_vertex_id=substation_vertex_id,
+                    to_vertex_id=first_vid,
                 )
             )
 
@@ -715,6 +748,9 @@ class CablePlacementAlgorithm:
                         length_km=seg_km,
                         parallel=trunk_par,
                         coordinates=coords,
+                        phases="ABC",  # Will be updated by phase allocator
+                        from_vertex_id=v_prev,
+                        to_vertex_id=v_curr,
                     )
                 )
 
@@ -742,6 +778,9 @@ class CablePlacementAlgorithm:
                         length_km=0.005,
                         parallel=1,
                         coordinates=coords,
+                        phases="ABC",  # Will be updated by phase allocator
+                        from_vertex_id=conn_vid,
+                        to_vertex_id=trafo_vid,
                     )
                 )
 
@@ -774,7 +813,7 @@ class CablePlacementAlgorithm:
         """
         mv_distance_mapping = {}
 
-        if not self.database:
+        if not self.dbc:
             self.logger.warning(
                 "No database connection for MV routing distance calculation"
             )
@@ -788,7 +827,7 @@ class CablePlacementAlgorithm:
             load_vertex = load_point["vertex_id"]
 
             try:
-                _, length = self.database.get_path_to_bus_with_length(
+                _, length = self.dbc.get_path_to_bus_with_length(
                     load_vertex, substation_vertex_id
                 )
 
@@ -841,11 +880,11 @@ class CablePlacementAlgorithm:
     def _get_node_coordinates(
             self, node_id: int) -> Optional[Tuple[float, float]]:
         """Get coordinates for a node from database."""
-        if not self.database:
+        if not self.dbc:
             return None
 
         try:
-            coord = self.database.get_node_geom(node_id)
+            coord = self.dbc.get_node_geom(node_id)
             if coord:
                 return (float(coord[0]), float(coord[1]))
         except Exception as e:
@@ -862,6 +901,7 @@ class CablePlacementAlgorithm:
         transformer_vertex: int,
         vertex_distance_mapping: Dict,
         power_demand: Dict,
+        n_phases: int = 3,
     ) -> List[ComponentSpec]:
         """
         Install cables from connection points to consumer buildings (house connections).
@@ -881,17 +921,23 @@ class CablePlacementAlgorithm:
         """
         line_specs = []
 
+        # Determine phase configuration for consumer connections
+        if n_phases == 1:
+            consumer_phases = "A"  # Single-phase on phase A
+        else:
+            consumer_phases = "ABC"  # 3-phase
+
         # Get consumers that need to be connected through each connection point
         # This uses the database method to find which consumers connect through
         # which connection points
-        if not self.database:
+        if not self.dbc:
             self.logger.warning(
                 "No database connection for consumer cable routing")
             return line_specs
 
         for connection_point in connection_nodes:
             # Get consumers that connect through this connection point
-            consumer_vertices = self.database.get_vertices_from_connection_points(
+            consumer_vertices = self.dbc.get_vertices_from_connection_points(
                 [connection_point]
             )
 
@@ -902,7 +948,7 @@ class CablePlacementAlgorithm:
             for consumer_vertex in branch_consumers:
                 # Get the path from consumer to transformer to find the
                 # connection point
-                path_nodes = self.database.get_path_to_bus(
+                path_nodes = self.dbc.get_path_to_bus(
                     consumer_vertex, transformer_vertex
                 )
 
@@ -929,6 +975,7 @@ class CablePlacementAlgorithm:
                     required_current_a=current_a,
                     voltage_level="LV",
                     distance_km=distance_km,
+                    n_phases=n_phases,
                 )
 
                 cable_equipment = cable_eq
@@ -946,6 +993,9 @@ class CablePlacementAlgorithm:
                     length_km=distance_km,
                     parallel=parallel_count,
                     coordinates=coordinates,
+                    phases=consumer_phases,
+                    from_vertex_id=connection_point,
+                    to_vertex_id=consumer_vertex,
                 )
                 line_specs.append(line_spec)
 
@@ -986,7 +1036,7 @@ class CablePlacementAlgorithm:
             coords: List[Tuple[float, float]] = []
             for nid in node_ids:
                 # (lon, lat) in 4326 per your query
-                c = self.database.get_node_geom(nid)
+                c = self.dbc.get_node_geom(nid)
                 if c:
                     coords.append((float(c[0]), float(c[1])))
             return coords if len(coords) >= 2 else None
@@ -1002,6 +1052,7 @@ class CablePlacementAlgorithm:
                     name=f"mv_building_{osm_id}_{cluster_id}",
                     coordinates=self._get_node_coordinates(vid),
                     voltage_kv=12.47,
+                    vertex_id=vid,
                 )
             )
             line_specs.append(
@@ -1010,10 +1061,11 @@ class CablePlacementAlgorithm:
                     bus=f"mv_building_{osm_id}_{cluster_id}",
                     kw=peak_kw,
                     kvar=peak_kw * 0.3,
-                    kv=12.47,
+                    kv=12.47,  # L-L for 3φ wye
                     n_phases=3,
-                    conn="delta",
+                    conn="wye",
                     building_id=str(osm_id),
+                    vertex_id=vid,
                 )
             )
 
@@ -1026,9 +1078,8 @@ class CablePlacementAlgorithm:
 
             # Routed path + length (meters) from building to connection point
             try:
-                node_seq, length_m = self.database.get_path_to_bus_with_length(
-                    vid, conn_pt
-                )
+                node_seq, length_m = self.dbc.get_path_to_bus_with_length(
+                    vid, conn_pt)
             except Exception:
                 node_seq, length_m = None, None
 
@@ -1074,6 +1125,9 @@ class CablePlacementAlgorithm:
                     length_km=distance_km,
                     parallel=parallel,
                     coordinates=coordinates,
+                    phases="ABC",  # Will be updated by phase allocator
+                    from_vertex_id=conn_pt,
+                    to_vertex_id=vid,
                 )
             )
 

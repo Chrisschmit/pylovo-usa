@@ -106,6 +106,21 @@ The project requires PostgreSQL with PostGIS extension and Python packages inclu
 - scikit-learn for clustering algorithms
 - SQLAlchemy, psycopg2 for database operations
 - matplotlib, plotly, seaborn for visualization
+- altdss for electrical simulation backend
+
+### AltDSS Library Documentation
+
+The `altdss_library_copy/` directory contains complete documentation for all AltDSS components and their Python API:
+- **Complete Component Reference**: All electrical components (Bus, Line, Transformer, Load, etc.)
+- **Python API Documentation**: How to access and manipulate components pythonically
+- **Property and Method Reference**: Detailed interface for each component type
+- **Key Files**:
+  - `Bus.py` - Bus operations and voltage analysis
+  - `Vsource.py` - External grid and voltage source management
+  - `Transformer.py` - Transformer creation and configuration
+  - `Line.py` - Line/cable modeling
+  - `Load.py` - Load modeling and management
+  - `Solution.py` - Power flow solving and analysis
 
 ## Development Notes
 

@@ -504,3 +504,200 @@ class AltDSSComponentFactory:
         }
         self.line_codes.clear()
         self.logger.info("Factory reset for new circuit")
+
+    # ===== SINGLE-PHASE COMPONENT CREATION =====
+
+    def create_single_phase_line(
+        self,
+        name: str,
+        cable: CableEquipment,
+        bus1: str,
+        bus2: str,
+        length_km: float,
+        phase: str = "A"
+    ) -> Any:
+        """
+        Create single-phase line on specified phase.
+
+        Based on SINGLE_PHASE_LATERAL_IMPLEMENTATION_PLAN.md section 3.2.
+        Maps phase letters to AltDSS numeric notation.
+
+        Args:
+            name: Line name
+            cable: Cable equipment (may be 3-phase cable used for 1-phase)
+            bus1: From bus name
+            bus2: To bus name
+            length_km: Line length in km
+            phase: Phase assignment ("A", "B", or "C")
+
+        Returns:
+            Created single-phase line object
+        """
+        # Map phase letters to AltDSS numeric suffixes
+        phase_map = {"A": "1", "B": "2", "C": "3"}
+        phase_suffix = phase_map.get(phase, "1")
+
+        # Create single-phase line code if needed
+        line_code = self.create_single_phase_line_code(cable, phase)
+
+        # Create line with phase-specific bus connections
+        line = self.dss.Line.new(
+            name,
+            Bus1=f"{bus1}.{phase_suffix}",
+            # Single-phase connection (implicit neutral)
+            Bus2=f"{bus2}.{phase_suffix}",
+            LineCode=line_code,
+            Length=length_km,
+            Units="km",
+            Phases=1  # Single phase
+        )
+
+        self._components_created["lines"].append(line)
+        self.logger.debug(
+            f"Created single-phase line {name}: {bus1}.{phase_suffix} -> {bus2}.{phase_suffix}, {length_km}km"
+        )
+        return line
+
+    def create_single_phase_line_code(
+            self, cable: CableEquipment, phase: str) -> Any:
+        """
+        Create single-phase line code from three-phase cable equipment.
+
+        Args:
+            cable: Cable equipment (may be 3-phase)
+            phase: Phase assignment for naming
+
+        Returns:
+            Single-phase line code object
+        """
+        code_name = f"LC_{cable.name}_1P_{phase}"
+
+        if code_name in self.line_codes:
+            return self.line_codes[code_name]
+
+        # Create single-phase line code using positive sequence parameters
+        line_code = self.dss.LineCode.new(
+            code_name,
+            NPhases=1,
+            R1=cable.r_ohm_per_km,        # Positive sequence resistance
+            X1=cable.x_ohm_per_km,        # Positive sequence reactance
+            C1=cable.capacitance_nf_per_km,  # Positive sequence capacitance
+            Units="km",
+            NormAmps=cable.max_i_a,
+            EmergAmps=cable.max_i_a * 1.25,
+        )
+
+        self.line_codes[code_name] = line_code
+        self._components_created["linecodes"].append(line_code)
+        self.logger.debug(f"Created single-phase line code: {code_name}")
+        return line_code
+
+    def create_split_phase_transformer(
+        self,
+        name: str,
+        equipment: TransformerEquipment,
+        mv_bus: str,
+        lv_bus: str,
+        mv_phase: str = "A"
+    ) -> Any:
+        """
+        Create US residential split-phase transformer with center-tap.
+
+        Based on SINGLE_PHASE_LATERAL_IMPLEMENTATION_PLAN.md section 3.1.
+        Creates 3-winding transformer for true US 120/240V split-phase service.
+
+        Args:
+            name: Transformer name
+            equipment: Transformer equipment data
+            mv_bus: MV side bus name
+            lv_bus: LV side bus name
+            mv_phase: MV phase connection ("A", "B", or "C")
+
+        Returns:
+            Created split-phase transformer object
+        """
+        # Map phase letters to AltDSS numeric suffixes
+        phase_map = {"A": "1", "B": "2", "C": "3"}
+        mv_suffix = phase_map.get(mv_phase, "1")
+
+        # Calculate MV phase-to-neutral voltage
+        mv_ph_neutral_kv = equipment.primary_voltage_kv / 1.732  # L-L to L-N
+
+        # Create 3-winding split-phase transformer
+        transformer = self.dss.Transformer.new(
+            name,
+            Phases=1,
+            Windings=3,
+            # Buses: MV phase-neutral, LV hot1-neutral, LV hot2-neutral
+            Buses=[
+                f"{mv_bus}.{mv_suffix}",      # MV phase (implicit neutral)
+                f"{lv_bus}.1",                # LV hot leg 1 (implicit neutral)
+                f"{lv_bus}.2"                 # LV hot leg 2 (implicit neutral)
+            ],
+            Conns=["wye", "wye", "wye"],      # All wye connections
+            # Primary 7.2kV, two 120V secondaries
+            kVs=[mv_ph_neutral_kv, 0.12, 0.12],
+            kVAs=[
+                equipment.s_max_kva,
+                equipment.s_max_kva,
+                equipment.s_max_kva],
+            pctRs=[0.5, 0.5, 0.5],           # Winding resistances
+            XHL=1.5,  # Reactance H-L (primary to secondary 1)
+            XHT=1.5,  # Reactance H-T (primary to secondary 2)
+            # Reactance L-T (between secondaries - low for center-tap)
+            XLT=0.5
+        )
+
+        self._components_created["transformers"].append(transformer)
+        self.logger.debug(
+            f"Created split-phase transformer {name}: {mv_bus}.{mv_suffix} -> {lv_bus} (120/240V), {
+                equipment.s_max_kva}kVA"
+        )
+        return transformer
+
+    def create_single_phase_load(
+        self,
+        name: str,
+        bus: str,
+        kw: float,
+        kvar: float,
+        kv: float,
+        phase: str = "A",
+        conn: str = "wye"
+    ) -> Any:
+        """
+        Create single-phase load with proper AltDSS bus notation.
+
+        Args:
+            name: Load name
+            bus: Bus name (will be modified with phase suffix)
+            kw: Active power in kW
+            kvar: Reactive power in kvar
+            kv: Voltage in kV (should be 0.120 for US residential)
+            phase: Phase assignment ("A", "B", or "C")
+            conn: Connection type
+
+        Returns:
+            Created single-phase load object
+        """
+        # Map phase letters to AltDSS numeric suffixes
+        phase_map = {"A": "1", "B": "2", "C": "3"}
+        phase_suffix = phase_map.get(phase, "1")
+
+        # Create single-phase load with phase-specific bus connection
+        load = self.dss.Load.new(
+            name,
+            Bus1=f"{bus}.{phase_suffix}",
+            # Single-phase wye connection (implicit neutral)
+            Phases=1,
+            kV=kv,  # Should be 0.120 for US residential L-N voltage
+            kW=kw,
+            kvar=kvar,
+            Conn=conn,
+            Model=1  # Constant PQ model
+        )
+
+        self._components_created["loads"].append(load)
+        self.logger.debug(
+            f"Created single-phase load {name}: {kw}kW at {bus}.{phase_suffix}")
+        return load

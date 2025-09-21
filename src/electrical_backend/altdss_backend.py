@@ -72,9 +72,17 @@ class AltDSSBackend(IElectricalBackend):
                 f"New Circuit.{name} basekv={primary_kv} pu=1.0 phases=3 bus1={source_bus}"
             )
 
-            # Set US distribution voltage bases
-            # Primary, MV, LV line-to-line, LV line-to-neutral
-            voltage_bases = [primary_kv, 12.47, 0.416, 0.208]
+            # Set US distribution voltage bases with single-phase support
+            voltage_bases = [
+                primary_kv,  # Transmission (69 kV)
+                12.47,  # MV three-phase (L-L)
+                7.2,  # MV single-phase (L-N) = 12.47/√3
+                0.416,  # LV three-phase (L-L)
+                0.240,  # US residential 240V (L-L across split-phase)
+                0.208,  # LV three-phase 208V (L-L)
+                # US residential 120V (L-N for each hot to neutral)
+                0.120,
+            ]
             bases_str = ",".join(str(v) for v in voltage_bases)
             altdss.altdss(f"Set VoltageBases=[{bases_str}]")
 
@@ -128,7 +136,26 @@ class AltDSSBackend(IElectricalBackend):
 
         try:
             if isinstance(spec, TransformerSpec):
-                if spec.equipment.secondary_voltage_kv > 1:
+                # Check for single-phase split-phase transformer based on phase
+                # allocation
+                if (
+                    hasattr(spec, "primary_phase")
+                    and spec.primary_phases
+                    and spec.primary_phases in ["A", "B", "C"]
+                    and hasattr(spec, "secondary_phases")
+                    and spec.secondary_phases == "split_phase"
+                ):
+
+                    return self.component_factory.create_split_phase_transformer(
+                        name=spec.name,
+                        equipment=spec.equipment,
+                        mv_bus=spec.bus1,
+                        lv_bus=spec.bus2,
+                        mv_phase=spec.primary_phases,
+                    )
+
+                elif spec.equipment.secondary_voltage_kv > 1:
+                    # Substation transformer (69kV -> 12.47kV)
                     return self.component_factory.create_substation_transformer(
                         name=spec.name,
                         equipment=spec.equipment,
@@ -136,6 +163,7 @@ class AltDSSBackend(IElectricalBackend):
                         bus2=spec.bus2,
                     )
                 else:
+                    # Standard MV-LV three-phase transformer
                     return self.component_factory.create_mv_lv_transformer(
                         name=spec.name,
                         equipment=spec.equipment,
@@ -144,23 +172,59 @@ class AltDSSBackend(IElectricalBackend):
                     )
 
             elif isinstance(spec, LineSpec):
-                return self.component_factory.create_line_from_equipment(
-                    name=spec.name,
-                    cable=spec.cable_equipment,
-                    bus1=spec.bus1,
-                    bus2=spec.bus2,
-                    length_km=spec.length_km,
-                )
+                # Check for single-phase line based on phase allocation
+                if (
+                    hasattr(spec, "phases")
+                    and spec.phases
+                    and spec.phases in ["A", "B", "C"]
+                ):
+
+                    return self.component_factory.create_single_phase_line(
+                        name=spec.name,
+                        cable=spec.cable_equipment,
+                        bus1=spec.bus1,
+                        bus2=spec.bus2,
+                        length_km=spec.length_km,
+                        phase=spec.phases,
+                    )
+                else:
+                    # Standard three-phase line
+                    return self.component_factory.create_line_from_equipment(
+                        name=spec.name,
+                        cable=spec.cable_equipment,
+                        bus1=spec.bus1,
+                        bus2=spec.bus2,
+                        length_km=spec.length_km,
+                    )
             elif isinstance(spec, LoadSpec):
-                return self.component_factory.create_load(
-                    name=spec.name,
-                    bus=spec.bus,
-                    kw=spec.kw,
-                    kvar=spec.kvar,
-                    kv=spec.kv,
-                    n_phases=spec.n_phases,
-                    conn=spec.conn,
-                )
+                # Check for single-phase load based on phase allocation
+                if (
+                    spec.n_phases == 1
+                    and hasattr(spec, "phase")
+                    and spec.phase
+                    and spec.phase in ["A", "B", "C"]
+                ):
+
+                    return self.component_factory.create_single_phase_load(
+                        name=spec.name,
+                        bus=spec.bus,
+                        kw=spec.kw,
+                        kvar=spec.kvar,
+                        kv=spec.kv,
+                        phase=spec.phase,
+                        conn=spec.conn,
+                    )
+                else:
+                    # Standard three-phase load
+                    return self.component_factory.create_load(
+                        name=spec.name,
+                        bus=spec.bus,
+                        kw=spec.kw,
+                        kvar=spec.kvar,
+                        kv=spec.kv,
+                        n_phases=spec.n_phases,
+                        conn=spec.conn,
+                    )
             elif isinstance(spec, BusSpec):
                 # No need to create a bus, AltDSS will create it implicitly
                 return spec.name

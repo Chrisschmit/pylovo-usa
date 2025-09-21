@@ -18,8 +18,8 @@ from ..equipment_schema import (CableEquipment,
 
 class CableSelector:
     """
-    Enhanced cable selection that considers voltage levels, settlement types,
-    and integrates with equipment_data table instead of static config.
+    Cable selection that considers voltage levels, settlement types,
+    and integrates with equipment_data table.
     """
 
     def __init__(
@@ -107,6 +107,7 @@ class CableSelector:
         voltage_level: str,
         distance_km: float = 0,
         application_area: Optional[int] = None,
+        n_phases: int = 3,
     ) -> Tuple[Optional[CableEquipment], int]:
         """
         Find optimal cable considering voltage level, current capacity, and voltage drop.
@@ -121,7 +122,8 @@ class CableSelector:
             Tuple of (selected_cable, parallel_count) or (None, 0) if no suitable cable found
         """
         available_cables = self.get_available_cables(
-            voltage_level, application_area)
+            voltage_level, application_area, n_phases
+        )
 
         if not available_cables:
             self.logger.warning(
