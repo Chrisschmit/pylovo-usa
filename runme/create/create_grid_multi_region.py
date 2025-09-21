@@ -9,6 +9,8 @@ from src.config_loader import ANALYZE_GRIDS
 from src.grid_generator import GridGenerator
 from src.load_data.load_buildings import \
     import_buildings_for_multiple_regional_identifier
+from src.load_data.load_transformers import \
+    import_transformers_for_multiple_regional_identifiers
 
 # start timing the script
 start_time = time.time()
@@ -16,8 +18,10 @@ start_time = time.time()
 # Enter the fips codes for which the geodata is exported
 regional_identifier_list = [2501711000, 2501713135]
 
-# import buildings and generate grids
+# import buildings and transformers, then generate grids
 import_buildings_for_multiple_regional_identifier(
+    regional_identifier_list=regional_identifier_list)
+import_transformers_for_multiple_regional_identifiers(
     regional_identifier_list=regional_identifier_list)
 
 # initialize GridGenerator

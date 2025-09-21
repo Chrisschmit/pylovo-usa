@@ -11,9 +11,6 @@ import sqlparse
 import src.database.database_client as dbc
 from config.config_table_structure import *
 from src.config_loader import *
-from src.load_data.load_transformers import (
-    EPSG, RELATION_ID, fetch_trafos, get_trafos_processed_3035_geojson_path,
-    get_trafos_processed_geojson_path, process_trafos)
 
 
 class DatabaseConstructor:
@@ -150,49 +147,32 @@ class DatabaseConstructor:
             et = time.time()
             print(f"{file_name} is successfully imported to db in {int(et - st)} s")
 
-    def transformers_to_db(self):
-        """Call the overpass api for transformer data and populate the transformers table.
-        Delete raw_data/transformer_data/processed_trafos/*_trafos_processed.geojson to
-        fetch fresh data from OSM.
+    def transformers_to_db(self, geojson_path: Path):
+        """Load transformer data from local GeoJSON file and populate the transformers table.
 
+        Simply loads the power.geojson file using ogr2ogr which handles CRS transformation.
+        Uses -overwrite flag to upsert data.
+
+        Args:
+            geojson_path: Path to the power.geojson file. If not provided, uses the default
+                         location based on REGION configuration.
         """
-        trafos_processed_geojson_path = get_trafos_processed_geojson_path(
-            RELATION_ID)
-        trafos_processed_3035_geojson_path = get_trafos_processed_3035_geojson_path(
-            RELATION_ID)
 
-        update_trafos = not os.path.isfile(trafos_processed_geojson_path)
+        # Check if the file exists
+        if not os.path.isfile(geojson_path):
+            print(f"Warning: Transformer file not found: {geojson_path}")
+            return
 
-        if update_trafos:
-            print(
-                f"{trafos_processed_geojson_path} does not exist -> fetch transformer data from API and process it")
-            fetch_trafos(RELATION_ID)
-            process_trafos(RELATION_ID)
-
-        in_file = trafos_processed_geojson_path
-        out_file = trafos_processed_3035_geojson_path
-
-        if update_trafos or not os.path.isfile(out_file):
-            # Convert the GeoJSON file to EPSG and write to a new file
-            subprocess.run(
-                [
-                    "ogr2ogr",
-                    "-f", "GeoJSON",
-                    "-s_srs", f"EPSG:{str(EPSG)}",
-                    "-t_srs", f"EPSG:{str(EPSG)}",
-                    out_file,  # output
-                    in_file  # input
-                ],
-                shell=False
-            )
-
+        # Simply use ogr_to_db with the original file - it handles everything
         trafo_dict = [
             {
-                "path": out_file,
+                "path": geojson_path,
                 "table_name": "transformers"
             }
         ]
-        self.ogr_to_db(trafo_dict)
+
+        # ogr_to_db will handle CRS transformation and upsert
+        self.ogr_to_db(trafo_dict, skip_failures=True)
 
     def csv_to_db(self, file_dict, overwrite=False):
         """

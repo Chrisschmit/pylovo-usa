@@ -10,6 +10,8 @@ from src.database.database_client import DatabaseClient
 from src.grid_generator import GridGenerator
 from src.load_data.load_buildings import \
     import_buildings_for_single_regional_identifier
+from src.load_data.load_transformers import \
+    import_transformers_for_single_regional_identifier
 
 # generate the grid for the regional_identifier set below
 # building data import is included
@@ -50,6 +52,8 @@ def main():
     # import building data to the database and get information about the
     # regional_identifier
     import_buildings_for_single_regional_identifier(gg)
+    # import transformer data to the database
+    import_transformers_for_single_regional_identifier(gg)
 
     # generate a grid for the specified region
     gg.generate_grid_for_single_regional_identifier(

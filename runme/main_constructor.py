@@ -32,12 +32,6 @@ def main():
         # Change to overwrite=False if you want to append to existing data
         sgc.csv_to_db(file_dict, overwrite=True)
 
-    # Add transformer data from geojson to the database
-    logger.info(
-        "### QUERY TRANSFORMERS AND INSERT THEM INTO DB (~50 min if processing new trafo data) ###"
-    )
-    sgc.transformers_to_db()
-
     # Create table with data from osm
     logger.info("### POPULATE public_2po_4pgr TABLE (~30 min) ###")
     sgc.create_public_2po_table()

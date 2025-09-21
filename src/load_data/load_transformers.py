@@ -1,176 +1,80 @@
-import json
 import os
 
-import geopandas as gpd
-import numpy as np
-import pandas as pd
-
-from src.config_loader import EPSG
-from src.utils import query_overpass_for_geojson
-
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
-RELATION_ID_BASE = 3600000000  # do not change
-
-# change relation id to desired location according to docs
-RELATION_ID = 61315
-
-AREA_THRESHOLD = 60
-MIN_DISTANCE_BETWEEN_TRAFOS = 8
-VOLTAGE_THRESHOLD = 110000
-
-SUBSTATIONS_QUERY_PATH = os.path.join(
-    "",
-    "raw_data",
-    "transformer_data",
-    "overpass_queries",
-    "substations_query.txt")
-SHOPPING_MALL_QUERY_PATH = os.path.join(
-    "",
-    "raw_data",
-    "transformer_data",
-    "overpass_queries",
-    "shopping_mall_query.txt")
+from src.config_loader import PROJECT_ROOT, REGION
+from src.database.database_constructor import DatabaseConstructor
+from src.grid_generator import GridGenerator
 
 
-def get_substations_geojson_path(relation_id: int) -> str:
-    return os.path.join("", "raw_data", "transformer_data",
-                        "fetched_trafos", f"{relation_id}_substations.geojson")
-
-
-def get_shopping_mall_geojson_path(relation_id: int) -> str:
-    return os.path.join("", "raw_data", "transformer_data",
-                        "fetched_trafos", f"{relation_id}_shopping_mall.geojson")
-
-
-def get_trafos_processed_geojson_path(relation_id: int) -> str:
-    return os.path.join("", "raw_data", "transformer_data",
-                        "processed_trafos", f"{relation_id}_trafos_processed.geojson")
-
-
-def get_trafos_processed_3035_geojson_path(relation_id: int) -> str:
-    return os.path.join("", "raw_data", "transformer_data",
-                        "processed_trafos", f"{relation_id}_trafos_processed_3035.geojson")
-
-
-def fetch_trafos(relation_id: int) -> None:
-    """Fetch trafos from OSM bound by area defined by given relation_id
-
-    Args:
-        relation_id (int): relation_id of area to fetch trafos from
-
+def import_transformers_for_single_regional_identifier(gg: GridGenerator):
     """
-    with open(SUBSTATIONS_QUERY_PATH, "r") as f:
-        overpass_query_substations = f.read()
-    with open(SHOPPING_MALL_QUERY_PATH, "r") as f:
-        overpass_query_mall = f.read()
+    Imports transformer data to the database for a given FIPS code specified in the GridGenerator object.
+    Checks for existing transformers by osm_id to avoid duplicates.
 
-    # set chosen relation_id in query
-    overpass_query_substations = overpass_query_substations.replace(
-        "$relation_id$", str(RELATION_ID_BASE + relation_id))
-    overpass_query_mall = overpass_query_mall.replace(
-        "$relation_id$", str(RELATION_ID_BASE + relation_id))
-
-    geojson_bayern = query_overpass_for_geojson(
-        OVERPASS_URL, overpass_query_substations)
-    geojson_mall = query_overpass_for_geojson(
-        OVERPASS_URL, overpass_query_mall)
-
-    # save resulting GeoJSON-s
-    with open(get_substations_geojson_path(relation_id), "w") as f:
-        json.dump(geojson_bayern, f, indent=2)
-    with open(get_shopping_mall_geojson_path(relation_id), "w") as f:
-        json.dump(geojson_mall, f, indent=2)
-
-
-def process_trafos(relation_id: int) -> None:
-    """Process trafo data and output it as GeoJSON into output_geojson.
-
-    Args:
-        relation_id (int): relation ID of the area of interest that specifies which file is used as processing input
-
+    :param gg: Grid generator object for querying relevant FIPS code data
     """
-    # Import geojson of substations/trafos. Trafos of "Deutsche Bahn" and
-    # historic trafos have already been deleted.
-    gdf_substations = gpd.read_file(get_substations_geojson_path(relation_id))
-    print('start:')
-    print(len(gdf_substations))
+    # Retrieve regional_identifier from GridGenerator object
+    dbc_client = gg.dbc
+    regional_identifier = gg.regional_identifier
 
-    # the geodata imported from the geojson is imported in the CRS (Coordinate Reference System) WGS84, "EPSG","4326".
-    # It has lan and lat values. For area calculations it needs to be
-    # converted into a planar projection.
-    gdf_substations = gdf_substations.to_crs(EPSG)
+    # Retrieve postcode entry for logging
+    postcode_entry = dbc_client.get_postcode_table_for_regional_identifier(
+        regional_identifier)
+    gg.logger.info(
+        f"Loading transformers for {
+            postcode_entry.iloc[0]['regional_identifier']} "
+        f"{postcode_entry.iloc[0]['county_name']}")
 
-    # 1. eliminate all trafos that lay within other trafo geometries
-    gdf_substations['geom_type'] = gdf_substations.geom_type
-    gdf_points = gdf_substations.groupby('geom_type').get_group('Point')
-    gdf_polygon = gdf_substations.groupby('geom_type').get_group('Polygon')
-    union_of_polygons = gdf_polygon.geometry.unary_union
-    gdf_points['within_poly'] = gdf_points.within(union_of_polygons)
-    gdf_substations.drop(
-        gdf_points[gdf_points['within_poly'] == True].index, inplace=True)
-    print('After step 1:')
-    print(len(gdf_substations))
+    # Define the path for transformer GeoJSON file
+    data_path = os.path.abspath(
+        os.path.join(
+            PROJECT_ROOT,
+            "raw_data",
+            "imports",
+            REGION['STATE'].replace(' ', '_'),
+            REGION['COUNTY'].replace(' ', '_'),
+            REGION['COUNTY_SUBDIVISION'].replace(' ', '_'),
+            "OSM"
+        ))
 
-    # 2. eliminate all Umspannungswerke area larger than threshold and all
-    # transformers that are tagged within that area
-    gdf_substations['area'] = gdf_substations.area
-    gdf_substations.drop(
-        gdf_substations[gdf_substations['area'] >= AREA_THRESHOLD].index, inplace=True)
-    print('After step 2:')
-    print(len(gdf_substations))
+    # Look for power.geojson file
+    power_geojson_path = os.path.join(data_path, "power.geojson")
 
-    # 3. Delete all high voltage transformers
-    # replace any values that cannot be converted to float by nan
-    gdf_substations['voltage'] = (
-        gdf_substations['voltage'].fillna(1).apply(lambda x: pd.to_numeric(x, errors='coerce')))
-    gdf_substations['voltage'] = gdf_substations['voltage'].astype(float)
-    gdf_substations.drop(
-        gdf_substations[gdf_substations['voltage'] >= VOLTAGE_THRESHOLD].index, inplace=True)
-    print('After step 3:')
-    print(len(gdf_substations))
+    # Check if file exists
+    if not os.path.isfile(power_geojson_path):
+        gg.logger.warning(
+            f"Transformer file not found at {power_geojson_path}. "
+            f"Skipping transformer import.")
+        return
 
-    # 4. how many transformers are there in a radius of 5, 10, 15 m of each
-    # other
-    gdf_substations['centroid'] = gdf_substations.centroid
-    distance_matrix = gdf_substations['centroid'].apply(
-        lambda c: gdf_substations['centroid'].distance(c))
-    # set lower triangle of matrix to nan
-    distance_matrix = distance_matrix.where(
-        np.triu(np.ones(distance_matrix.shape)).astype(bool))
-    # set diagonal to nan
-    np.fill_diagonal(distance_matrix.values, float('nan'))
-    distance_matrix = distance_matrix[(
-        distance_matrix < MIN_DISTANCE_BETWEEN_TRAFOS).any(axis=1)]
-    index_list = list(distance_matrix.index)
-    gdf_substations.drop(index=index_list, inplace=True)
-    print('After step 4:')
-    print(len(gdf_substations))
+    gg.logger.info(f"Found transformer file at {power_geojson_path}")
 
-    # 5. how many trafos are there in / next to mall?
-    gdf_shopping = gpd.read_file(get_shopping_mall_geojson_path(relation_id))
-    gdf_shopping = gdf_shopping.to_crs(EPSG)
-    union_of_shopping = gdf_shopping.geometry.unary_union
-    gdf_substations['within_shopping'] = gdf_substations.within(
-        union_of_shopping)
-    gdf_substations.drop(
-        gdf_substations[gdf_substations['within_shopping']].index, inplace=True)
-    print('After step 5:')
-    print(len(gdf_substations))
+    # Check for existing transformers in database
+    try:
+        with dbc_client.conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM transformers")
+            existing_count = cur.fetchone()[0]
+            if existing_count > 0:
+                gg.logger.info(
+                    f"Found {existing_count} existing transformers in database. "
+                    f"New transformers will be added if they don't already exist.")
+    except Exception as e:
+        gg.logger.debug(f"Could not check existing transformers: {e}")
 
-    # drop geometry that can be of type polygon and point, use centroid as new geometry instead
-    # drop tag columns
-    gdf_substations.drop('geometry', axis=1, inplace=True)
-    gdf_substations.rename(columns={"centroid": "geometry"}, inplace=True)
-    gdf_substations.dropna(axis='columns', inplace=True)
+    # Add transformer data to the database using the simplified method
+    sgc = DatabaseConstructor(dbc_obj=dbc_client)
+    sgc.transformers_to_db(power_geojson_path)
 
-    # transform column id into osm_id as is used for buildings
-    gdf_substations['id'] = gdf_substations.apply(
-        lambda row: f"{row['type']}/{row['id']}", axis=1)
-    gdf_substations.rename(columns={"id": "osm_id"}, inplace=True)
-    if "@id" in gdf_substations:
-        gdf_substations.drop('@id', axis=1, inplace=True)
+    gg.logger.info(
+        f"Transformers for FIPS code {regional_identifier} have been successfully processed.")
 
-    # export geojson
-    gdf_substations.to_file(
-        get_trafos_processed_geojson_path(relation_id),
-        driver='GeoJSON')
+
+def import_transformers_for_multiple_regional_identifiers(
+        regional_identifier_list: list[int]):
+    """
+    Imports transformer data to db for multiple regional_identifiers.
+
+    :param regional_identifier_list: List of FIPS codes to process
+    """
+    for regional_identifier in regional_identifier_list:
+        gg = GridGenerator(regional_identifier=regional_identifier)
+        import_transformers_for_single_regional_identifier(gg)

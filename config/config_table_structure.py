@@ -298,7 +298,6 @@ CREATE_QUERIES = {
         area double precision,
         power varchar,
         geom_type varchar,
-        within_shopping boolean,
         geom geometry(MultiPoint, %(epsg)s)
     )
     """,
