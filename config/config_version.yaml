@@ -55,11 +55,21 @@ MV_THRESHOLD_KW: 1000
 
 # Load density thresholds for settlement type classification (MVA/km²)
 POWER_FACTOR: 0.9 # 90% of the peak load is used for the load density calculation
-RURAL_LD:      # Rural areas: < X MVA/km²
-URBAN_LD:      # Urban areas: > X MVA/km² 
+RURAL_LD: 150     # Rural areas: < X MVA/km²
+URBAN_LD: 300     # Urban areas: > X MVA/km² 
 
 # Voltage properties
-# TODO: for the US we need differnt VN for single, split and three phase
+
 VN: 400  # V
+
 V_BAND_LOW: 0.95  # +-5%
 V_BAND_HIGH: 1.05
+
+# Voltage-level specific bases and drop limits
+BASE_VOLTAGE_V:
+  MV: 12470   # 12.47 kV for MV
+  LV: 416     # 416 V for LV secondary
+
+VOLTAGE_DROP_LIMIT_PCT:
+  MV: 2.5     # Typical stricter MV feeder limit
+  LV: 4.5     # Typical LV feeder limit

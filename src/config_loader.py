@@ -49,8 +49,10 @@ LOG_LEVEL = CONFIG_DATA["LOG_LEVEL"]
 LOG_FILE = CONFIG_DATA["LOG_FILE"]
 EPSG = CONFIG_DATA["EPSG"]
 CSV_FILE_LIST = [
-    {"path": os.path.join("raw_data", "equipment_data.csv"),
-     "table_name": "equipment_data"},
+    {
+        "path": os.path.join("raw_data", "equipment_data.csv"),
+        "table_name": "equipment_data",
+    },
     {"path": os.path.join("raw_data", "postcode.csv"),
      "table_name": "postcode"},
 ]
@@ -73,6 +75,12 @@ V_BAND_LOW = CONFIG_VERSION["V_BAND_LOW"]
 V_BAND_HIGH = CONFIG_VERSION["V_BAND_HIGH"]
 LV_THRESHOLD_KW = CONFIG_VERSION["LV_THRESHOLD_KW"]
 MV_THRESHOLD_KW = CONFIG_VERSION["MV_THRESHOLD_KW"]
+
+# Voltage-level specific bases and drop limits
+BASE_VOLTAGE_V = CONFIG_VERSION.get("BASE_VOLTAGE_V", {"MV": 12470, "LV": 416})
+VOLTAGE_DROP_LIMIT_PCT = CONFIG_VERSION.get(
+    "VOLTAGE_DROP_LIMIT_PCT", {"MV": 2.5, "LV": 4.5}
+)
 
 # Assign all Data Import variables
 REGION = CONFIG_DATA["REGION"]
