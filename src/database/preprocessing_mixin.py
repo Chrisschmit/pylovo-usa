@@ -4,7 +4,7 @@ from abc import ABC
 from src.config_loader import *
 from src.database.base_mixin import BaseMixin
 
-warnings.simplefilter(action='ignore', category=UserWarning)
+warnings.simplefilter(action="ignore", category=UserWarning)
 
 
 class PreprocessingMixin(BaseMixin, ABC):
@@ -20,7 +20,8 @@ class PreprocessingMixin(BaseMixin, ABC):
                     name="consumer_categories",
                     con=conn,
                     if_exists="append",
-                    index=False)
+                    index=False,
+                )
                 self.logger.debug("Parameter tables are inserted")
 
     def insert_version_if_not_exists(self):
@@ -32,9 +33,13 @@ class PreprocessingMixin(BaseMixin, ABC):
         if not version_exists:
             # create new version
             consumer_categories_str = CONSUMER_CATEGORIES.to_json().replace("'", "''")
-            other_parameters_dict = {"LARGE_COMPONENT_LOWER_BOUND": LARGE_COMPONENT_LOWER_BOUND,
-                                     "LARGE_COMPONENT_DIVIDER": LARGE_COMPONENT_DIVIDER, "VN": VN,
-                                     "V_BAND_LOW": V_BAND_LOW, "V_BAND_HIGH": V_BAND_HIGH, }
+            other_parameters_dict = {
+                "LARGE_COMPONENT_LOWER_BOUND": LARGE_COMPONENT_LOWER_BOUND,
+                "LARGE_COMPONENT_DIVIDER": LARGE_COMPONENT_DIVIDER,
+                "VN": VN,
+                "V_BAND_LOW": V_BAND_LOW,
+                "V_BAND_HIGH": V_BAND_HIGH,
+            }
             other_paramters_str = str(other_parameters_dict).replace("'", "''")
 
             insert_query = f"""INSERT INTO version (version_id, version_comment, consumer_categories, other_parameters) VALUES
@@ -44,17 +49,19 @@ class PreprocessingMixin(BaseMixin, ABC):
                 f"Version: {VERSION_ID} (created for the first time)")
 
     def get_postcode_table_for_regional_identifier(
-            self, regional_identifier: int) -> pd.DataFrame:
+        self, regional_identifier: int
+    ) -> pd.DataFrame:
         """get postcode table for given regional_identifier"""
         query = """SELECT *
                    FROM postcode
                    WHERE regional_identifier = %(p)s;"""
         df_postcode = pd.read_sql_query(
-            query, con=self.conn, params={
-                "p": regional_identifier})
+            query, con=self.conn, params={"p": regional_identifier}
+        )
         if len(df_postcode) == 0:
             raise ValueError(
-                f"No entry in postcode table found for regional_identifier: {regional_identifier}")
+                f"No entry in postcode table found for regional_identifier: {regional_identifier}"
+            )
         return df_postcode
 
     def copy_postcode_result_table(self, regional_identifier: int) -> None:
@@ -92,8 +99,8 @@ class PreprocessingMixin(BaseMixin, ABC):
         SET regional_identifier = %(regional_identifier)s
         WHERE regional_identifier ISNULL;"""
         self.cur.execute(
-            query, {
-                "v": VERSION_ID, "regional_identifier": regional_identifier})
+            query, {"v": VERSION_ID, "regional_identifier": regional_identifier}
+        )
 
     def set_other_buildings_table(self, regional_identifier: int):
         """
@@ -119,8 +126,8 @@ class PreprocessingMixin(BaseMixin, ABC):
         SET floors = 1
         WHERE floors ISNULL;"""
         self.cur.execute(
-            query, {
-                "v": VERSION_ID, "regional_identifier": regional_identifier})
+            query, {"v": VERSION_ID, "regional_identifier": regional_identifier}
+        )
 
     def remove_duplicate_buildings(self):
         """
@@ -169,7 +176,8 @@ class PreprocessingMixin(BaseMixin, ABC):
 
         if not result or result[1] is None:
             raise ValueError(
-                f"No area data found in postcode table for regional_identifier: {regional_identifier}")
+                f"No area data found in postcode table for regional_identifier: {regional_identifier}"
+            )
 
         total_load_kw, area_km2 = result
 
@@ -179,12 +187,14 @@ class PreprocessingMixin(BaseMixin, ABC):
 
         if area_km2 <= 0:
             raise ValueError(
-                f"Invalid area ({area_km2}) for regional_identifier: {regional_identifier}")
+                f"Invalid area ({area_km2}) for regional_identifier: {regional_identifier}"
+            )
 
         # Calculate load density in MVA/km² using power factor
-        load_density_mva_km2 = (total_load_kw / POWER_FACTOR) / 1000 / area_km2
+        load_density_mva_km2 = total_load_kw / (POWER_FACTOR * 1000 * area_km2)
         self.logger.info(
-            f"Load density for: {regional_identifier} is {load_density_mva_km2} MVA/km²")
+            f"Load density for: {regional_identifier} is {load_density_mva_km2} MVA/km²"
+        )
 
         # Update database with load density and set settlement types based on
         # thresholds
@@ -200,13 +210,15 @@ class PreprocessingMixin(BaseMixin, ABC):
                   AND postcode_result_regional_identifier = %(p)s;"""
 
         self.cur.execute(
-            query, {
+            query,
+            {
                 "v": VERSION_ID,
                 "load_density": load_density_mva_km2,
                 "p": regional_identifier,
                 "rural_threshold": RURAL_LD,
-                "urban_threshold": URBAN_LD
-            })
+                "urban_threshold": URBAN_LD,
+            },
+        )
 
     def set_building_peak_load(self) -> int:
         """
@@ -237,9 +249,9 @@ class PreprocessingMixin(BaseMixin, ABC):
                     END);"""
         self.cur.execute(query, {"avg_apartment_area": AVG_APARTMENT_AREA})
 
-        count_query = ("""SELECT COUNT(*)
+        count_query = """SELECT COUNT(*)
                           FROM buildings_tem
-                          WHERE peak_load_in_kw = 0;""")
+                          WHERE peak_load_in_kw = 0;"""
         self.cur.execute(count_query)
         count = self.cur.fetchone()[0]
 
@@ -294,7 +306,8 @@ class PreprocessingMixin(BaseMixin, ABC):
                 "lower": LV_THRESHOLD_KW, "upper": MV_THRESHOLD_KW})
         lv_count, mv_count, zeroed_count = self.cur.fetchone()
         self.logger.info(
-            f"Grid-level assignment: LV={lv_count}, MV={mv_count}, Zeroed={zeroed_count}")
+            f"Grid-level assignment: LV={lv_count}, MV={mv_count}, Zeroed={zeroed_count}"
+        )
         return
 
     def remove_zero_peak_load_buildings(self) -> int:
@@ -308,7 +321,8 @@ class PreprocessingMixin(BaseMixin, ABC):
         self.cur.execute(query)
         self.logger.info(
             f"Buildings with peak load = 0 removed from buildings_tem, {
-                self.cur.rowcount} buildings removed")
+                self.cur.rowcount} buildings removed"
+        )
         return
 
     def assign_close_buildings(self) -> None:
@@ -422,7 +436,8 @@ class PreprocessingMixin(BaseMixin, ABC):
 
         if count == 0:
             raise ValueError(
-                f"Ways table is empty for the given regional_identifier: {regional_identifier}")
+                f"Ways table is empty for the given regional_identifier: {regional_identifier}"
+            )
 
         return count
 
@@ -479,9 +494,11 @@ class PreprocessingMixin(BaseMixin, ABC):
         if result and result[0] > 0:
             groups, total_segments, to_remove = result
             self.logger.info(
-                f"Found {groups} duplicate geometry groups with {total_segments} total segments")
+                f"Found {groups} duplicate geometry groups with {total_segments} total segments"
+            )
             self.logger.info(
-                f"Removing {to_remove} duplicate segments (keeping 1 per group)")
+                f"Removing {to_remove} duplicate segments (keeping 1 per group)"
+            )
 
             # Remove duplicates - keep the one with the smallest way_id
             remove_query = """
@@ -554,5 +571,8 @@ class PreprocessingMixin(BaseMixin, ABC):
         """get fips log: the fips code of the region of interest of which the buildings have already been imported to the database"""
         query = """SELECT *
                    FROM fips_log;"""
-        df_query = pd.read_sql_query(query, con=self.conn, )
+        df_query = pd.read_sql_query(
+            query,
+            con=self.conn,
+        )
         return df_query

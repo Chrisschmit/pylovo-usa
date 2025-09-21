@@ -1,19 +1,19 @@
-# generate the grid for the regional_identifier set below
-# building data import is included
-
 import os
 import subprocess
 import sys
 import time
 
-from plotting.plot_for_region import (
-    plot_boxplot_regional_identifier,
-    plot_pie_of_trafo_cables,
-)
+from plotting.plot_for_region import (plot_boxplot_regional_identifier,
+                                      plot_pie_of_trafo_cables)
 from src.config_loader import ANALYZE_GRIDS, REGION
 from src.database.database_client import DatabaseClient
 from src.grid_generator import GridGenerator
-from src.load_data.load_buildings import import_buildings_for_single_regional_identifier
+from src.load_data.load_buildings import \
+    import_buildings_for_single_regional_identifier
+
+# generate the grid for the regional_identifier set below
+# building data import is included
+
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
@@ -58,7 +58,8 @@ def main():
 
     if plot_results:
         # plot data from the generated grids
-        cluster_list = gg.dbc.get_list_from_regional_identifier(regional_identifier)
+        cluster_list = gg.dbc.get_list_from_regional_identifier(
+            regional_identifier)
         print("The regional_identifier has", len(cluster_list), "grids.")
         print(cluster_list)
         plot_boxplot_regional_identifier(regional_identifier)
@@ -67,7 +68,8 @@ def main():
     # End timing and print results
     elapsed_time = time.time() - start_time
     minutes, seconds = divmod(elapsed_time, 60)
-    print(f"--- Elapsed Time: {int(minutes)} minutes and {seconds:.2f} seconds ---")
+    print(
+        f"--- Elapsed Time: {int(minutes)} minutes and {seconds:.2f} seconds ---")
 
 
 if __name__ == "__main__":
