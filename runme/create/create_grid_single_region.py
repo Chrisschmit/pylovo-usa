@@ -5,7 +5,7 @@ import time
 
 from plotting.plot_for_region import (plot_boxplot_regional_identifier,
                                       plot_pie_of_trafo_cables)
-from src.config_loader import ANALYZE_GRIDS, REGION
+from src.config_loader import REGION
 from src.database.database_client import DatabaseClient
 from src.grid_generator import GridGenerator
 from src.load_data.load_buildings import \
@@ -57,7 +57,7 @@ def main():
 
     # generate a grid for the specified region
     gg.generate_grid_for_single_regional_identifier(
-        regional_identifier=regional_identifier, analyze_grids=ANALYZE_GRIDS
+        regional_identifier=regional_identifier
     )
 
     if plot_results:

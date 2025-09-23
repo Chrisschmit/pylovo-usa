@@ -285,7 +285,10 @@ CREATE_QUERIES = {
         ratio numeric,
         vsw_per_branch numeric,
         max_vsw_of_a_branch numeric,
-        
+
+        mv_parameters JSONB,
+        lv_parameters JSONB,
+
         filtered boolean,
         CONSTRAINT fk_clustering_parameters_grid_result
             FOREIGN KEY (grid_result_id)
@@ -375,8 +378,6 @@ CREATE_QUERIES = {
             ON DELETE CASCADE
     )
     """,
-    # old name: grid_parameters
-    # saves grid parameters for a whole regional_identifier for visualization
     "regional_identifier_parameters": """
     CREATE TABLE IF NOT EXISTS regional_identifier_parameters (
         version_id varchar(10) NOT NULL,

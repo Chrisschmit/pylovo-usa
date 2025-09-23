@@ -10,7 +10,6 @@ from src.cable_installation.electrical_grid_builder import \
     ElectricalGridBuilder
 from src.config_loader import *
 from src.electrical_backend.altdss_backend import AltDSSBackend
-from src.parameter_calculator import ParameterCalculator
 
 
 class ResultExistsError(Exception):
@@ -40,7 +39,7 @@ class GridGenerator:
     # ------------------------------------------------------------
 
     def generate_grid_for_single_regional_identifier(
-        self, regional_identifier: str, analyze_grids: bool = False
+        self, regional_identifier: str
     ) -> None:
         """
         Generates the grid for a single regional_identifier.
@@ -63,11 +62,6 @@ class GridGenerator:
             self.generate_grid()
             # Save data from temporary tables to result tables
             self.dbc.save_tables(regional_identifier=self.regional_identifier)
-            if analyze_grids:
-                pc = ParameterCalculator()
-                pc.calc_parameters_per_regional_identifier(
-                    regional_identifier=self.regional_identifier
-                )
         except ResultExistsError:
             self.dbc.logger.info(
                 f"Grid for the postcode area {regional_identifier} has already been generated."
@@ -95,14 +89,12 @@ class GridGenerator:
         )
 
     def generate_grid_for_multiple_regional_identifier(
-        self, df_regional_identifier: pd.DataFrame, analyze_grids: bool = False
+        self, df_regional_identifier: pd.DataFrame
     ) -> None:
         """generates grid for all regional_identifier contained in the column 'regional_identifier' of df_samples
 
         :param df_regional_identifier: table that contains regional_identifier for grid generation
         :type df_regional_identifier: pd.DataFrame
-        :param analyze_grids: option to analyse the results after grid generation, defaults to False
-        :type analyze_grids: bool
         """
         self.dbc.create_temp_tables()  # create temp tables for the grid generation
 
@@ -119,11 +111,6 @@ class GridGenerator:
                 self.dbc.save_tables(
                     regional_identifier=self.regional_identifier)
                 self.dbc.reset_tables()  # Reset temporary tables
-                if analyze_grids:
-                    pc = ParameterCalculator()
-                    pc.calc_parameters_per_regional_identifier(
-                        regional_identifier=self.regional_identifier
-                    )
             except ResultExistsError:
                 self.dbc.logger.info(
                     f"Grid for the postcode area {
@@ -220,6 +207,11 @@ class GridGenerator:
 
         # Remove all buildings from buildings_tem with peak load = 0
         self.dbc.remove_zero_peak_load_buildings()
+
+        # for debugging purposes, i want to keep only 2 buildings for LV and
+        # two for MV, please write me the function quick andd dirty
+        self.dbc.keep_only_n_buildings_for_LV(n=100)
+        self.dbc.keep_only_n_buildings_for_MV(n=100)
 
     def prepare_transformers(self):
         """

@@ -5,7 +5,6 @@ import time
 
 import pandas as pd
 
-from src.config_loader import ANALYZE_GRIDS
 from src.grid_generator import GridGenerator
 from src.load_data.load_buildings import \
     import_buildings_for_multiple_regional_identifier
@@ -29,8 +28,7 @@ gg = GridGenerator()
 df_regional_identifier = pd.DataFrame(
     list(map(str, regional_identifier_list)), columns=['fips_code'])
 gg.generate_grid_for_multiple_regional_identifier(
-    df_regional_identifier=df_regional_identifier,
-    analyze_grids=ANALYZE_GRIDS)
+    df_regional_identifier=df_regional_identifier)
 
 # end timing and print results
 elapsed_time = time.time() - start_time

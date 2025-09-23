@@ -2,7 +2,6 @@ import warnings
 from abc import ABC
 from typing import Any, Dict, List, Tuple
 
-import pandapower as pp
 from shapely.geometry import LineString
 
 from src.config_loader import *
@@ -16,48 +15,6 @@ warnings.simplefilter(action="ignore", category=UserWarning)
 class GridMixin(BaseMixin, ABC):
     def __init__(self):
         super().__init__()
-
-    def create_cable_std_type(self, net: pp.pandapowerNet) -> None:
-        # TODO Refactor
-        """Create standard pandapower cable types from equipment_data table."""
-        query = """
-                SELECT name,
-                       r_ohm_per_km,
-                       x_ohm_per_km,
-                       max_i_a / 1000.0       as max_i_ka
-                FROM equipment_data
-                WHERE type = 'Cable' \
-                """
-
-        # Execute query and fetch cable data
-        self.cur.execute(query)
-        cables = self.cur.fetchall()
-
-        # Create standard type for each cable in the database
-        for cable in cables:
-            name, r_ohm_per_km, x_ohm_per_km, max_i_ka = cable
-            pp_name = name.replace("_", " ")  # Extract name
-            q_mm2 = int(name.split("_")[-1])  # Extract cross-section from name
-
-            pp.create_std_type(
-                net,
-                {
-                    "r_ohm_per_km": float(r_ohm_per_km),
-                    "x_ohm_per_km": float(x_ohm_per_km),
-                    "max_i_ka": float(max_i_ka),
-                    # Set to zero for our standard grids
-                    "c_nf_per_km": float(0),
-                    "q_mm2": q_mm2,
-                },
-                name=pp_name,
-                element="line",
-            )
-
-        self.logger.debug(
-            f"Created {
-                len(cables)} standard cable types from equipment_data table"
-        )
-        return None
 
     def get_vertices_from_bcid(
         self, regional_identifier: int, kcid: int, bcid: int, scid
@@ -639,21 +596,32 @@ class GridMixin(BaseMixin, ABC):
                 grid_data, str) else grid_data
         )
 
-        query = """
-        UPDATE grid_result
-        SET grid = %s
-        WHERE version_id = %s
-          AND regional_identifier = %s
-          AND kcid = %s
-          AND scid = %s
+        # Use UPSERT to ensure grid_result row exists
+        upsert_query = """
+        INSERT INTO grid_result (
+            version_id, regional_identifier, kcid, scid,
+            substation_rated_power, substation_vertice_id,
+            equipment_id, model_status, grid
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (version_id, regional_identifier, kcid, scid)
+        DO UPDATE SET
+            grid = EXCLUDED.grid,
+            model_status = COALESCE(EXCLUDED.model_status, grid_result.model_status)
         """
+
+        # Set default values for missing fields (will be updated during
+        # clustering if needed)
         self.cur.execute(
-            query,
+            upsert_query,
             (
-                grid_json,
                 str(VERSION_ID),
                 int(regional_identifier),
                 int(kcid),
                 int(scid),
+                0,  # default substation_rated_power
+                0,  # default substation_vertice_id
+                None,  # equipment_id = NULL (avoid FK constraint)
+                1,  # model_status = 1 (completed)
+                grid_json,
             ),
         )

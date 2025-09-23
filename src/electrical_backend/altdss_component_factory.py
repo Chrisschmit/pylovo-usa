@@ -95,7 +95,6 @@ class AltDSSComponentFactory:
             kVAs=[equipment.s_max_kva, equipment.s_max_kva],
             pctRs=[0.5, 0.5],  # Default resistances
             XHL=equipment.reactance_pu * 100 if equipment.reactance_pu else 7.0,
-            # Skip no-load losses for now - can be set later if needed
         )
 
         self._components_created["transformers"].append(transformer)
@@ -533,9 +532,6 @@ class AltDSSComponentFactory:
         Returns:
             Created single-phase line object
         """
-        # Map phase letters to AltDSS numeric suffixes
-        phase_map = {"A": "1", "B": "2", "C": "3"}
-        phase_suffix = phase_map.get(phase, "1")
 
         # Create single-phase line code if needed
         line_code = self.create_single_phase_line_code(cable, phase)
@@ -543,9 +539,8 @@ class AltDSSComponentFactory:
         # Create line with phase-specific bus connections
         line = self.dss.Line.new(
             name,
-            Bus1=f"{bus1}.{phase_suffix}",
-            # Single-phase connection (implicit neutral)
-            Bus2=f"{bus2}.{phase_suffix}",
+            Bus1=bus1,
+            Bus2=bus2,
             LineCode=line_code,
             Length=length_km,
             Units="km",
@@ -554,7 +549,7 @@ class AltDSSComponentFactory:
 
         self._components_created["lines"].append(line)
         self.logger.debug(
-            f"Created single-phase line {name}: {bus1}.{phase_suffix} -> {bus2}.{phase_suffix}, {length_km}km"
+            f"Created single-phase line {name}: {bus1} -> {bus2}, {length_km}km"
         )
         return line
 
@@ -598,7 +593,6 @@ class AltDSSComponentFactory:
         equipment: TransformerEquipment,
         mv_bus: str,
         lv_bus: str,
-        mv_phase: str = "A"
     ) -> Any:
         """
         Create US residential split-phase transformer with center-tap.
@@ -611,14 +605,10 @@ class AltDSSComponentFactory:
             equipment: Transformer equipment data
             mv_bus: MV side bus name
             lv_bus: LV side bus name
-            mv_phase: MV phase connection ("A", "B", or "C")
 
         Returns:
             Created split-phase transformer object
         """
-        # Map phase letters to AltDSS numeric suffixes
-        phase_map = {"A": "1", "B": "2", "C": "3"}
-        mv_suffix = phase_map.get(mv_phase, "1")
 
         # Calculate MV phase-to-neutral voltage
         mv_ph_neutral_kv = equipment.primary_voltage_kv / 1.732  # L-L to L-N
@@ -630,9 +620,11 @@ class AltDSSComponentFactory:
             Windings=3,
             # Buses: MV phase-neutral, LV hot1-neutral, LV hot2-neutral
             Buses=[
-                f"{mv_bus}.{mv_suffix}",      # MV phase (implicit neutral)
-                f"{lv_bus}.1",                # LV hot leg 1 (implicit neutral)
-                f"{lv_bus}.2"                 # LV hot leg 2 (implicit neutral)
+                mv_bus,      # MV phase (implicit neutral)
+                # LV hot leg 1 (implicit neutral)
+                f"{lv_bus}.1.0",
+                # LV hot leg 2 (implicit neutral)
+                f"{lv_bus}.0.2"
             ],
             Conns=["wye", "wye", "wye"],      # All wye connections
             # Primary 7.2kV, two 120V secondaries
@@ -641,16 +633,15 @@ class AltDSSComponentFactory:
                 equipment.s_max_kva,
                 equipment.s_max_kva,
                 equipment.s_max_kva],
-            pctRs=[0.5, 0.5, 0.5],           # Winding resistances
-            XHL=1.5,  # Reactance H-L (primary to secondary 1)
-            XHT=1.5,  # Reactance H-T (primary to secondary 2)
-            # Reactance L-T (between secondaries - low for center-tap)
-            XLT=0.5
+            pctRs=[0.6, 1.2, 1.2],
+            XHL=2.04,                   # high‑to‑low reactance in percent
+            XHT=2.04,                   # high‑to‑tertiary reactance in percent
+            XLT=1.36             # Winding resistances
         )
 
         self._components_created["transformers"].append(transformer)
         self.logger.debug(
-            f"Created split-phase transformer {name}: {mv_bus}.{mv_suffix} -> {lv_bus} (120/240V), {
+            f"Created split-phase transformer {name}: {mv_bus} -> {lv_bus} (120/240V), {
                 equipment.s_max_kva}kVA"
         )
         return transformer
@@ -662,7 +653,6 @@ class AltDSSComponentFactory:
         kw: float,
         kvar: float,
         kv: float,
-        phase: str = "A",
         conn: str = "wye"
     ) -> Any:
         """
@@ -674,30 +664,23 @@ class AltDSSComponentFactory:
             kw: Active power in kW
             kvar: Reactive power in kvar
             kv: Voltage in kV (should be 0.120 for US residential)
-            phase: Phase assignment ("A", "B", or "C")
             conn: Connection type
 
         Returns:
             Created single-phase load object
         """
-        # Map phase letters to AltDSS numeric suffixes
-        phase_map = {"A": "1", "B": "2", "C": "3"}
-        phase_suffix = phase_map.get(phase, "1")
-
         # Create single-phase load with phase-specific bus connection
         load = self.dss.Load.new(
             name,
-            Bus1=f"{bus}.{phase_suffix}",
-            # Single-phase wye connection (implicit neutral)
+            Bus1=bus,
             Phases=1,
             kV=kv,  # Should be 0.120 for US residential L-N voltage
             kW=kw,
             kvar=kvar,
             Conn=conn,
-            Model=1  # Constant PQ model
+            Model=1
         )
 
         self._components_created["loads"].append(load)
-        self.logger.debug(
-            f"Created single-phase load {name}: {kw}kW at {bus}.{phase_suffix}")
+
         return load

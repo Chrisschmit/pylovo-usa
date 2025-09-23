@@ -219,10 +219,12 @@ class AnalysisMixin(BaseMixin, ABC):
                    reactance,
                    ratio,
                    vsw_per_branch,
-                   max_vsw_of_a_branch
+                   max_vsw_of_a_branch,
+                   mv_parameters,
+                   lv_parameters
                   )
                   VALUES (
-                  (SELECT grid_result_id FROM grid_result WHERE version_id = %(version_id)s AND regional_identifier = %(regional_identifier)s AND bcid = %(bcid)s AND kcid = %(kcid)s),
+                  (SELECT grid_result_id FROM grid_result WHERE version_id = %(version_id)s AND regional_identifier = %(regional_identifier)s AND scid = %(scid)s AND kcid = %(kcid)s),
                   %(no_connection_buses)s,
                   %(no_branches)s,
                   %(no_house_connections)s,
@@ -244,7 +246,9 @@ class AnalysisMixin(BaseMixin, ABC):
                   %(reactance)s,
                   %(ratio)s,
                   %(vsw_per_branch)s,
-                  %(max_vsw_of_a_branch)s);"""
+                  %(max_vsw_of_a_branch)s,
+                  %(mv_parameters)s,
+                  %(lv_parameters)s);"""
 
         self.cur.execute(insert_query, params)
         self.conn.commit()

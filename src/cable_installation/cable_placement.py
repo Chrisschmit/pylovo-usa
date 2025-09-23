@@ -27,7 +27,7 @@ class CablePlacementAlgorithm:
     Implements cable placement algorithms for electrical distribution networks.
 
     Extracted from GridGenerator._install_cables_for_cluster with refactoring
-    to work with component specifications instead of direct pandapower creation.
+    to work with component specifications.
     """
 
     def __init__(
@@ -1063,6 +1063,7 @@ class CablePlacementAlgorithm:
                     kvar=peak_kw * 0.3,
                     kv=12.47,  # L-L for 3φ wye
                     n_phases=3,
+                    phase="ABC",
                     conn="wye",
                     building_id=str(osm_id),
                     vertex_id=vid,
