@@ -37,8 +37,7 @@ class AnalysisMixin(BaseMixin, ABC):
         )
         self.logger.debug("basic parameter count finished")
 
-    def insert_cable_length(self, regional_identifier: int,
-                            cable_length_string: str):
+    def insert_cable_length(self, regional_identifier: int, cable_length_string: str):
         update_query = """UPDATE regional_identifier_parameters
                           SET cable_length = %(c)s
                           WHERE version_id = %(v)s
@@ -82,9 +81,7 @@ class AnalysisMixin(BaseMixin, ABC):
         )
         self.logger.debug("per trafo analysis finished")
 
-    def save_pp_net_with_json(
-        self, regional_identifier: int, kcid: int, bcid: int, json_string: str
-    ) -> None:
+    def save_pp_net_with_json(self, regional_identifier: int, kcid: int, bcid: int, json_string: str) -> None:
         insert_query = """UPDATE grid_result
                            SET grid = %s
                            WHERE version_id = %s
@@ -109,9 +106,7 @@ class AnalysisMixin(BaseMixin, ABC):
         self.cur.execute(query, {"v": VERSION_ID, "p": regional_identifier})
         return int(self.cur.fetchone()[0])
 
-    def read_per_trafo_dict(
-        self, regional_identifier: int
-    ) -> tuple[list[dict], list[str], dict]:
+    def read_per_trafo_dict(self, regional_identifier: int) -> tuple[list[dict], list[str], dict]:
         read_query = """SELECT load_count_per_trafo,
                                bus_count_per_trafo,
                                sim_peak_load_per_trafo,
@@ -120,9 +115,7 @@ class AnalysisMixin(BaseMixin, ABC):
                         FROM regional_identifier_parameters
                         WHERE version_id = %(v)s
                           AND regional_identifier = %(p)s;"""
-        self.cur.execute(
-            read_query, {
-                "v": VERSION_ID, "p": regional_identifier})
+        self.cur.execute(read_query, {"v": VERSION_ID, "p": regional_identifier})
         result = self.cur.fetchall()
 
         # Sort all parameters according to transformer size
@@ -151,9 +144,7 @@ class AnalysisMixin(BaseMixin, ABC):
 
         return data_list, data_labels, trafo_dict
 
-    def read_net(
-        self, regional_identifier: int, kcid: int, bcid: int
-    ) -> pp.pandapowerNet:
+    def read_net(self, regional_identifier: int, kcid: int, bcid: int) -> pp.pandapowerNet:
         """
         Reads a pandapower network from the database for the specified grid.
 
@@ -169,22 +160,14 @@ class AnalysisMixin(BaseMixin, ABC):
             ValueError: If the requested grid does not exist in the database
         """
         read_query = "SELECT grid FROM grid_result WHERE version_id = %s AND regional_identifier = %s AND kcid = %s AND bcid = %s LIMIT 1"
-        self.cur.execute(
-            read_query,
-            vars=(
-                VERSION_ID,
-                regional_identifier,
-                kcid,
-                bcid))
+        self.cur.execute(read_query, vars=(VERSION_ID, regional_identifier, kcid, bcid))
 
         result = self.cur.fetchall()
         if not result:
             self.logger.error(
                 f"Grid not found for regional_identifier={regional_identifier}, kcid={kcid}, bcid={bcid}, version_id={VERSION_ID}"
             )
-            raise ValueError(
-                f"Grid not found for regional_identifier={regional_identifier}, kcid={kcid}, bcid={bcid}"
-            )
+            raise ValueError(f"Grid not found for regional_identifier={regional_identifier}, kcid={kcid}, bcid={bcid}")
 
         grid_tuple = result[0]
         grid_dict = grid_tuple[0]
@@ -266,11 +249,7 @@ class AnalysisMixin(BaseMixin, ABC):
         """
         if kwargs:
             filters = " AND " + " AND ".join(
-                [
-                    f"{key} = {value}"
-                    for key, value in kwargs.items()
-                    if key != "version_id"
-                ]
+                [f"{key} = {value}" for key, value in kwargs.items() if key != "version_id"]
             )
         else:
             filters = ""
@@ -308,11 +287,7 @@ class AnalysisMixin(BaseMixin, ABC):
         """
         if kwargs:
             filters = " AND " + " AND ".join(
-                [
-                    f"{key} = {value}"
-                    for key, value in kwargs.items()
-                    if key != "version_id"
-                ]
+                [f"{key} = {value}" for key, value in kwargs.items() if key != "version_id"]
             )
         else:
             filters = ""
@@ -347,9 +322,7 @@ class AnalysisMixin(BaseMixin, ABC):
                         FROM regional_identifier_parameters
                         WHERE version_id = %(v)s
                           AND regional_identifier = %(p)s;"""
-        self.cur.execute(
-            read_query, {
-                "v": VERSION_ID, "p": regional_identifier})
+        self.cur.execute(read_query, {"v": VERSION_ID, "p": regional_identifier})
         trafo_num_dict = self.cur.fetchall()[0][0]
 
         return trafo_num_dict
@@ -359,9 +332,7 @@ class AnalysisMixin(BaseMixin, ABC):
                         FROM regional_identifier_parameters
                         WHERE version_id = %(v)s
                           AND regional_identifier = %(p)s;"""
-        self.cur.execute(
-            read_query, {
-                "v": VERSION_ID, "p": regional_identifier})
+        self.cur.execute(read_query, {"v": VERSION_ID, "p": regional_identifier})
         cable_length = self.cur.fetchall()[0][0]
 
         return cable_length
@@ -376,7 +347,7 @@ class AnalysisMixin(BaseMixin, ABC):
         Returns:
             bool: True if record exists, False otherwise
         """
-        query = f"""
+        query = """
             SELECT 1
             FROM regional_identifier_parameters
             WHERE version_id = %(version_id)s AND regional_identifier = %(regional_identifier)s

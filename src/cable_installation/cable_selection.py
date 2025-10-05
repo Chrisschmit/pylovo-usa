@@ -6,14 +6,12 @@ equipment_data table and supports the hierarchical MV-LV grid construction appro
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
 from ..config_loader import BASE_VOLTAGE_V, VOLTAGE_DROP_LIMIT_PCT
 from ..database.database_client import DatabaseClient
-from ..equipment_schema import (CableEquipment,
-                                create_equipment_from_database_row)
+from ..equipment_schema import CableEquipment, create_equipment_from_database_row
 
 
 class CableSelector:
@@ -22,9 +20,7 @@ class CableSelector:
     and integrates with equipment_data table.
     """
 
-    def __init__(
-        self, database: DatabaseClient, logger: Optional[logging.Logger] = None
-    ):
+    def __init__(self, database: DatabaseClient, logger: logging.Logger | None = None):
         """
         Initialize voltage-aware cable selector.
 
@@ -36,15 +32,15 @@ class CableSelector:
         self.logger = logger or logging.getLogger(__name__)
 
         # Cache for cable data to avoid repeated database queries
-        self._cable_cache: Dict[str, List[CableEquipment]] = {}
+        self._cable_cache: dict[str, list[CableEquipment]] = {}
 
     # Currently default only 3 phase cables are supported
     def get_available_cables(
         self,
         voltage_level: str,
-        application_area: Optional[int] = None,
+        application_area: int | None = None,
         n_phases: int = 3,
-    ) -> List[CableEquipment]:
+    ) -> list[CableEquipment]:
         """
         Get available cables filtered by voltage level and optional settlement type.
 
@@ -80,9 +76,8 @@ class CableSelector:
             columns = [desc[0] for desc in self.database.cur.description]
 
             for row in rows:
-                cable_dict = dict(zip(columns, row))
+                cable_dict = dict(zip(columns, row, strict=False))
                 try:
-
                     cable = create_equipment_from_database_row(cable_dict)
                     if isinstance(cable, CableEquipment):
                         cables.append(cable)
@@ -106,9 +101,9 @@ class CableSelector:
         required_current_a: float,
         voltage_level: str,
         distance_km: float = 0,
-        application_area: Optional[int] = None,
+        application_area: int | None = None,
         n_phases: int = 3,
-    ) -> Tuple[Optional[CableEquipment], int]:
+    ) -> tuple[CableEquipment | None, int]:
         """
         Find optimal cable considering voltage level, current capacity, and voltage drop.
 
@@ -121,19 +116,14 @@ class CableSelector:
         Returns:
             Tuple of (selected_cable, parallel_count) or (None, 0) if no suitable cable found
         """
-        available_cables = self.get_available_cables(
-            voltage_level, application_area, n_phases
-        )
+        available_cables = self.get_available_cables(voltage_level, application_area, n_phases)
 
         if not available_cables:
-            self.logger.warning(
-                f"No cables available for {voltage_level} level")
+            self.logger.warning(f"No cables available for {voltage_level} level")
             return None, 0
 
         base_voltage_v = float(BASE_VOLTAGE_V.get(voltage_level, 416))
-        voltage_drop_limit_pct = float(
-            VOLTAGE_DROP_LIMIT_PCT.get(
-                voltage_level, 4.5))
+        voltage_drop_limit_pct = float(VOLTAGE_DROP_LIMIT_PCT.get(voltage_level, 4.5))
 
         # Try increasing numbers of parallel cables until a suitable cable is
         # found
@@ -142,11 +132,7 @@ class CableSelector:
             current_per_cable = required_current_a / parallel_count
 
             # Filter cables by current capacity
-            suitable_cables = [
-                cable
-                for cable in available_cables
-                if cable.max_i_a >= current_per_cable
-            ]
+            suitable_cables = [cable for cable in available_cables if cable.max_i_a >= current_per_cable]
 
             if not suitable_cables:
                 parallel_count += 1
@@ -158,15 +144,10 @@ class CableSelector:
 
                 for cable in suitable_cables:
                     # Calculate cable impedance (Z = sqrt(R^2 + X^2))
-                    impedance_ohm_per_km = np.sqrt(
-                        float(cable.r_ohm_per_km) ** 2 +
-                        float(cable.x_ohm_per_km) ** 2
-                    )
+                    impedance_ohm_per_km = np.sqrt(float(cable.r_ohm_per_km) ** 2 + float(cable.x_ohm_per_km) ** 2)
 
                     # Voltage drop = I * Z * L / parallel_count
-                    voltage_drop_v = (
-                        required_current_a * impedance_ohm_per_km * distance_km
-                    ) / parallel_count
+                    voltage_drop_v = (required_current_a * impedance_ohm_per_km * distance_km) / parallel_count
                     voltage_drop_pct = (voltage_drop_v / base_voltage_v) * 100
 
                     if voltage_drop_pct <= voltage_drop_limit_pct:
@@ -175,8 +156,7 @@ class CableSelector:
                 if voltage_drop_suitable:
                     # Select cable with smallest current rating (most
                     # economical)
-                    optimal_cable = min(
-                        voltage_drop_suitable, key=lambda c: c.max_i_a)
+                    optimal_cable = min(voltage_drop_suitable, key=lambda c: c.max_i_a)
                     return optimal_cable, parallel_count
             else:
                 # No voltage drop constraint - select smallest suitable cable

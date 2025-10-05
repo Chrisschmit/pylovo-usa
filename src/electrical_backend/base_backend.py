@@ -7,7 +7,7 @@ algorithms from the specific electrical simulation software.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any
 
 
 class IElectricalBackend(ABC):
@@ -20,8 +20,7 @@ class IElectricalBackend(ABC):
     """
 
     @abstractmethod
-    def initialize_circuit(self, name: str, source_bus: str,
-                           primary_kv: float) -> None:
+    def initialize_circuit(self, name: str, source_bus: str, primary_kv: float) -> None:
         """
         Initialize a new electrical circuit.
 
@@ -53,7 +52,7 @@ class IElectricalBackend(ABC):
         """
 
     @abstractmethod
-    def export_to_format(self) -> Dict[str, Any]:
+    def export_to_format(self) -> dict[str, Any]:
         """
         Export circuit to configured format.
 
@@ -66,7 +65,7 @@ class IElectricalBackend(ABC):
         """Clean up resources and reset backend state."""
 
     @abstractmethod
-    def get_circuit_metrics(self) -> Dict[str, Any]:
+    def get_circuit_metrics(self) -> dict[str, Any]:
         """
         Get key circuit metrics after solving.
 

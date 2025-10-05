@@ -6,10 +6,8 @@ import time
 import pandas as pd
 
 from src.grid_generator import GridGenerator
-from src.load_data.load_buildings import \
-    import_buildings_for_multiple_regional_identifier
-from src.load_data.load_transformers import \
-    import_transformers_for_multiple_regional_identifiers
+from src.load_data.load_buildings import import_buildings_for_multiple_regional_identifier
+from src.load_data.load_transformers import import_transformers_for_multiple_regional_identifiers
 
 # start timing the script
 start_time = time.time()
@@ -18,20 +16,15 @@ start_time = time.time()
 regional_identifier_list = [2501711000, 2501713135]
 
 # import buildings and transformers, then generate grids
-import_buildings_for_multiple_regional_identifier(
-    regional_identifier_list=regional_identifier_list)
-import_transformers_for_multiple_regional_identifiers(
-    regional_identifier_list=regional_identifier_list)
+import_buildings_for_multiple_regional_identifier(regional_identifier_list=regional_identifier_list)
+import_transformers_for_multiple_regional_identifiers(regional_identifier_list=regional_identifier_list)
 
 # initialize GridGenerator
 gg = GridGenerator()
-df_regional_identifier = pd.DataFrame(
-    list(map(str, regional_identifier_list)), columns=['fips_code'])
-gg.generate_grid_for_multiple_regional_identifier(
-    df_regional_identifier=df_regional_identifier)
+df_regional_identifier = pd.DataFrame(list(map(str, regional_identifier_list)), columns=["fips_code"])
+gg.generate_grid_for_multiple_regional_identifier(df_regional_identifier=df_regional_identifier)
 
 # end timing and print results
 elapsed_time = time.time() - start_time
 minutes, seconds = divmod(elapsed_time, 60)
-print(
-    f"--- Elapsed Time: {int(minutes)} minutes and {seconds:.2f} seconds ---")
+print(f"--- Elapsed Time: {int(minutes)} minutes and {seconds:.2f} seconds ---")

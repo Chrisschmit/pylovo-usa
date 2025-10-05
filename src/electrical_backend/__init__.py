@@ -4,8 +4,4 @@ from .altdss_backend import AltDSSBackend, AltDSSBackendError
 from .altdss_component_factory import AltDSSComponentFactory
 from .base_backend import IElectricalBackend
 
-__all__ = [
-    'IElectricalBackend',
-    'AltDSSBackend',
-    'AltDSSBackendError',
-    'AltDSSComponentFactory']
+__all__ = ["IElectricalBackend", "AltDSSBackend", "AltDSSBackendError", "AltDSSComponentFactory"]

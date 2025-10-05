@@ -20,8 +20,7 @@ from scipy.spatial.distance import squareform
 from src import utils
 from src.config_loader import *
 from src.database.base_mixin import BaseMixin
-from src.equipment_schema import (InfrastructureCluster, LVLoadAggregator,
-                                  MVLoadAggregator, TransformerEquipment)
+from src.equipment_schema import InfrastructureCluster, LVLoadAggregator, MVLoadAggregator, TransformerEquipment
 
 warnings.simplefilter(action="ignore", category=UserWarning)
 
@@ -73,30 +72,22 @@ class ClusteringMixin(BaseMixin, ABC):
                 n_phases = 3
 
             # Load equipment catalog
-            equipment_catalog = self._load_equipment_catalog(
-                settlement_type, grid_level, n_phases=n_phases
-            )
+            equipment_catalog = self._load_equipment_catalog(settlement_type, grid_level, n_phases=n_phases)
 
             if not equipment_catalog:
-                self.logger.warning(
-                    f"No equipment available for {grid_level} placement"
-                )
+                self.logger.warning(f"No equipment available for {grid_level} placement")
                 return []
 
             # Load building and consumer data
-            buildings_df = self._get_buildings(
-                kcid, regional_identifier, grid_level)
+            buildings_df = self._get_buildings(kcid, regional_identifier, grid_level)
             consumer_df = self._get_consumer_categories()
 
             # Get distance matrix and create vertex mapping using unified
             # approach
-            localid2vid, dist_mat, _ = self.get_distance_matrix(
-                kcid, regional_identifier, grid_level
-            )
+            localid2vid, dist_mat, _ = self.get_distance_matrix(kcid, regional_identifier, grid_level)
 
             if dist_mat.size == 0 or len(localid2vid) <= 1:
-                self.logger.warning(
-                    f"Insufficient data for clustering in kcid {kcid}")
+                self.logger.warning(f"Insufficient data for clustering in kcid {kcid}")
                 return []
 
             # Create initial linkage matrix
@@ -124,10 +115,7 @@ class ClusteringMixin(BaseMixin, ABC):
             return infrastructure_clusters
 
         except Exception as e:
-            self.logger.error(
-                f"Error in {grid_level} infrastructure placement for "
-                f"kcid {kcid}: {str(e)}"
-            )
+            self.logger.error(f"Error in {grid_level} infrastructure placement for " f"kcid {kcid}: {str(e)}")
             raise
 
     def _clustering(
@@ -146,8 +134,7 @@ class ClusteringMixin(BaseMixin, ABC):
         Uses maxclust criterion and iterative approach.
         """
         # Convert equipment catalog to old format for compatibility
-        equipment_capacities = np.array(
-            [eq.s_max_kva for eq in equipment_catalog])
+        equipment_capacities = np.array([eq.s_max_kva for eq in equipment_catalog])
         equipment_capacities = np.sort(equipment_capacities)
 
         # Create double transformer options (similar to old approach)
@@ -171,16 +158,12 @@ class ClusteringMixin(BaseMixin, ABC):
         while True:
             iteration_count += 1
             if iteration_count > max_iterations:
-                self.logger.error(
-                    f"Maximum iterations ({max_iterations}) reached in clustering!"
-                )
+                self.logger.error(f"Maximum iterations ({max_iterations}) reached in clustering!")
                 break
 
             # Count buildings before clustering
             buildings_in_current_iteration = len(new_localid2vid)
-            self.logger.debug(
-                f"Iteration {iteration_count}: {buildings_in_current_iteration} buildings"
-            )
+            self.logger.debug(f"Iteration {iteration_count}: {buildings_in_current_iteration} buildings")
 
             # Try clustering with current cluster amount
             invalid_cluster_dict, cluster_dict, _ = self._try_clustering(
@@ -196,33 +179,22 @@ class ClusteringMixin(BaseMixin, ABC):
             # Process valid clusters
             if cluster_dict:
                 current_valid_amount = len(valid_cluster_dict)
-                valid_cluster_dict.update(
-                    {x + current_valid_amount: y for x, y in cluster_dict.items()}
-                )
+                valid_cluster_dict.update({x + current_valid_amount: y for x, y in cluster_dict.items()})
                 # reindexing the dict with enumerate
-                valid_cluster_dict = dict(
-                    enumerate(valid_cluster_dict.values()))
+                valid_cluster_dict = dict(enumerate(valid_cluster_dict.values()))
 
             # Process invalid clusters - ADD them to accumulator
             if invalid_cluster_dict:
                 current_invalid_amount = len(invalid_trans_cluster_dict)
                 invalid_trans_cluster_dict.update(
-                    {
-                        x + current_invalid_amount: y
-                        for x, y in invalid_cluster_dict.items()
-                    }
+                    {x + current_invalid_amount: y for x, y in invalid_cluster_dict.items()}
                 )
-                invalid_trans_cluster_dict = dict(
-                    enumerate(invalid_trans_cluster_dict.values())
-                )
+                invalid_trans_cluster_dict = dict(enumerate(invalid_trans_cluster_dict.values()))
 
             # Count buildings in valid and invalid clusters
-            buildings_in_valid = sum(
-                len(cluster[0]) for cluster in valid_cluster_dict.values()
-            )
+            buildings_in_valid = sum(len(cluster[0]) for cluster in valid_cluster_dict.values())
             buildings_in_invalid = (
-                sum(len(cluster)
-                    for cluster in invalid_trans_cluster_dict.values())
+                sum(len(cluster) for cluster in invalid_trans_cluster_dict.values())
                 if invalid_trans_cluster_dict
                 else 0
             )
@@ -263,17 +235,12 @@ class ClusteringMixin(BaseMixin, ABC):
                 # Get first invalid cluster for re-clustering
                 invalid_vertice_ids = list(invalid_trans_cluster_dict[0])
                 vid2localid = {v: k for k, v in localid2vid.items()}
-                invalid_local_ids = [
-                    vid2localid[v] for v in invalid_vertice_ids if v in vid2localid
-                ]
+                invalid_local_ids = [vid2localid[v] for v in invalid_vertice_ids if v in vid2localid]
 
                 # Create new mappings and distance matrix for the subclustering
-                new_localid2vid = {
-                    k: v for k, v in localid2vid.items() if k in invalid_local_ids
-                }
+                new_localid2vid = {k: v for k, v in localid2vid.items() if k in invalid_local_ids}
                 new_localid2vid = dict(enumerate(new_localid2vid.values()))
-                new_dist_mat = dist_mat[np.ix_(
-                    invalid_local_ids, invalid_local_ids)]
+                new_dist_mat = dist_mat[np.ix_(invalid_local_ids, invalid_local_ids)]
                 new_dist_vector = squareform(new_dist_mat)
 
                 # Prepare for next iteration
@@ -283,14 +250,10 @@ class ClusteringMixin(BaseMixin, ABC):
                 # Delete the processed invalid cluster (just like old
                 # implementation)
                 del invalid_trans_cluster_dict[0]
-                invalid_trans_cluster_dict = dict(
-                    enumerate(invalid_trans_cluster_dict.values())
-                )
+                invalid_trans_cluster_dict = dict(enumerate(invalid_trans_cluster_dict.values()))
 
                 # Log what we're carrying forward
-                remaining_buildings = sum(
-                    len(cluster) for cluster in invalid_trans_cluster_dict.values()
-                )
+                remaining_buildings = sum(len(cluster) for cluster in invalid_trans_cluster_dict.values())
                 self.logger.debug(
                     f"After processing 1 invalid cluster, "
                     f"{len(invalid_trans_cluster_dict)} invalid clusters remain "
@@ -298,9 +261,7 @@ class ClusteringMixin(BaseMixin, ABC):
                 )
 
         # Final verification: Check all buildings are assigned
-        final_assigned_buildings = sum(
-            len(cluster[0]) for cluster in valid_cluster_dict.values()
-        )
+        final_assigned_buildings = sum(len(cluster[0]) for cluster in valid_cluster_dict.values())
         if final_assigned_buildings != total_buildings_initial:
             self.logger.error(
                 f"CRITICAL: Building assignment mismatch! "
@@ -327,8 +288,7 @@ class ClusteringMixin(BaseMixin, ABC):
 
         # Convert valid clusters to InfrastructureCluster objects
         infrastructure_clusters = []
-        for cluster_id, (cluster_nodes,
-                         transformer_size) in valid_cluster_dict.items():
+        for cluster_id, (cluster_nodes, transformer_size) in valid_cluster_dict.items():
             # Find equipment that matches the selected transformer size
             selected_equipment = None
             for eq in equipment_catalog:
@@ -338,18 +298,12 @@ class ClusteringMixin(BaseMixin, ABC):
 
             # If no exact match, find closest larger equipment
             if selected_equipment is None:
-                suitable_equipment = [
-                    eq for eq in equipment_catalog if eq.s_max_kva >= transformer_size
-                ]
+                suitable_equipment = [eq for eq in equipment_catalog if eq.s_max_kva >= transformer_size]
                 if suitable_equipment:
-                    selected_equipment = min(
-                        suitable_equipment, key=lambda eq: eq.s_max_kva
-                    )
+                    selected_equipment = min(suitable_equipment, key=lambda eq: eq.s_max_kva)
                 else:
                     # Fallback to largest available equipment
-                    selected_equipment = max(
-                        equipment_catalog, key=lambda eq: eq.s_max_kva
-                    )
+                    selected_equipment = max(equipment_catalog, key=lambda eq: eq.s_max_kva)
 
             infrastructure_cluster = self._create_infrastructure_cluster(
                 cluster_id=cluster_id,
@@ -395,45 +349,32 @@ class ClusteringMixin(BaseMixin, ABC):
         for cluster_id in range(1, cluster_count + 1):
             # Python list of vertex ids that belong to the current
             # hierarchical-cluster
-            vid_list = [
-                localid2vid[lid[0]] for lid in np.argwhere(flat_groups == cluster_id)
-            ]
-            total_sim_load = utils.simultaneousPeakLoad(
-                buildings, consumer_cat_df, vid_list
-            )
+            vid_list = [localid2vid[lid[0]] for lid in np.argwhere(flat_groups == cluster_id)]
+            total_sim_load = utils.simultaneousPeakLoad(buildings, consumer_cat_df, vid_list)
 
             # Too large load and buildings count >5 --> invalid cluster
-            if total_sim_load >= max(
-                    transformer_capacities) and len(vid_list) >= 5:
+            if total_sim_load >= max(transformer_capacities) and len(vid_list) >= 5:
                 invalid_cluster_dict[cluster_id] = vid_list
 
             # Load can be served by a given transformer --> valid cluster
             elif total_sim_load < max(transformer_capacities):
                 # find the smallest transformer that satisfies the load
-                optimal_transformer = transformer_capacities[
-                    transformer_capacities > total_sim_load
-                ][0]
+                optimal_transformer = transformer_capacities[transformer_capacities > total_sim_load][0]
 
                 if len(double_trans) > 0:
                     # Check if any double transformer can handle the load
-                    suitable_double_trans = double_trans[
-                        double_trans > total_sim_load * 1.15
-                    ]
+                    suitable_double_trans = double_trans[double_trans > total_sim_load * 1.15]
                     if len(suitable_double_trans) > 0:
                         optimal_double_transformer = suitable_double_trans[0]
-                        if (optimal_double_transformer - total_sim_load) > (
-                            optimal_transformer - total_sim_load
-                        ):
-                            cluster_dict[cluster_id] = (
-                                vid_list, optimal_transformer)
+                        if (optimal_double_transformer - total_sim_load) > (optimal_transformer - total_sim_load):
+                            cluster_dict[cluster_id] = (vid_list, optimal_transformer)
                         else:
                             cluster_dict[cluster_id] = (
                                 vid_list,
                                 optimal_double_transformer,
                             )
                     else:
-                        cluster_dict[cluster_id] = (
-                            vid_list, optimal_transformer)
+                        cluster_dict[cluster_id] = (vid_list, optimal_transformer)
                 else:
                     cluster_dict[cluster_id] = (vid_list, optimal_transformer)
             else:
@@ -562,11 +503,7 @@ class ClusteringMixin(BaseMixin, ABC):
         candidate_nodes = []
 
         # Add LV transformer vertices
-        self.cur.execute(
-            lv_transformer_query,
-            (kcid,
-             regional_identifier,
-             VERSION_ID))
+        self.cur.execute(lv_transformer_query, (kcid, regional_identifier, VERSION_ID))
         lv_transformers = self.cur.fetchall()
         candidate_nodes.extend([row[0] for row in lv_transformers])
 
@@ -605,20 +542,16 @@ class ClusteringMixin(BaseMixin, ABC):
         ORDER BY s_max_kva ASC
         """
 
-        self.cur.execute(
-            query, (application_area_tuple, voltage_level, n_phases))
+        self.cur.execute(query, (application_area_tuple, voltage_level, n_phases))
         results = self.cur.fetchall()
 
         # Convert to list of dictionaries
         columns = [desc[0] for desc in self.cur.description]
-        equipment_data = [dict(zip(columns, row)) for row in results]
+        equipment_data = [dict(zip(columns, row, strict=False)) for row in results]
 
-        return [TransformerEquipment.from_database_row(
-            row) for row in equipment_data]
+        return [TransformerEquipment.from_database_row(row) for row in equipment_data]
 
-    def _get_buildings(
-        self, kcid: int, regional_identifier: int, grid_level: str = None
-    ) -> pd.DataFrame:
+    def _get_buildings(self, kcid: int, regional_identifier: int, grid_level: str = None) -> pd.DataFrame:
         """Load buildings data for the specified cluster."""
         base_query = """
         SELECT *
@@ -679,9 +612,7 @@ class ClusteringMixin(BaseMixin, ABC):
         vid2localid = {v: k for k, v in localid2vid.items()}
 
         # Get local indices for cluster nodes
-        cluster_local_ids = [
-            vid2localid[vid] for vid in cluster_nodes if vid in vid2localid
-        ]
+        cluster_local_ids = [vid2localid[vid] for vid in cluster_nodes if vid in vid2localid]
 
         if not cluster_local_ids:
             return cluster_nodes[0]
@@ -692,9 +623,7 @@ class ClusteringMixin(BaseMixin, ABC):
             # This is a connection_point, NOT a vertice_id!
             connection_point = localid2vid[local_id]
             # Match by connection_point, not vertice_id
-            building = buildings_df[
-                buildings_df["connection_point"] == connection_point
-            ]
+            building = buildings_df[buildings_df["connection_point"] == connection_point]
             if not building.empty:
                 # Sum loads if multiple buildings share same connection_point
                 total_load = building["peak_load_in_kw"].sum()
@@ -705,8 +634,7 @@ class ClusteringMixin(BaseMixin, ABC):
         load_weights = np.array(load_weights)
 
         # Extract sub-distance matrix for cluster
-        cluster_dist_mat = distance_matrix[np.ix_(
-            cluster_local_ids, cluster_local_ids)]
+        cluster_dist_mat = distance_matrix[np.ix_(cluster_local_ids, cluster_local_ids)]
 
         # Calculate weighted distances
         weighted_distances = cluster_dist_mat.dot(load_weights)
@@ -775,9 +703,7 @@ class ClusteringMixin(BaseMixin, ABC):
         WHERE id IN %(v)s;"""
         self.cur.execute(query, {"v": tuple(map(int, vertices))})
 
-    def update_large_kmeans_cluster(
-        self, vertices: Union[list, tuple], cluster_count: int
-    ):
+    def update_large_kmeans_cluster(self, vertices: Union[list, tuple], cluster_count: int):
         """
         Applies k-means clustering to large components and updated values in buildings_tem
         :param vertices:
@@ -799,8 +725,7 @@ class ClusteringMixin(BaseMixin, ABC):
                 FROM kmean AS k,
                      maxk AS m
                 WHERE b.osm_id = k.osm_id;"""
-        self.cur.execute(query, {"ca": cluster_count,
-                         "v": tuple(map(int, vertices))})
+        self.cur.execute(query, {"ca": cluster_count, "v": tuple(map(int, vertices))})
 
     def update_kmeans_cluster(self, vertices: list) -> None:
         """
@@ -835,14 +760,10 @@ class ClusteringMixin(BaseMixin, ABC):
             - vid2localid: dict mapping vertex IDs to local indices
         """
         # Get candidate connection_points nodes using the efunction
-        candidate_nodes = self._get_candidate_nodes(
-            kcid, regional_identifier, grid_level
-        )
+        candidate_nodes = self._get_candidate_nodes(kcid, regional_identifier, grid_level)
 
         if not candidate_nodes:
-            self.logger.warning(
-                f"No candidate nodes found for {grid_level} in kcid {kcid}"
-            )
+            self.logger.warning(f"No candidate nodes found for {grid_level} in kcid {kcid}")
             return {}, np.array([]), {}
 
         # Generate distance matrix for these specific nodes
@@ -853,15 +774,11 @@ class ClusteringMixin(BaseMixin, ABC):
                                       false);"""
         params = {"nodes": candidate_nodes}
 
-        localid2vid, dist_mat, vid2localid = self.calculate_cost_arr_dist_matrix(
-            costmatrix_query, params
-        )
+        localid2vid, dist_mat, vid2localid = self.calculate_cost_arr_dist_matrix(costmatrix_query, params)
 
         return localid2vid, dist_mat, vid2localid
 
-    def calculate_cost_arr_dist_matrix(
-        self, costmatrix_query: str, params: dict
-    ) -> tuple[dict, np.ndarray, dict]:
+    def calculate_cost_arr_dist_matrix(self, costmatrix_query: str, params: dict) -> tuple[dict, np.ndarray, dict]:
         """
         Helper function for calculating cost array and distance matrix from given parameters
         """
@@ -870,10 +787,7 @@ class ClusteringMixin(BaseMixin, ABC):
             costmatrix_query,
             con=self.conn,
             params=params,
-            dtype={
-                "start_vid": np.int32,
-                "end_vid": np.int32,
-                "agg_cost": np.int32},
+            dtype={"start_vid": np.int32, "end_vid": np.int32, "agg_cost": np.int32},
         )
         cost_arr = cost_df.to_numpy()
         et = time.time()
@@ -900,9 +814,7 @@ class ClusteringMixin(BaseMixin, ABC):
         kcid_length = self.cur.fetchone()[0]
         return kcid_length
 
-    def get_next_unfinished_kcid(
-        self, regional_identifier: int, target_table: str = "grid_result"
-    ) -> int:
+    def get_next_unfinished_kcid(self, regional_identifier: int, target_table: str = "grid_result") -> int:
         """
         :return: one unmodeled k mean cluster ID - regional_identifier
         """
@@ -915,9 +827,7 @@ class ClusteringMixin(BaseMixin, ABC):
                      AND kcid IS NOT NULL
                    ORDER BY kcid
                    LIMIT 1;"""
-        self.cur.execute(
-            query, {"v": VERSION_ID, "regional_identifier": regional_identifier}
-        )
+        self.cur.execute(query, {"v": VERSION_ID, "regional_identifier": regional_identifier})
         kcid = self.cur.fetchone()[0]
         return kcid
 
@@ -932,14 +842,10 @@ class ClusteringMixin(BaseMixin, ABC):
                    WHERE kcid = %(k)s
                      AND type = 'Transformer';"""
         self.cur.execute(query, {"k": kcid})
-        transformers_list = (
-            [t[0] for t in data] if (data := self.cur.fetchall()) else []
-        )
+        transformers_list = [t[0] for t in data] if (data := self.cur.fetchall()) else []
         return transformers_list
 
-    def clear_lv_grid_result_in_kmean_cluster(
-        self, regional_identifier: int, kcid: int
-    ):
+    def clear_lv_grid_result_in_kmean_cluster(self, regional_identifier: int, kcid: int):
         # Remove old clustering at same postcode cluster
         clear_query = """DELETE
                          FROM lv_grid_result
@@ -1021,8 +927,7 @@ class ClusteringMixin(BaseMixin, ABC):
                      AND bcid ISNULL;"""
         self.cur.execute(query, {"p": regional_identifier, "k": kcid})
 
-    def get_greenfield_bcids(
-            self, regional_identifier: int, kcid: int) -> list:
+    def get_greenfield_bcids(self, regional_identifier: int, kcid: int) -> list:
         """
         Args:
             regional_identifier: loadarea cluster ID
@@ -1038,14 +943,10 @@ class ClusteringMixin(BaseMixin, ABC):
                    ORDER BY bcid; """
         params = {"v": VERSION_ID, "pc": regional_identifier, "kc": kcid}
         self.cur.execute(query, params)
-        bcid_list = [t[0] for t in data] if (
-            data := self.cur.fetchall()) else []
+        bcid_list = [t[0] for t in data] if (data := self.cur.fetchall()) else []
         return bcid_list
 
-    def get_buildings_from_bcid(
-        self, regional_identifier: int, kcid: int, bcid: int, scid: int = None
-    ) -> pd.DataFrame:
-
+    def get_buildings_from_bcid(self, regional_identifier: int, kcid: int, bcid: int, scid: int = None) -> pd.DataFrame:
         # Build query with optional scid filter for hierarchical structure
         scid_filter = " AND scid = %(s)s" if scid is not None else ""
 
@@ -1060,8 +961,7 @@ class ClusteringMixin(BaseMixin, ABC):
         if scid is not None:
             params["s"] = scid
 
-        buildings_df = pd.read_sql_query(
-            buildings_query, con=self.conn, params=params)
+        buildings_df = pd.read_sql_query(buildings_query, con=self.conn, params=params)
         buildings_df.set_index("vertice_id", drop=False, inplace=True)
         buildings_df.sort_index(inplace=True)
         # dropping duplicate indices
@@ -1071,9 +971,7 @@ class ClusteringMixin(BaseMixin, ABC):
 
         return buildings_df
 
-    def update_dist_transformer_rated_power(
-        self, regional_identifier: int, kcid: int, bcid: int, note: int
-    ):
+    def update_dist_transformer_rated_power(self, regional_identifier: int, kcid: int, bcid: int, note: int):
         """
         Update the transformer_rated_power (kVA) for a specific building cluster in lv_grid_result
         according to the allowed catalog for the postcode's settlement type.
@@ -1104,10 +1002,8 @@ class ClusteringMixin(BaseMixin, ABC):
         - Updates lv_grid_result.dist_transformer_rated_power for the (version_id, regional_identifier, kcid, bcid) row.
         - Emits a debug log when a double/multiple transformer group assignment occurs.
         """
-        sdl = self.get_settlement_type_from_regional_identifier(
-            regional_identifier)
-        transformer_capacities, _ = self.get_transformer_data(
-            sdl, grid_level="LV")
+        sdl = self.get_settlement_type_from_regional_identifier(regional_identifier)
+        transformer_capacities, _ = self.get_transformer_data(sdl, grid_level="LV")
 
         if note == 0:
             old_query = """SELECT dist_transformer_rated_power
@@ -1122,9 +1018,9 @@ class ClusteringMixin(BaseMixin, ABC):
             )
             transformer_rated_power = self.cur.fetchone()[0]
 
-            new_transformer_rated_power = transformer_capacities[
-                transformer_capacities > transformer_rated_power
-            ][0].item()
+            new_transformer_rated_power = transformer_capacities[transformer_capacities > transformer_rated_power][
+                0
+            ].item()
             update_query = """UPDATE lv_grid_result
                               SET dist_transformer_rated_power = %(n)s
                               WHERE version_id = %(v)s
@@ -1143,8 +1039,7 @@ class ClusteringMixin(BaseMixin, ABC):
             )
         else:
             double_trans = np.multiply(transformer_capacities[2:4], 2)
-            combined = np.concatenate(
-                (transformer_capacities, double_trans), axis=None)
+            combined = np.concatenate((transformer_capacities, double_trans), axis=None)
             np.sort(combined, axis=None)
             old_query = """SELECT dist_transformer_rated_power
                            FROM lv_grid_result
@@ -1159,8 +1054,7 @@ class ClusteringMixin(BaseMixin, ABC):
             transformer_rated_power = self.cur.fetchone()[0]
             if transformer_rated_power in combined.tolist():
                 return None
-            new_transformer_rated_power = np.ceil(
-                transformer_rated_power / 630) * 630
+            new_transformer_rated_power = np.ceil(transformer_rated_power / 630) * 630
             update_query = """UPDATE lv_grid_result
                               SET dist_transformer_rated_power = %(n)s
                               WHERE version_id = %(v)s
@@ -1177,13 +1071,9 @@ class ClusteringMixin(BaseMixin, ABC):
                     "n": new_transformer_rated_power,
                 },
             )
-            self.logger.debug(
-                "double or multiple transformer group transformer_rated_power assigned"
-            )
+            self.logger.debug("double or multiple transformer group transformer_rated_power assigned")
 
-    def get_transformer_data(
-        self, settlement_type: int = None, grid_level: str = "LV"
-    ) -> tuple[np.array, dict]:
+    def get_transformer_data(self, settlement_type: int = None, grid_level: str = "LV") -> tuple[np.array, dict]:
         """
         Args:
             Settlement type: 1=City, 2=Village, 3=Rural
@@ -1212,8 +1102,7 @@ class ClusteringMixin(BaseMixin, ABC):
 
         self.cur.execute(
             query,
-            {"tuple": application_area_tuple,
-             "transformer_type": transformer_type},
+            {"tuple": application_area_tuple, "transformer_type": transformer_type},
         )
         data = self.cur.fetchall()
         capacities = [i[0] for i in data]
@@ -1222,8 +1111,7 @@ class ClusteringMixin(BaseMixin, ABC):
         self.logger.debug("Transformer data fetched.")
         return np.array(capacities), transformer2cost
 
-    def get_settlement_type_from_regional_identifier(
-            self, regional_identifier) -> int:
+    def get_settlement_type_from_regional_identifier(self, regional_identifier) -> int:
         """
         Args:
             regional_identifier:
@@ -1238,9 +1126,7 @@ class ClusteringMixin(BaseMixin, ABC):
 
         return settlement_type
 
-    def get_lv_transformer_power_at_vertex(
-        self, vertex_id: int, kcid: int
-    ) -> Optional[float]:
+    def get_lv_transformer_power_at_vertex(self, vertex_id: int, kcid: int) -> Optional[float]:
         """
         Get LV transformer power rating at specified vertex.
         Used by MVLoadAggregator to calculate aggregate loads.
@@ -1259,9 +1145,7 @@ class ClusteringMixin(BaseMixin, ABC):
 
         return float(result[0]) if result and result[0] else None
 
-    def _update_buildings_bcid(
-        self, regional_identifier: int, kcid: int, bcid: int, node_vertices: List[int]
-    ) -> None:
+    def _update_buildings_bcid(self, regional_identifier: int, kcid: int, bcid: int, node_vertices: List[int]) -> None:
         """
         Update bcid in buildings_tem for all buildings in this cluster.
 
@@ -1282,10 +1166,7 @@ class ClusteringMixin(BaseMixin, ABC):
           AND type != 'Transformer'
         """
 
-        self.cur.execute(
-            update_query, (bcid, regional_identifier,
-                           kcid, tuple(node_vertices))
-        )
+        self.cur.execute(update_query, (bcid, regional_identifier, kcid, tuple(node_vertices)))
 
         self.logger.debug(
             f"Updated bcid={bcid} for {
@@ -1315,10 +1196,8 @@ class ClusteringMixin(BaseMixin, ABC):
         created_ids = []
 
         try:
-
             for cluster in infrastructure_clusters:
                 if grid_level == "LV":
-
                     # Insert into lv_grid_result
                     insert_query = """
                     INSERT INTO lv_grid_result (
@@ -1352,8 +1231,7 @@ class ClusteringMixin(BaseMixin, ABC):
                         regional_identifier=regional_identifier,
                         kcid=kcid,
                         bcid=int(cluster.cluster_id),
-                        node_vertices=list(int(v)
-                                           for v in cluster.node_vertices),
+                        node_vertices=list(int(v) for v in cluster.node_vertices),
                     )
 
                 elif grid_level == "MV":
@@ -1424,9 +1302,7 @@ class ClusteringMixin(BaseMixin, ABC):
             grid_result_ids: Corresponding grid result IDs
         """
         try:
-            for cluster, grid_result_id in zip(
-                infrastructure_clusters, grid_result_ids
-            ):
+            for cluster, grid_result_id in zip(infrastructure_clusters, grid_result_ids, strict=False):
                 # Get geometry for the optimal vertex (which is a
                 # connection_point on the road network)
                 geom_query = """
@@ -1435,9 +1311,7 @@ class ClusteringMixin(BaseMixin, ABC):
                 WHERE id = %s
                 """
 
-                self.cur.execute(
-                    geom_query, (EPSG, int(
-                        cluster.optimal_vertex)))
+                self.cur.execute(geom_query, (EPSG, int(cluster.optimal_vertex)))
                 geom_result = self.cur.fetchone()
 
                 if not geom_result:
@@ -1455,15 +1329,10 @@ class ClusteringMixin(BaseMixin, ABC):
                 ) VALUES (%s, %s, %s, %s, %s, %s)
                 """
 
-                lv_grid_result_id = int(
-                    grid_result_id) if grid_level == "LV" else None
-                mv_grid_result_id = int(
-                    grid_result_id) if grid_level == "MV" else None
+                lv_grid_result_id = int(grid_result_id) if grid_level == "LV" else None
+                mv_grid_result_id = int(grid_result_id) if grid_level == "MV" else None
 
-                comment = (
-                    f"{grid_level} {cluster.equipment.type} "
-                    f"{cluster.equipment.s_max_kva}kVA"
-                )
+                comment = f"{grid_level} {cluster.equipment.type} " f"{cluster.equipment.s_max_kva}kVA"
 
                 self.cur.execute(
                     insert_query,
@@ -1480,20 +1349,13 @@ class ClusteringMixin(BaseMixin, ABC):
             # If this is MV level, update existing LV transformer positions
             # to reference the MV grid_result_id
             if grid_level == "MV":
-                self._update_lv_transformer_positions_with_mv_reference(
-                    infrastructure_clusters, grid_result_ids
-                )
+                self._update_lv_transformer_positions_with_mv_reference(infrastructure_clusters, grid_result_ids)
 
-            self.logger.info(
-                f"Created {len(infrastructure_clusters)} {grid_level} "
-                f"transformer positions"
-            )
+            self.logger.info(f"Created {len(infrastructure_clusters)} {grid_level} " f"transformer positions")
 
         except Exception as e:
             self.conn.rollback()
-            self.logger.error(
-                f"Error creating {grid_level} transformer positions: {str(e)}"
-            )
+            self.logger.error(f"Error creating {grid_level} transformer positions: {str(e)}")
             raise
 
     def _update_lv_transformer_positions_with_mv_reference(
@@ -1509,9 +1371,7 @@ class ClusteringMixin(BaseMixin, ABC):
             grid_result_ids: Corresponding MV grid_result_ids
         """
         try:
-            for cluster, mv_grid_result_id in zip(
-                infrastructure_clusters, grid_result_ids
-            ):
+            for cluster, mv_grid_result_id in zip(infrastructure_clusters, grid_result_ids, strict=False):
                 # Find LV transformer vertices in this MV cluster
                 lv_transformer_vertices = []
 
@@ -1583,9 +1443,7 @@ class ClusteringMixin(BaseMixin, ABC):
         3. Propagates scid to all buildings (LV and MV) in the cluster
         """
         try:
-            for cluster, grid_result_id in zip(
-                infrastructure_clusters, grid_result_ids
-            ):
+            for cluster, grid_result_id in zip(infrastructure_clusters, grid_result_ids, strict=False):
                 scid = cluster.cluster_id
 
                 # Get LV transformer vertices and MV building vertices in this
@@ -1704,17 +1562,14 @@ class ClusteringMixin(BaseMixin, ABC):
                 )
 
             self.conn.commit()
-            self.logger.info(
-                f"Successfully updated LV-MV links for kcid {kcid}")
+            self.logger.info(f"Successfully updated LV-MV links for kcid {kcid}")
 
         except Exception as e:
             self.conn.rollback()
-            self.logger.error(
-                f"Error updating LV-MV links for kcid {kcid}: {str(e)}")
+            self.logger.error(f"Error updating LV-MV links for kcid {kcid}: {str(e)}")
             raise
 
-    def finalize_mv_substation_placement(
-            self, grid_result_ids: List[int]) -> None:
+    def finalize_mv_substation_placement(self, grid_result_ids: List[int]) -> None:
         """
         Set model_status = 1 for completed MV substation placements.
         """
@@ -1725,8 +1580,7 @@ class ClusteringMixin(BaseMixin, ABC):
             WHERE grid_result_id IN %s
               AND version_id = %s
             """
-            self.cur.execute(
-                update_query, (tuple(grid_result_ids), VERSION_ID))
+            self.cur.execute(update_query, (tuple(grid_result_ids), VERSION_ID))
 
             self.logger.info(
                 f"Finalized {

@@ -7,12 +7,11 @@ provides a clean interface for grid construction algorithms.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .altdss_component_factory import AltDSSComponentFactory
 from .base_backend import IElectricalBackend
-from .component_specs import (BusSpec, ComponentSpec, LineSpec, LoadSpec,
-                              TransformerSpec)
+from .component_specs import BusSpec, ComponentSpec, LineSpec, LoadSpec, TransformerSpec
 
 # Import AltDSS with fallback
 try:
@@ -34,7 +33,7 @@ class AltDSSBackend(IElectricalBackend):
     with the AltDSSComponentFactory for component creation.
     """
 
-    def __init__(self, logger: Optional[logging.Logger] = None):
+    def __init__(self, logger: logging.Logger | None = None):
         """
         Initialize AltDSS backend.
 
@@ -47,12 +46,9 @@ class AltDSSBackend(IElectricalBackend):
         self._circuit_name = None
 
         if altdss is None:
-            raise AltDSSBackendError(
-                "AltDSS not available. Please install altdss package."
-            )
+            raise AltDSSBackendError("AltDSS not available. Please install altdss package.")
 
-    def initialize_circuit(self, name: str, source_bus: str,
-                           primary_kv: float) -> None:
+    def initialize_circuit(self, name: str, source_bus: str, primary_kv: float) -> None:
         """
         Initialize AltDSS circuit with US distribution standards.
 
@@ -68,9 +64,7 @@ class AltDSSBackend(IElectricalBackend):
             altdss.altdss("Clear")
 
             # Create new circuit with specified primary voltage level
-            altdss.altdss(
-                f"New Circuit.{name} basekv={primary_kv} pu=1.0 phases=3 bus1={source_bus}"
-            )
+            altdss.altdss(f"New Circuit.{name} basekv={primary_kv} pu=1.0 phases=3 bus1={source_bus}")
 
             # Set US distribution voltage bases with single-phase support
             voltage_bases = [
@@ -93,14 +87,12 @@ class AltDSSBackend(IElectricalBackend):
             self._circuit_name = name
 
             # Initialize component factory
-            self.component_factory = AltDSSComponentFactory(
-                self.dss, self.logger)
+            self.component_factory = AltDSSComponentFactory(self.dss, self.logger)
 
             # Edit the existing Vsource (created by initialize_circuit) to set MVA levels
             # This avoids creating duplicate sources
             self.dss(
-                f"Edit Vsource.source basekv={primary_kv} pu=1.0 phases=3 bus1={source_bus} "
-                f"MVASC3=1000 MVASC1=900"
+                f"Edit Vsource.source basekv={primary_kv} pu=1.0 phases=3 bus1={source_bus} " f"MVASC3=1000 MVASC1=900"
             )
             self.logger.info(f"✓ Initialized AltDSS circuit: {name}")
             self.logger.debug(f"Voltage bases: {voltage_bases} kV")
@@ -125,16 +117,13 @@ class AltDSSBackend(IElectricalBackend):
             AltDSS component object
         """
         if self.component_factory is None:
-            raise AltDSSBackendError(
-                "Backend not initialized. Call initialize_circuit() first."
-            )
+            raise AltDSSBackendError("Backend not initialized. Call initialize_circuit() first.")
 
         try:
             if isinstance(spec, TransformerSpec):
                 # Check for single-phase split-phase transformer based on phase
                 # allocation
                 if spec.secondary_phases == "split_phase":
-
                     return self.component_factory.create_split_phase_transformer(
                         name=spec.name,
                         equipment=spec.equipment,
@@ -161,7 +150,6 @@ class AltDSSBackend(IElectricalBackend):
             elif isinstance(spec, LineSpec):
                 # Check for single-phase line based on phase allocation
                 if spec.phases in ["L1", "L2", "A", "B", "C"]:
-
                     return self.component_factory.create_single_phase_line(
                         name=spec.name,
                         cable=spec.cable_equipment,
@@ -181,11 +169,7 @@ class AltDSSBackend(IElectricalBackend):
                     )
             elif isinstance(spec, LoadSpec):
                 # Check for single-phase load based on phase allocation
-                if (
-                    spec.n_phases == 1 and spec.phase in [
-                        "L1", "L2", "A", "B", "C"]
-                ):
-
+                if spec.n_phases == 1 and spec.phase in ["L1", "L2", "A", "B", "C"]:
                     return self.component_factory.create_single_phase_load(
                         name=spec.name,
                         bus=spec.bus,
@@ -235,8 +219,7 @@ class AltDSSBackend(IElectricalBackend):
             True if power flow converged, False otherwise
         """
         if self.dss is None:
-            raise AltDSSBackendError(
-                "No AltDSS instance available for analysis")
+            raise AltDSSBackendError("No AltDSS instance available for analysis")
 
         try:
             # CRITICAL: Calculate voltage bases before solving
@@ -259,7 +242,7 @@ class AltDSSBackend(IElectricalBackend):
             self.logger.error(f"Power flow solution failed: {str(e)}")
             return False
 
-    def export_to_format(self) -> Dict[str, Any]:
+    def export_to_format(self) -> dict[str, Any]:
         """
         Export to JSON with metadata.
 
@@ -275,7 +258,7 @@ class AltDSSBackend(IElectricalBackend):
             # Export using AltDSS built-in JSON functionality
             json_str = self.dss.to_json()
 
-            self.logger.info(f"✓ Exported circuit to JSON format")
+            self.logger.info("✓ Exported circuit to JSON format")
             return json_str
 
         except Exception as e:
@@ -314,7 +297,7 @@ class AltDSSBackend(IElectricalBackend):
 
         self.logger.debug("✓ AltDSS cleanup completed")
 
-    def get_circuit_metrics(self) -> Dict[str, Any]:
+    def get_circuit_metrics(self) -> dict[str, Any]:
         """
         Get key circuit metrics after solving.
 
@@ -344,8 +327,7 @@ class AltDSSBackend(IElectricalBackend):
             if bus_voltages is not None and len(bus_voltages) > 0:
                 metrics["min_voltage_pu"] = min(bus_voltages)
                 metrics["max_voltage_pu"] = max(bus_voltages)
-                metrics["avg_voltage_pu"] = sum(
-                    bus_voltages) / len(bus_voltages)
+                metrics["avg_voltage_pu"] = sum(bus_voltages) / len(bus_voltages)
 
                 # Log voltage validation info
                 min_v, max_v, avg_v = (

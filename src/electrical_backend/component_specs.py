@@ -7,7 +7,6 @@ serve as an intermediate format between grid construction algorithms and backend
 """
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 from ..equipment_schema import CableEquipment, TransformerEquipment
 
@@ -25,9 +24,9 @@ class BusSpec(ComponentSpec):
     """Bus specification."""
 
     voltage_kv: float = 0.208  # US standard LV three-phase voltage (208Y/120V)
-    coordinates: Optional[Tuple[float, float]] = None
+    coordinates: tuple[float, float] | None = None
     n_phases: int = 3
-    vertex_id: Optional[int] = None
+    vertex_id: int | None = None
 
     def __post_init__(self):
         self.component_type = "bus"
@@ -39,12 +38,12 @@ class TransformerSpec(ComponentSpec):
 
     bus1: str = ""  # Primary side bus
     bus2: str = ""  # Secondary side bus
-    equipment: Optional[TransformerEquipment] = None
-    kva: Optional[float] = None  # Override equipment rating if needed
-    coordinates: Optional[Tuple[float, float]] = None
-    primary_phases: Optional[str] = None
-    secondary_phases: Optional[str] = None
-    vertex_id: Optional[int] = None
+    equipment: TransformerEquipment | None = None
+    kva: float | None = None  # Override equipment rating if needed
+    coordinates: tuple[float, float] | None = None
+    primary_phases: str | None = None
+    secondary_phases: str | None = None
+    vertex_id: int | None = None
 
     def __post_init__(self):
         self.component_type = "transformer"
@@ -56,13 +55,13 @@ class LineSpec(ComponentSpec):
 
     bus1: str = ""  # From bus
     bus2: str = ""  # To bus
-    cable_equipment: Optional[CableEquipment] = None  # From equipment_data
+    cable_equipment: CableEquipment | None = None  # From equipment_data
     length_km: float = 0.0
     parallel: int = 1  # Number of parallel cables
-    coordinates: Optional[list] = None
-    phases: Optional[str] = None
-    from_vertex_id: Optional[int] = None
-    to_vertex_id: Optional[int] = None
+    coordinates: list | None = None
+    phases: str | None = None
+    from_vertex_id: int | None = None
+    to_vertex_id: int | None = None
 
     def __post_init__(self):
         self.component_type = "line"
@@ -79,10 +78,10 @@ class LoadSpec(ComponentSpec):
     n_phases: int = 3
     conn: str = "wye"  # Connection type
     load_type: str = "residential"
-    building_id: Optional[str] = None
-    coordinates: Optional[Tuple[float, float]] = None
-    phase: Optional[str] = None
-    vertex_id: Optional[int] = None
+    building_id: str | None = None
+    coordinates: tuple[float, float] | None = None
+    phase: str | None = None
+    vertex_id: int | None = None
 
     def __post_init__(self):
         self.component_type = "load"

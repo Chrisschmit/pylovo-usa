@@ -7,9 +7,7 @@ from src import utils
 from src.config_loader import CSV_FILE_LIST, LOG_FILE, LOG_LEVEL
 from src.database.database_constructor import DatabaseConstructor
 
-logger = utils.create_logger(
-    name="main_constructor", log_level=LOG_LEVEL, log_file=LOG_FILE
-)
+logger = utils.create_logger(name="main_constructor", log_level=LOG_LEVEL, log_file=LOG_FILE)
 
 
 def main():
@@ -33,7 +31,7 @@ def main():
         sgc.csv_to_db(file_dict, overwrite=True)
 
     # Create table with data from osm
-    logger.info("### POPULATE public_2po_4pgr TABLE (~30 min) ###")
+    logger.info("### POPULATE road_network TABLE (~30 min) ###")
     sgc.create_public_2po_table()
 
     # Transform these data into our ways table

@@ -17,12 +17,12 @@ def import_transformers_for_single_regional_identifier(gg: GridGenerator):
     regional_identifier = gg.regional_identifier
 
     # Retrieve postcode entry for logging
-    postcode_entry = dbc_client.get_postcode_table_for_regional_identifier(
-        regional_identifier)
+    postcode_entry = dbc_client.get_postcode_table_for_regional_identifier(regional_identifier)
     gg.logger.info(
         f"Loading transformers for {
             postcode_entry.iloc[0]['regional_identifier']} "
-        f"{postcode_entry.iloc[0]['county_name']}")
+        f"{postcode_entry.iloc[0]['county_name']}"
+    )
 
     # Define the path for transformer GeoJSON file
     data_path = os.path.abspath(
@@ -30,20 +30,19 @@ def import_transformers_for_single_regional_identifier(gg: GridGenerator):
             PROJECT_ROOT,
             "raw_data",
             "imports",
-            REGION['STATE'].replace(' ', '_'),
-            REGION['COUNTY'].replace(' ', '_'),
-            REGION['COUNTY_SUBDIVISION'].replace(' ', '_'),
-            "OSM"
-        ))
+            REGION["STATE"].replace(" ", "_"),
+            REGION["COUNTY"].replace(" ", "_"),
+            REGION["COUNTY_SUBDIVISION"].replace(" ", "_"),
+            "OSM",
+        )
+    )
 
     # Look for power.geojson file
     power_geojson_path = os.path.join(data_path, "power.geojson")
 
     # Check if file exists
     if not os.path.isfile(power_geojson_path):
-        gg.logger.warning(
-            f"Transformer file not found at {power_geojson_path}. "
-            f"Skipping transformer import.")
+        gg.logger.warning(f"Transformer file not found at {power_geojson_path}. " f"Skipping transformer import.")
         return
 
     gg.logger.info(f"Found transformer file at {power_geojson_path}")
@@ -56,7 +55,8 @@ def import_transformers_for_single_regional_identifier(gg: GridGenerator):
             if existing_count > 0:
                 gg.logger.info(
                     f"Found {existing_count} existing transformers in database. "
-                    f"New transformers will be added if they don't already exist.")
+                    f"New transformers will be added if they don't already exist."
+                )
     except Exception as e:
         gg.logger.debug(f"Could not check existing transformers: {e}")
 
@@ -64,12 +64,10 @@ def import_transformers_for_single_regional_identifier(gg: GridGenerator):
     sgc = DatabaseConstructor(dbc_obj=dbc_client)
     sgc.transformers_to_db(power_geojson_path)
 
-    gg.logger.info(
-        f"Transformers for FIPS code {regional_identifier} have been successfully processed.")
+    gg.logger.info(f"Transformers for FIPS code {regional_identifier} have been successfully processed.")
 
 
-def import_transformers_for_multiple_regional_identifiers(
-        regional_identifier_list: list[int]):
+def import_transformers_for_multiple_regional_identifiers(regional_identifier_list: list[int]):
     """
     Imports transformer data to db for multiple regional_identifiers.
 

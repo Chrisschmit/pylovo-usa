@@ -1,13 +1,12 @@
 import warnings
 from abc import ABC
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from shapely.geometry import LineString
 
 from src.config_loader import *
 from src.database.base_mixin import BaseMixin
-from src.equipment_schema import (TransformerEquipment,
-                                  create_equipment_from_database_row)
+from src.equipment_schema import TransformerEquipment, create_equipment_from_database_row
 
 warnings.simplefilter(action="ignore", category=UserWarning)
 
@@ -16,9 +15,7 @@ class GridMixin(BaseMixin, ABC):
     def __init__(self):
         super().__init__()
 
-    def get_vertices_from_bcid(
-        self, regional_identifier: int, kcid: int, bcid: int, scid
-    ) -> tuple[dict, int]:
+    def get_vertices_from_bcid(self, regional_identifier: int, kcid: int, bcid: int, scid) -> tuple[dict, int]:
         """
         Get vertices and distance mapping for LV cable placement algorithm.
 
@@ -46,14 +43,11 @@ class GridMixin(BaseMixin, ABC):
                                 AND kcid = %s
                                 AND scid = %s
                                 AND bcid = %s"""
-        self.cur.execute(
-            transformer_query, (VERSION_ID,
-                                regional_identifier, kcid, scid, bcid)
-        )
+        self.cur.execute(transformer_query, (VERSION_ID, regional_identifier, kcid, scid, bcid))
         result = self.cur.fetchone()
         transformer = result[0] if result else None
 
-        consumer_query = f"""SELECT vertice_id
+        consumer_query = """SELECT vertice_id
                             FROM buildings_tem
                             WHERE regional_identifier = %(p)s
                               AND kcid = %(k)s
@@ -64,7 +58,7 @@ class GridMixin(BaseMixin, ABC):
         self.cur.execute(consumer_query, params)
         consumer = [t[0] for t in self.cur.fetchall()]
 
-        connection_query = f"""SELECT DISTINCT connection_point
+        connection_query = """SELECT DISTINCT connection_point
                               FROM buildings_tem
                               WHERE regional_identifier = %(p)s
                                 AND kcid = %(k)s
@@ -82,15 +76,11 @@ class GridMixin(BaseMixin, ABC):
         data = self.cur.fetchall()
         # data contains tuples of (vertex_id, routing_distance_meters) from the Dijkstra query
         # t[0] = vertex ID, t[1] = routing distance in meters
-        vertex_distance_mapping = {
-            t[0]: t[1] for t in data if t[0] in consumer or t[0] in connection
-        }
+        vertex_distance_mapping = {t[0]: t[1] for t in data if t[0] in consumer or t[0] in connection}
 
         return vertex_distance_mapping, transformer
 
-    def get_transformer_geom_from_bcid(
-        self, regional_identifier: int, kcid: int, bcid: int
-    ):
+    def get_transformer_geom_from_bcid(self, regional_identifier: int, kcid: int, bcid: int):
         query = """SELECT ST_X(ST_Transform(geom, 4326)), ST_Y(ST_Transform(geom, 4326))
                    FROM transformer_positions tp
                             JOIN grid_result gr
@@ -99,27 +89,19 @@ class GridMixin(BaseMixin, ABC):
                      AND regional_identifier = %(p)s
                      AND kcid = %(k)s
                      AND bcid = %(b)s;"""
-        self.cur.execute(
-            query, {"v": VERSION_ID, "p": regional_identifier,
-                    "k": kcid, "b": bcid}
-        )
+        self.cur.execute(query, {"v": VERSION_ID, "p": regional_identifier, "k": kcid, "b": bcid})
         geo = self.cur.fetchone()
 
         return geo
 
-    def get_transformer_rated_power_from_bcid(
-        self, regional_identifier: int, kcid: int, bcid: int
-    ) -> int:
+    def get_transformer_rated_power_from_bcid(self, regional_identifier: int, kcid: int, bcid: int) -> int:
         query = """SELECT transformer_rated_power
                    FROM grid_result
                    WHERE version_id = %(v)s
                      AND regional_identifier = %(p)s
                      AND kcid = %(k)s
                      AND bcid = %(b)s;"""
-        self.cur.execute(
-            query, {"v": VERSION_ID, "p": regional_identifier,
-                    "k": kcid, "b": bcid}
-        )
+        self.cur.execute(query, {"v": VERSION_ID, "p": regional_identifier, "k": kcid, "b": bcid})
         transformer_rated_power = self.cur.fetchone()[0]
 
         return transformer_rated_power
@@ -134,7 +116,6 @@ class GridMixin(BaseMixin, ABC):
         return geo
 
     def get_vertices_from_connection_points(self, connection: list) -> list:
-
         query = """SELECT vertice_id
                    FROM buildings_tem
                    WHERE connection_point IN %(c)s
@@ -180,7 +161,7 @@ class GridMixin(BaseMixin, ABC):
         load_vertex: int,
         substation_vertex_id: int,
         geom_col: str = "geom",  # set to "geom" if that's your column
-    ) -> Tuple[List[int], float]:
+    ) -> tuple[list[int], float]:
         """
         Returns (path_nodes, length_meters) for the shortest path between two vertices.
         Length is computed on WGS84 geography (meters). Works even if ways_tem is projected.
@@ -215,9 +196,7 @@ class GridMixin(BaseMixin, ABC):
             0.0
         ) AS meters;
         """
-        self.cur.execute(
-            sql, {
-                "start": load_vertex, "goal": substation_vertex_id})
+        self.cur.execute(sql, {"start": load_vertex, "goal": substation_vertex_id})
         row = self.cur.fetchone()
         if not row:
             return [], 0.0
@@ -339,9 +318,7 @@ class GridMixin(BaseMixin, ABC):
         length_km: float,
     ) -> None:
         """DEPRECATED: Use insert_lv_line or insert_mv_line instead."""
-        self.logger.warning(
-            "insert_lines is deprecated. Use insert_lv_line() for LV networks."
-        )
+        self.logger.warning("insert_lines is deprecated. Use insert_lv_line() for LV networks.")
         # Convert to new format - assume LV line if bcid is provided
         scid = 0  # Default scid for legacy compatibility
         self.insert_lv_line(
@@ -366,7 +343,7 @@ class GridMixin(BaseMixin, ABC):
         Returns:
             bool: True if record exists, False otherwise
         """
-        query = f"""
+        query = """
             SELECT 1
             FROM postcode_result
             WHERE version_id = %(version_id)s AND postcode_result_regional_identifier = %(regional_identifier)s
@@ -380,9 +357,7 @@ class GridMixin(BaseMixin, ABC):
         result = self.cur.fetchone()
         return result is not None
 
-    def get_substation_for_scid(
-        self, kcid: int, scid: int
-    ) -> Tuple[TransformerEquipment, int]:
+    def get_substation_for_scid(self, kcid: int, scid: int) -> tuple[TransformerEquipment, int]:
         """
         Get substation data with full equipment specifications for MV network construction.
 
@@ -417,7 +392,7 @@ class GridMixin(BaseMixin, ABC):
 
             # Convert to dict and create equipment object
             columns = [desc[0] for desc in self.cur.description]
-            equipment_dict = dict(zip(columns, equipment_row))
+            equipment_dict = dict(zip(columns, equipment_row, strict=False))
             equipment = create_equipment_from_database_row(equipment_dict)
 
             return (
@@ -427,7 +402,7 @@ class GridMixin(BaseMixin, ABC):
 
         return None
 
-    def get_lv_transformers_for_scid(self, kcid: int, scid: int) -> List[dict]:
+    def get_lv_transformers_for_scid(self, kcid: int, scid: int) -> list[dict]:
         """
         Get all LV transformers with full equipment specifications for a given scid.
 
@@ -466,7 +441,7 @@ class GridMixin(BaseMixin, ABC):
 
             # Convert to dict and create equipment object
             columns = [desc[0] for desc in self.cur.description]
-            equipment_dict = dict(zip(columns, equipment_row))
+            equipment_dict = dict(zip(columns, equipment_row, strict=False))
             equipment = create_equipment_from_database_row(equipment_dict)
 
             transformer_list.append(
@@ -480,7 +455,7 @@ class GridMixin(BaseMixin, ABC):
 
         return transformer_list
 
-    def get_mv_buildings_for_scid(self, kcid: int, scid: int) -> List[dict]:
+    def get_mv_buildings_for_scid(self, kcid: int, scid: int) -> list[dict]:
         """
         Get MV buildings (high load buildings that connect directly to MV) for a given scid.
 
@@ -509,7 +484,7 @@ class GridMixin(BaseMixin, ABC):
             for row in results
         ]
 
-    def get_bcids_for_scid(self, kcid: int, scid: int) -> List[int]:
+    def get_bcids_for_scid(self, kcid: int, scid: int) -> list[int]:
         """
         Get all bcid clusters under a given substation cluster (scid).
 
@@ -529,8 +504,7 @@ class GridMixin(BaseMixin, ABC):
 
         return [row[0] for row in results]
 
-    def get_lv_transformer_for_bcid(
-            self, kcid: int, scid: int, bcid: int) -> dict:
+    def get_lv_transformer_for_bcid(self, kcid: int, scid: int, bcid: int) -> dict:
         """
         Get LV transformer data with full equipment specifications for a specific bcid cluster.
 
@@ -567,7 +541,7 @@ class GridMixin(BaseMixin, ABC):
 
             # Convert to dict and create equipment object
             columns = [desc[0] for desc in self.cur.description]
-            equipment_dict = dict(zip(columns, equipment_row))
+            equipment_dict = dict(zip(columns, equipment_row, strict=False))
             equipment = create_equipment_from_database_row(equipment_dict)
 
             return {
@@ -577,9 +551,7 @@ class GridMixin(BaseMixin, ABC):
             }
         return None
 
-    def save_grid_cluster(
-        self, regional_identifier: int, kcid: int, scid: int, grid_data: Dict[str, Any]
-    ) -> None:
+    def save_grid_cluster(self, regional_identifier: int, kcid: int, scid: int, grid_data: dict[str, Any]) -> None:
         """
         Save grid construction results for a single cluster to database.
 
@@ -591,10 +563,7 @@ class GridMixin(BaseMixin, ABC):
         import json
 
         # Convert grid_data to JSON string if needed
-        grid_json = (
-            json.dumps(grid_data) if not isinstance(
-                grid_data, str) else grid_data
-        )
+        grid_json = json.dumps(grid_data) if not isinstance(grid_data, str) else grid_data
 
         # Use UPSERT to ensure grid_result row exists
         upsert_query = """

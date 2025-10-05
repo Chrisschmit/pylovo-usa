@@ -1,12 +1,11 @@
 import warnings
 from abc import ABC
-from typing import Dict
 
 from config.config_table_structure import *
 from src.config_loader import *
 from src.database.base_mixin import BaseMixin
 
-warnings.simplefilter(action='ignore', category=UserWarning)
+warnings.simplefilter(action="ignore", category=UserWarning)
 
 
 class UtilsMixin(BaseMixin, ABC):
@@ -29,8 +28,7 @@ class UtilsMixin(BaseMixin, ABC):
     def commit_changes(self):
         self.conn.commit()
 
-    def get_list_from_regional_identifier(
-            self, regional_identifier: int) -> list:
+    def get_list_from_regional_identifier(self, regional_identifier: int) -> list:
         query = """SELECT DISTINCT kcid, scid
                    FROM grid_result
                    WHERE version_id = %(v)s
@@ -41,17 +39,13 @@ class UtilsMixin(BaseMixin, ABC):
 
         return cluster_list
 
-    def get_regional_identifier_from_region(
-            self, region: Dict[str, str]) -> int:
+    def get_regional_identifier_from_region(self, region: dict[str, str]) -> int:
         query = """SELECT regional_identifier
                    FROM postcode
                    WHERE state_abbr = %(st)s
                     AND county_name = %(c)s
                     AND subdivision_name = %(s)s;"""
-        self.cur.execute(query,
-                         {"st": region['STATE'],
-                          "c": region['COUNTY'],
-                             "s": region['COUNTY_SUBDIVISION']})
+        self.cur.execute(query, {"st": region["STATE"], "c": region["COUNTY"], "s": region["COUNTY_SUBDIVISION"]})
         regional_identifier = self.cur.fetchone()[0]
         return regional_identifier
 

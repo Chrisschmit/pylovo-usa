@@ -4,29 +4,6 @@ VERSION_ID: "1.0"
 # state here which parameters, queries are used to compute the grids with current VERSION_ID
 VERSION_COMMENT: base version
 
-PLOT_COLOR_DICT:
-  100: gold
-  160: orange
-  200: darkorange
-  250: peru
-  315: orangered
-  400: red
-  515: crimson
-  500: crimson
-  630: purple
-  715: blue
-  800: darkblue
-  1260: black
-
-CONNECTION_AVAILABLE_CABLES:
-  - NAYY 4x120 SE
-  - NAYY 4x95 SE
-  - NAYY 4x50 SE
-  - NYY 4x16 SE
-  - NYY 4x35 SE
-  - NYY 4x70 SE
-
-
 # installed_power * (sim_factor + (1 - sim_factor) * (load_count ** (-3 / 4)))
 SIM_FACTOR: {Residential: 0.07, Public: 0.6, Commercial: 0.5}
 
@@ -38,8 +15,8 @@ AVG_APARTMENT_AREA: 75
 # Peak load per m2 for commercial, public and industrial is in kW/m2
 # Peak load per household for SFH, MFH, TH and AB is in kW/household
 CONSUMER_CATEGORIES:
-  - {consumer_category_id: 1, definition: Commercial, peak_load: null, yearly_consumption: null, peak_load_per_m2: 0.79, yearly_consumption_per_m2: 2.457, sim_factor: 0.50}
-  - {consumer_category_id: 2, definition: Public, peak_load: null, yearly_consumption: null, peak_load_per_m2: 0.29, yearly_consumption_per_m2: 1.557, sim_factor: 0.60}
+  - {consumer_category_id: 1, definition: Commercial, peak_load: null, yearly_consumption: null, peak_load_per_m2: 0.2, yearly_consumption_per_m2: 2.457, sim_factor: 0.50}
+  - {consumer_category_id: 2, definition: Public, peak_load: null, yearly_consumption: null, peak_load_per_m2: 0.15, yearly_consumption_per_m2: 1.557, sim_factor: 0.60}
   - {consumer_category_id: 9, definition: SFH, peak_load: 30.00, yearly_consumption: 0.00, peak_load_per_m2: null, yearly_consumption_per_m2: null, sim_factor: 0.07}
   - {consumer_category_id: 10, definition: MFH, peak_load: 30.00, yearly_consumption: 0.00, peak_load_per_m2: null, yearly_consumption_per_m2: null, sim_factor: 0.07}
   - {consumer_category_id: 11, definition: TH, peak_load: 30.00, yearly_consumption: 0.00, peak_load_per_m2: null, yearly_consumption_per_m2: null, sim_factor: 0.07}
@@ -56,7 +33,7 @@ MV_THRESHOLD_KW: 1000
 # Load density thresholds for settlement type classification (MVA/km²)
 POWER_FACTOR: 0.9 # 90% of the peak load is used for the load density calculation
 RURAL_LD: 150     # Rural areas: < X MVA/km²
-URBAN_LD: 300     # Urban areas: > X MVA/km² 
+URBAN_LD: 300     # Urban areas: > X MVA/km²
 
 # Voltage properties
 

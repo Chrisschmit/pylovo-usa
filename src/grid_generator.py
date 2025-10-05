@@ -6,8 +6,7 @@ import pandas as pd
 
 import src.database.database_client as dbc
 from src import utils
-from src.cable_installation.electrical_grid_builder import \
-    ElectricalGridBuilder
+from src.cable_installation.electrical_grid_builder import ElectricalGridBuilder
 from src.config_loader import *
 from src.electrical_backend.altdss_backend import AltDSSBackend
 
@@ -25,11 +24,8 @@ class GridGenerator:
         self.regional_identifier = regional_identifier
         self.dbc = dbc.DatabaseClient()
         self.dbc.insert_version_if_not_exists()
-        self.dbc.insert_parameter_tables(
-            consumer_categories=CONSUMER_CATEGORIES)
-        self.logger = utils.create_logger(
-            name="GridGenerator", log_level=LOG_LEVEL, log_file=LOG_FILE
-        )
+        self.dbc.insert_parameter_tables(consumer_categories=CONSUMER_CATEGORIES)
+        self.logger = utils.create_logger(name="GridGenerator", log_level=LOG_LEVEL, log_file=LOG_FILE)
 
     def __del__(self):
         self.dbc.__del__()
@@ -38,16 +34,12 @@ class GridGenerator:
     # MAIN GRID GENERATION FUNCTIONS
     # ------------------------------------------------------------
 
-    def generate_grid_for_single_regional_identifier(
-        self, regional_identifier: str
-    ) -> None:
+    def generate_grid_for_single_regional_identifier(self, regional_identifier: str) -> None:
         """
         Generates the grid for a single regional_identifier.
 
         :param regional_identifier: Postal code for which the grid should be generated.
         :type regional_identifier: str
-        :param analyze_grids: Option to analyze the results after grid generation, defaults to False.
-        :type analyze_grids: bool
         """
         self.regional_identifier = regional_identifier
         print(
@@ -63,9 +55,7 @@ class GridGenerator:
             # Save data from temporary tables to result tables
             self.dbc.save_tables(regional_identifier=self.regional_identifier)
         except ResultExistsError:
-            self.dbc.logger.info(
-                f"Grid for the postcode area {regional_identifier} has already been generated."
-            )
+            self.dbc.logger.info(f"Grid for the postcode area {regional_identifier} has already been generated.")
         except Exception as e:
             self.logger.error(
                 f"Error during grid generation for regional_identifier {
@@ -88,9 +78,7 @@ class GridGenerator:
             "-----------------------------",
         )
 
-    def generate_grid_for_multiple_regional_identifier(
-        self, df_regional_identifier: pd.DataFrame
-    ) -> None:
+    def generate_grid_for_multiple_regional_identifier(self, df_regional_identifier: pd.DataFrame) -> None:
         """generates grid for all regional_identifier contained in the column 'regional_identifier' of df_samples
 
         :param df_regional_identifier: table that contains regional_identifier for grid generation
@@ -108,8 +96,7 @@ class GridGenerator:
             try:
                 self.generate_grid()
                 # Save data from temporary tables to result tables
-                self.dbc.save_tables(
-                    regional_identifier=self.regional_identifier)
+                self.dbc.save_tables(regional_identifier=self.regional_identifier)
                 self.dbc.reset_tables()  # Reset temporary tables
             except ResultExistsError:
                 self.dbc.logger.info(
@@ -199,8 +186,7 @@ class GridGenerator:
         # Update all buildings with peak load > TRESHHOLD to MV level
         self.dbc.assign_grid_level_connection_by_peak_load()
 
-        self.dbc.set_regional_identifier_settlement_type(
-            self.regional_identifier)
+        self.dbc.set_regional_identifier_settlement_type(self.regional_identifier)
         self.logger.info("Load density and settlement_type in postcode_result")
 
         self.dbc.assign_close_buildings()
@@ -210,8 +196,8 @@ class GridGenerator:
 
         # for debugging purposes, i want to keep only 2 buildings for LV and
         # two for MV, please write me the function quick andd dirty
-        self.dbc.keep_only_n_buildings_for_LV(n=100)
-        self.dbc.keep_only_n_buildings_for_MV(n=100)
+        # self.dbc.keep_only_n_buildings_for_LV(n=10)
+        # self.dbc.keep_only_n_buildings_for_MV(n=10)
 
     def prepare_transformers(self):
         """
@@ -223,8 +209,7 @@ class GridGenerator:
         self.logger.info("Transformers inserted in to the buildings_tem table")
         self.dbc.count_indoor_transformers()
         self.dbc.drop_indoor_transformers()
-        self.logger.info(
-            "Indoor transformers dropped from the buildings_tem table")
+        self.logger.info("Indoor transformers dropped from the buildings_tem table")
 
     def prepare_ways(self):
         """
@@ -235,16 +220,13 @@ class GridGenerator:
         ways_count = self.dbc.set_ways_tem_table(self.regional_identifier)
         self.logger.info(f"The ways_tem table filled with {ways_count} ways")
         # self.dbc.connect_unconnected_ways()
-        self.logger.info(
-            "Connecting road_network to the buildings, this might take a while..."
-        )
+        self.logger.info("Connecting road_network to the buildings, this might take a while...")
         self.dbc.draw_building_connection()
         self.logger.info("Building connection finished in ways_tem")
 
         self.dbc.update_ways_cost()
         unconn = self.dbc.set_vertice_id()
-        self.logger.debug(
-            f"vertice id set, {unconn} buildings with no vertice id")
+        self.logger.debug(f"vertice id set, {unconn} buildings with no vertice id")
 
     # ------------------------------------------------------------
     # CLUSTERING SECTION
@@ -269,8 +251,7 @@ class GridGenerator:
             if len(component_ids) > 1:
                 # Process multiple connected components
                 for i, component_id in enumerate(component_ids):
-                    related_vertices = vertices[np.argwhere(
-                        component == component_id)]
+                    related_vertices = vertices[np.argwhere(component == component_id)]
                     self._process_component_to_kcid(related_vertices, i)
             else:
                 # Process single connected component
@@ -282,9 +263,7 @@ class GridGenerator:
         # Verify clustering was successful for all buildings
         no_kmean_count = self.dbc.count_no_kmean_buildings()
         if no_kmean_count not in [0, None]:
-            warnings.warn(
-                f"K-means clustering issue: {no_kmean_count} buildings not assigned to clusters"
-            )
+            warnings.warn(f"K-means clustering issue: {no_kmean_count} buildings not assigned to clusters")
 
     def _process_component_to_kcid(self, vertices, component_index=None):
         """Helper method to process components to kcid groups"""
@@ -294,9 +273,7 @@ class GridGenerator:
             # Remove isolated or empty components
             self.dbc.delete_ways(vertices)
             self.dbc.delete_transformers_from_buildings_tem(vertices)
-            self.logger.debug(
-                "Empty/isolated component removed. Ways and transformers deleted from temporary tables."
-            )
+            self.logger.debug("Empty/isolated component removed. Ways and transformers deleted from temporary tables.")
         elif conn_building_count >= LARGE_COMPONENT_LOWER_BOUND:
             # K-means applied to large component to define subgroups with
             # cluster ids
@@ -325,9 +302,7 @@ class GridGenerator:
         kcid_length = self.dbc.get_kcid_length()
 
         for _ in range(kcid_length):
-            kcid = self.dbc.get_next_unfinished_kcid(
-                self.regional_identifier, "lv_grid_result"
-            )
+            kcid = self.dbc.get_next_unfinished_kcid(self.regional_identifier, "lv_grid_result")
             self.logger.info(f"working on kcid {kcid}")
 
             self.logger.debug(f"kcid{kcid} has no included transformer")
@@ -335,8 +310,7 @@ class GridGenerator:
             self.create_bcid_for_kcid(self.regional_identifier, kcid)
             self.logger.debug(f"kcid{kcid} building clusters finished")
 
-    def create_bcid_for_kcid(
-            self, regional_identifier: int, kcid: int) -> None:
+    def create_bcid_for_kcid(self, regional_identifier: int, kcid: int) -> None:
         """
 
         Steps:
@@ -344,14 +318,10 @@ class GridGenerator:
         2) Convert InfrastructureCluster results to the database format expected by downstream processes
         """
         try:
-            self.logger.info(
-                f"Starting LV clustering for kcid {kcid}, regional_identifier {regional_identifier}"
-            )
+            self.logger.info(f"Starting LV clustering for kcid {kcid}, regional_identifier {regional_identifier}")
 
             # Get settlement type for this region
-            settlement_type = self.dbc.get_settlement_type_from_regional_identifier(
-                regional_identifier
-            )
+            settlement_type = self.dbc.get_settlement_type_from_regional_identifier(regional_identifier)
 
             # Use the unified infrastructure placement interface for LV
             # clustering
@@ -363,20 +333,15 @@ class GridGenerator:
             )
 
             if not infrastructure_clusters:
-                self.logger.warning(
-                    f"No LV infrastructure clusters created for kcid {kcid}"
-                )
+                self.logger.warning(f"No LV infrastructure clusters created for kcid {kcid}")
                 return
 
             # Clear previous clustering results for this kcid
-            self.dbc.clear_lv_grid_result_in_kmean_cluster(
-                regional_identifier, kcid)
+            self.dbc.clear_lv_grid_result_in_kmean_cluster(regional_identifier, kcid)
 
             # Convert InfrastructureCluster results to traditional bcid format
             # Each infrastructure cluster becomes a building cluster (bcid)
-            self.logger.info(
-                "Converting infrastructure clusters to building clusters (bcids)"
-            )
+            self.logger.info("Converting infrastructure clusters to building clusters (bcids)")
 
             # Save infrastructure placement results to database
             grid_result_ids = self.dbc.save_infrastructure_placement_results(
@@ -416,18 +381,13 @@ class GridGenerator:
         kcid_length = self.dbc.get_kcid_length()
 
         # Get settlement type for this region
-        settlement_type = self.dbc.get_settlement_type_from_regional_identifier(
-            self.regional_identifier
-        )
+        settlement_type = self.dbc.get_settlement_type_from_regional_identifier(self.regional_identifier)
 
         for _ in range(kcid_length):
             try:
                 # Get next unfinished kcid for MV processing
-                kcid = self.dbc.get_next_unfinished_kcid(
-                    self.regional_identifier, "grid_result"
-                )
-                self.logger.info(
-                    f"Working on MV substation placement for kcid {kcid}")
+                kcid = self.dbc.get_next_unfinished_kcid(self.regional_identifier, "grid_result")
+                self.logger.info(f"Working on MV substation placement for kcid {kcid}")
 
                 # Use the new unified infrastructure placement interface
                 infrastructure_clusters = self.dbc.perform_infrastructure_placement(
@@ -438,9 +398,7 @@ class GridGenerator:
                 )
 
                 if not infrastructure_clusters:
-                    self.logger.info(
-                        f"No MV infrastructure clusters created for kcid {kcid}"
-                    )
+                    self.logger.info(f"No MV infrastructure clusters created for kcid {kcid}")
                     continue
 
                 # Save infrastructure placement results to database
@@ -525,9 +483,7 @@ class GridGenerator:
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
         # KCID, SCID pair
-        cluster_list = self.dbc.get_list_from_regional_identifier(
-            self.regional_identifier
-        )
+        cluster_list = self.dbc.get_list_from_regional_identifier(self.regional_identifier)
         if not cluster_list:
             self.logger.warning(
                 f"No clusters to process for regional_identifier {
@@ -543,7 +499,7 @@ class GridGenerator:
         # Create batches of clusters to process
         def create_batches(items, batch_size):
             for i in range(0, len(items), batch_size):
-                yield items[i: i + batch_size]
+                yield items[i : i + batch_size]
 
         # Calculate batch size to distribute work evenly
         batch_size = max(1, len(cluster_list) // max_workers)
@@ -555,8 +511,7 @@ class GridGenerator:
             initargs=(self.regional_identifier,),
         ) as executor:
             future_to_batch = {
-                executor.submit(GridGenerator._process_cluster_batch, batch): batch
-                for batch in cluster_batches
+                executor.submit(GridGenerator._process_cluster_batch, batch): batch for batch in cluster_batches
             }
 
             for future in as_completed(future_to_batch):
@@ -586,9 +541,7 @@ class GridGenerator:
         This method processes clusters one by one without parallel processing,
         making it easier to debug issues and test the new architecture.
         """
-        cluster_list = self.dbc.get_list_from_regional_identifier(
-            self.regional_identifier
-        )
+        cluster_list = self.dbc.get_list_from_regional_identifier(self.regional_identifier)
 
         if not cluster_list:
             self.logger.warning(
@@ -625,16 +578,13 @@ class GridGenerator:
                 )
                 continue
 
-        self.logger.info(
-            f"Sequential cable installation completed: {success_count} success, {error_count} errors"
-        )
+        self.logger.info(f"Sequential cable installation completed: {success_count} success, {error_count} errors")
 
     @staticmethod
     def _init_worker(regional_identifier):
         """Initialize worker process with one GridGenerator per worker."""
         global _worker_grid_generator
-        _worker_grid_generator = GridGenerator(
-            regional_identifier=regional_identifier)
+        _worker_grid_generator = GridGenerator(regional_identifier=regional_identifier)
 
     @staticmethod
     def _process_cluster_batch(cluster_batch):
@@ -660,29 +610,19 @@ class GridGenerator:
             scid: Substation cluster ID (was bcid in old system)
         """
         try:
-            self.logger.debug(
-                f"Building hierarchical grid for kcid {kcid}, scid {scid}"
-            )
+            self.logger.debug(f"Building hierarchical grid for kcid {kcid}, scid {scid}")
 
             # Create backend and unified builder
             backend = AltDSSBackend(logger=self.logger)
-            builder = ElectricalGridBuilder(
-                backend=backend, dbc=self.dbc, logger=self.logger
-            )
+            builder = ElectricalGridBuilder(backend=backend, dbc=self.dbc, logger=self.logger)
 
             # Build entire hierarchical grid using new architecture
-            success = builder.build_complete_grid_for_cluster(
-                kcid, scid, self.regional_identifier
-            )
+            success = builder.build_complete_grid_for_cluster(kcid, scid, self.regional_identifier)
 
             if success:
-                self.logger.info(
-                    f"✓ Successfully built hierarchical grid K{kcid}_S{scid}"
-                )
+                self.logger.info(f"✓ Successfully built hierarchical grid K{kcid}_S{scid}")
             else:
-                self.logger.error(
-                    f"✗ Failed to build hierarchical grid K{kcid}_S{scid}"
-                )
+                self.logger.error(f"✗ Failed to build hierarchical grid K{kcid}_S{scid}")
 
             return success
 

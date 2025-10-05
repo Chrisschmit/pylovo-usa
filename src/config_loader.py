@@ -7,15 +7,12 @@ from dotenv import find_dotenv, load_dotenv
 
 def load_yaml_config(filepath: str):
     """Loads a YAML configuration file."""
-    abs_path = os.path.join(
-        os.path.dirname(
-            os.path.abspath(__file__)),
-        filepath)
+    abs_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filepath)
 
     if not os.path.exists(abs_path):
         raise FileNotFoundError(f"Config file not found: {abs_path}")
 
-    with open(abs_path, "r", encoding="utf-8") as file:
+    with open(abs_path, encoding="utf-8") as file:
         return yaml.safe_load(file)
 
 
@@ -53,14 +50,12 @@ CSV_FILE_LIST = [
         "path": os.path.join("raw_data", "equipment_data.csv"),
         "table_name": "equipment_data",
     },
-    {"path": os.path.join("raw_data", "postcode.csv"),
-     "table_name": "postcode"},
+    {"path": os.path.join("raw_data", "postcode.csv"), "table_name": "postcode"},
 ]
 
 # Assign all variables from CONFIG_VERSION
 VERSION_ID = CONFIG_VERSION["VERSION_ID"]
 VERSION_COMMENT = CONFIG_VERSION["VERSION_COMMENT"]
-PLOT_COLOR_DICT = CONFIG_VERSION["PLOT_COLOR_DICT"]
 SIM_FACTOR = CONFIG_VERSION["SIM_FACTOR"]
 PEAK_LOAD_HOUSEHOLD = CONFIG_VERSION["PEAK_LOAD_HOUSEHOLD"]
 CONSUMER_CATEGORIES = pd.DataFrame(CONFIG_VERSION["CONSUMER_CATEGORIES"])
@@ -78,9 +73,7 @@ MV_THRESHOLD_KW = CONFIG_VERSION["MV_THRESHOLD_KW"]
 
 # Voltage-level specific bases and drop limits
 BASE_VOLTAGE_V = CONFIG_VERSION.get("BASE_VOLTAGE_V", {"MV": 12470, "LV": 416})
-VOLTAGE_DROP_LIMIT_PCT = CONFIG_VERSION.get(
-    "VOLTAGE_DROP_LIMIT_PCT", {"MV": 2.5, "LV": 4.5}
-)
+VOLTAGE_DROP_LIMIT_PCT = CONFIG_VERSION.get("VOLTAGE_DROP_LIMIT_PCT", {"MV": 2.5, "LV": 4.5})
 
 # Assign all Data Import variables
 REGION = CONFIG_DATA["REGION"]
