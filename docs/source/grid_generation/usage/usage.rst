@@ -9,24 +9,24 @@ Configuration
 
 Create your first grid
 =========================================
-After defining your plz in the ``grid_generation_for_single_plz.py`` script, you can run:
+After defining your region (FIPS codes) in the ``config/config_data.yaml`` file, you can run:
 
 ::
 
-    python3.12 executable_scripts/grid_generation_for_single_plz.py
+    python runme/create/create_grid_single_region.py
 
 If the grids for the given region and version are already generated, the code will terminate.
 
 Apart from this you can:
 
-- create grids for multiple PLZs or all PLZ within an AGS region.
+- create grids for multiple regions using FIPS county subdivision codes.
 - activate the flags to analyze the grid and visualize some basic results.
-- export the grid data as csv.
+- export the grid data as csv or GeoJSON.
 - delete specified grids/versions.
 
 .. note::
-    - Before running the scripts make sure you followed all steps descripbed in the :doc:`installation/installation` section.
-    - If you are from TUM and would like to connect to the remote db get your .env file from a ENS pylovo maintainer and save it in the root directory of the project.
+    - Before running the scripts make sure you followed all steps described in the installation section.
+    - Ensure your PostgreSQL database is properly configured in the ``config/config_data.yaml`` file.
 
 Result inspection with QGIS
 ==================
@@ -37,10 +37,10 @@ Result inspection with QGIS
 
 Tutorials / Examples
 =====================
-In the `notebook_tutorials.py` you will learn more about the following topics:
+In the `notebook_tutorials/` directory you will learn more about the following topics:
 
 * visualizing individual networks
-* the objects / elements the LV grids are made up of
-* the pandapower networks that are used to store the LV grids
+* the objects and elements the LV grids are made up of
+* the electrical network models and grid hierarchies
 * graph representation of the networks
-* and parameter visualisation options
+* parameter visualization and analysis options

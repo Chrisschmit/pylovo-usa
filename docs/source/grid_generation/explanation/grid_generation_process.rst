@@ -1,119 +1,161 @@
 Grid Generation Process
 =======================
 
-The functionalities of the grid generation process are divided into three classes:
+The functionalities of the grid generation process are divided into several main components:
 
-.. autoclass:: pylovo.SyngridDatabaseConstructor.SyngridDatabaseConstructor
+**DatabaseClient** - Main database interface for reading and writing grid data
 
-.. initializes database and read raw data.
+**GridGenerator** - Core class for generating synthetic low-voltage distribution grids
 
-.. autoclass:: pylovo.pgReaderWriter.PgReaderWriter
-
-.. reads and writes from / to database.
-
-.. autoclass:: pylovo.GridGenerator.GridGenerator
-
-.. generates grids.
+**ElectricalGridBuilder** - Handles electrical network creation with pandapower and AltDSS
 
 The higher level functions of the GridGenerator are explained in more detail since they contain the assumptions and logic
 of grid generation. For a visual representation refer to :doc:`overview`.
 
-Step 1
-------
+Step 1: Region Selection and Data Preprocessing
+------------------------------------------------
 
-.. autofunction:: pylovo.GridGenerator.GridGenerator.cache_and_preprocess_static_objects
+The selected region is defined using US Census FIPS codes (state, county, county subdivision) in the
+:code:`config/config_data.yaml` file. The region boundaries are searched in the :code:`postcode` table
+and define the geographical area for which network generation takes place.
 
-The selected zip code (PLZ) is searched in the table
-:code:`postcode` and stored in the :code:`postcode_result table`. The zip code
-defines the geographical area for which the network generation takes place.
-The buildings, which are located in the area of the zip code, are selected from :code:`res` and :code:`oth`
-and stored on :code:`buildings_tem`. The tables ending with :code:`tem`
-are tables that temporarily store the data for grid generation. For
-the buildings of the zip code the house distance is calculated and the settlement type is
-is derived from it. The settlement type decides which transformer types are installed in the zip code.
-Each building is assigned a maximum load.
-This depends on the building type. For residential buildings, the load is
-scaled to households, for other buildings (commercial, public,
-industrial buildings), the building floor area is taken into account in the calculation of the power.
-of the power. Buildings without load or with load over 100kW
-are not part of the low voltage network and are therefore deleted.
-Finally, the transformers from transformers are also transferred to :code:`buildings_tem`
-are transferred.
+Buildings located within the region are selected from the database and stored in :code:`buildings_tem`.
+The tables ending with :code:`tem` are temporary tables that store data during grid generation.
 
-Step 2
-------
+For each building:
 
-.. autofunction:: pylovo.GridGenerator.GridGenerator.preprocess_ways
+- House distance is calculated and settlement type is derived
+- Settlement type determines which transformer types are installed
+- Maximum load is assigned based on building type:
 
-The ways from :code:`ways`, which are located in the zip code area, will be
-stored on :code:`ways_tem`. In way sections that overlap, connection nodes are created.
-Then the buildings are connected to the ways.
-For this purpose, a path section is created that leads perpendicularly
-from the existing ways to the center of the building. Finally,
-the buildings from :code:`buildings_tem` are assigned a node from :code:`ways_tem`.
+  - **Residential buildings**: Load scaled to households using NREL residential typology data
+  - **Commercial/Public/Industrial buildings**: Load based on building floor area
 
-Step 3
-------
+- Buildings without load or with load over 100kW are excluded from the low-voltage network
 
-.. autofunction:: pylovo.GridGenerator.GridGenerator.apply_kmeans_clustering
+Finally, existing transformers from OpenStreetMap are transferred to :code:`buildings_tem`.
 
-Since the number of buildings in a postal code is too large for a coherent
-network, the buildings are divided into subgroups.
-The kmeans cluster algorithm divides the buildings into subgroups based on the geographic distance.
-The number of kmeans clusters
-for a postal code is usually single-digit. Each kmeans cluster is assigned an ID
-(kcid, kmeans cluster ID).
+Step 2: Road Network Processing
+--------------------------------
 
-Step 4
-------
+The road network (ways) from OpenStreetMap located in the region area are stored in :code:`ways_tem`.
 
-.. autofunction:: pylovo.GridGenerator.GridGenerator.position_substations
+Connection nodes are created at road intersections and overlapping sections.
 
-For the positioning of the transformers, existing transformers from OSM are considered first.
-Buildings at a certain distance from the transformer are connected to the transformer.
-The shape of the supply area transforms
-from a circle (allowed linear distance), to a polygon,
-because the distance to the consumers is measured along the streets.
+Buildings are connected to the road network:
 
-Step 5
-------
+- A path section is created perpendicular from existing roads to the building center
+- Each building in :code:`buildings_tem` is assigned a connection node from :code:`ways_tem`
 
-The kmeans clusters are further divided into so-called building clusters.
-A buildings cluster becomes a network in which all buildings are connected to a low-voltage transformer.
-The buildings are grouped
-by means of an agglomerative hierarchical average linkage clustering.
-The results of the hierarchical clustering can be displayed as a
-Dendogram. The distance between two clusters is calculated as
-average of all distances of buildings from cluster A to cluster B.
-For this purpose, a distance matrix of the buildings is set up. After
-each clustering step, there is a loop which verifies that the transformer power suffices to supply the consumers taking
-into consideration
-coincidence factor. The multilevel coincidence factor for each cable section is
-evaluated by summing  the classified consumers (residential, public, commercial) of that cable section
+Step 3: K-means Clustering
+---------------------------
 
-Step 6
-------
+Since the number of buildings in a region can be too large for a single coherent network,
+the buildings are divided into subgroups using the K-means clustering algorithm.
 
-.. autofunction:: pylovo.GridGenerator.GridGenerator.install_cables
+Buildings are clustered based on geographic distance. The number of K-means clusters
+for a region is typically in the single digits. Each cluster is assigned a unique ID
+(kcid, K-means cluster ID).
 
-Branches are created to connect the consumers to the transformer, resulting in a radial network.
-First, the consumers are connected to the road by cables.
-A consumer is created as a :code:`consumer node` bus and every point
-where several cables intersect as a :code:`connection node bus`. Next, the connections between the connection
-nodes are drawn. Finally,
-the connection nodes are connected to the transformers :code:`LVbus`.
-The cables are run along the streets from :code:`ways_tem`. When the branches are created, the
-Minimal Spanning Tree Algorithm determines a configuration of the network,
-whose edge lengths are as short as possible and thus inexpensive. From a
-repertoire of cable types, a suitable cable is selected. The process of
-cable installation is based on the realistic decision making of a technician
-and avoids the use of additional costly network components.
+Step 4: LV Distribution Transformer Positioning
+------------------------------------------------
 
-Step 7
-------
+The first phase of transformer positioning handles low-voltage (LV) distribution transformers
+for each K-means cluster (kcid). This creates building clusters (bcid) where each cluster
+connects to a single LV transformer.
 
-.. autofunction:: pylovo.pgReaderWriter.PgReaderWriter.saveInformationAndResetTables
+**Unified Infrastructure Placement**: The system uses a unified infrastructure placement engine
+that handles greenfield (new transformer placement) scenarios.
 
-The data from the tables with the extension
-:code:`tem` are deleted and transferred to the result tables :code:`bulidings_result`,
-:code:`ways_result`.
+For each kcid:
+
+1. **Settlement Type Determination**: Settlement type is determined for the region, which influences
+   transformer selection and placement strategy
+
+2. **Infrastructure Clustering**: Buildings are clustered using the infrastructure placement algorithm:
+
+   - Hierarchical clustering groups buildings based on geographic distance and load requirements
+   - Each cluster verifies that transformer capacity is sufficient for all connected consumers
+   - Coincidence factors are applied based on consumer types (residential, public, commercial)
+
+3. **Transformer Positioning**: LV transformers are positioned for each building cluster:
+
+   - Results are saved to :code:`lv_grid_result` table
+   - Transformer positions are recorded in :code:`transformer_positions` table
+
+Step 5: MV Substation Positioning
+----------------------------------
+
+The second phase positions medium-voltage (MV) substations that aggregate multiple LV transformers
+and high-load buildings (>100kW) that connect directly to the MV level.
+
+For each kcid:
+
+1. **MV-Level Infrastructure Placement**: The same unified infrastructure placement engine
+   creates substation clusters (scid) that group:
+
+   - LV distribution transformers from Step 4
+   - Buildings with peak load >100kW (assigned grid_level_connection = MV)
+
+2. **Hierarchical Network Creation**: MV substations create a hierarchical grid structure:
+
+   - Each MV substation (scid) connects multiple LV transformers and MV-level buildings
+   - LV transformers are updated with parent scid references
+   - Grid topology creates MV → LV → Consumer hierarchy
+
+3. **Database Updates**:
+
+   - Results saved to :code:`grid_result` table
+   - Parent-child relationships established between MV substations and LV transformers
+   - Model status set to completed for downstream cable installation
+
+Step 6: Hierarchical Cable Installation
+-----------------------------------------
+
+Cable installation creates the complete electrical network hierarchy using the **ElectricalGridBuilder**
+with backend-agnostic architecture (supports both pandapower and AltDSS backends).
+
+The process builds MV-LV hierarchical grids for each substation cluster (kcid, scid):
+
+**1. MV Network Construction** (Medium Voltage Level):
+
+   - External grid connection established at the MV substation
+   - MV buses created for the substation and connection points
+   - MV cables connect the substation to LV transformer locations
+
+**2. LV Network Construction** (Low Voltage Level):
+
+   For each LV transformer connected to the MV substation:
+
+   - Distribution transformer created
+   - Consumer buildings connected via radial network topology
+   - Three-phase allocation balances loads across L1, L2, L3 phases
+
+**3. Cable Routing and Sizing**:
+
+   - **Consumer Connections**: Buildings connected to roads via service drops
+   - **Network Routing**: Connection nodes linked along streets using road network from :code:`ways_tem`
+   - **Minimal Spanning Tree**: Optimizes network configuration for minimum total cable length
+   - **Cable Selection**: Appropriate cable types selected based on current requirements and voltage drop
+
+**4. Parallel Processing**:
+
+   - Cable installation runs in parallel using multiprocessing for efficiency
+   - Each worker processes batches of clusters independently
+   - Progress tracked per cluster (kcid, scid pair)
+
+The electrical networks are validated through power flow analysis to ensure voltage and
+current constraints are met.
+
+Step 7: Save and Finalize Results
+----------------------------------
+
+The data from temporary tables (ending with :code:`tem`) are transferred to permanent result tables:
+
+- **buildings_tem** → **buildings_result**: Final building data with grid connections
+- **ways_tem** → **ways_result**: Road network with cable routing information
+- **lv_grid_result**: LV transformer clusters and building assignments
+- **grid_result**: MV substation clusters and hierarchical relationships
+- **transformer_positions**: Geographic locations of all transformers
+
+Temporary tables are then cleared and the database transaction is committed.

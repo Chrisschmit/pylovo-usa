@@ -30,9 +30,8 @@ Check the raw data: Have the buildings been imported as expected? Are the ways c
 Grids
 ======
 
-These are the results of the pylovo grid generation. If you have created networks for the same PLZ with multiple
-versions
-make sure to filter the version you would like to see.
+These are the results of the pylovo grid generation. If you have created networks for the same region with multiple
+versions, make sure to filter the version you would like to see.
 Click on the filter symbol next to the layer name. In the query panel you can apply a filter like:
 `"version_id"='3.8'`.
 
@@ -43,8 +42,8 @@ Click on the filter symbol next to the layer name. In the query panel you can ap
 If you would only like to see a specific grid enter a query like:
 `"version_id" = '3.3' AND "in_building_cluster" = '5' AND "k_mean_cluster" = '1'`.
 
-Pylovo partitions the buildings of a PLZ for a grid using k-means cluster (kcid, k-means cluster ID) and
-building cluster (bcid, builings cluster ID).
+Pylovo partitions the buildings of a region for a grid using k-means cluster (kcid, k-means cluster ID) and
+building cluster (bcid, buildings cluster ID).
 
 Some more specific information about the different layers:
 
@@ -65,10 +64,10 @@ they will have the same colour.
 In this case douple click on the layer. Go to the `symbol` tab. click on `delete all`, `classify`.
 Now for all cluster IDs the colours will be newly created.
 
-Postcode
-----------------
+Region Boundaries
+-----------------
 
-On the outside of the postcode area marked in red, you will find the PLZ code.
+On the outside of the region area marked in red, you will find the region identifier (FIPS code).
 
 
 Clusters
@@ -90,16 +89,12 @@ Similarly the representative grids of the clusters can be shown.
     :width: 800
     :alt: Default view
 
-Visualize from csv
-====================
+Export and Visualize Grid Data
+===============================
 
-With the files :code:`export_grid_gis_data_as_csv` and :code:`export_grid_gis_data_as_csv_for_multiple_plz` the
-pandapower networks' information can exported to csv.  This is performed by the function
-
-.. autofunction:: plotting.export_net.get_bus_line_geo_for_network
-
-This way additional function about the grids can be visualised. This function would also enable to show grids in QGIS
-that are not on the database.
+Grid data can be exported to GeoJSON or CSV formats for visualization in QGIS or other GIS tools.
+This enables additional analysis and visualization of grid characteristics, and allows showing grids
+that are not currently stored in the database.
 
 .. image:: ../../images/visualisation/net_description.png
     :width: 800
