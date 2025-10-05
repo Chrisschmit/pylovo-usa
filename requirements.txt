@@ -6,7 +6,6 @@ SQLAlchemy
 psycopg2-binary
 sqlparse
 scipy
-pandapower
 openpyxl
 xlrd
 python-dotenv
@@ -25,9 +24,6 @@ factor-analyzer
 PyYAML
 requests
 osm2geojson
-autopep8
-isort
-autoflake
 certifi
 osmnx
 pyrosm

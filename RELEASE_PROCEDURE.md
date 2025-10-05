@@ -22,7 +22,7 @@ It always has the format `YYYY-MM-DD`, e.g. `1992-11-07`.
 ### 1. Update the `CHANGELOG.md`
 - 📝 **File**: Open the CHANGELOG.md file and add a new entry under the `[Unreleased]` section.
 - 💠 **Commit**: Commit your changes to the changelog, noting all new features, changes, and fixes.
-  
+
 ### 2. Create a `Draft GitHub Release` Issue
 - 🐙 **Template**: Use the `📝Release_Checklist` template for the issue.
 - 🐙 **Issue**: Create a new issue in the repository with the title `Release - Minor Version - 0.1.0`.
@@ -40,7 +40,7 @@ It always has the format `YYYY-MM-DD`, e.g. `1992-11-07`.
     ```bash
     git push --set-upstream origin release-1.5.0
     ```
-  
+
 ### 4. Finalize and Merge
 - 🐙 **Merge Request**: In GitHub, open a merge request (MR) from `release-1.5.0` into `main`.
 - 🐙 **Review**: Assign reviewers to the MR and ensure all tests pass.
@@ -57,7 +57,7 @@ It always has the format `YYYY-MM-DD`, e.g. `1992-11-07`.
     git tag -a v1.5.0 -m "Release 1.5.0"
     git push origin v1.5.0
     ```
-  
+
 ### 6. Create a GitHub Release (Optional)
 - 🐙 **GitHub Release Page**: Go to the GitHub project’s Releases section and create a new release linked to the v1.5.0 tag.
 - 📝 **Release Notes**: Add release notes using information from the changelog.
@@ -85,4 +85,3 @@ git push
 - **Versioning**: Always increment the version correctly using `bump2version` before creating the final release.
 - **Publishing Reminder**: Ensure your PyPI credentials are correctly set up in GitHub CI/CD or local `.pypirc` configuration for seamless uploads.
 - **Final Check**: If issues arise post-release, refer to the [GitHub CI/CD guide](https://docs.GitHub.com/ee/development/cicd/) and [PyPI documentation](https://packaging.python.org/en/latest/) for troubleshooting.
-

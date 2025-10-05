@@ -2,4 +2,4 @@
 
 from .cable_placement import CablePlacementAlgorithm
 
-__all__ = ['CablePlacementAlgorithm']
+__all__ = ["CablePlacementAlgorithm"]

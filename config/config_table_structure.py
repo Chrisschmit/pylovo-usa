@@ -33,8 +33,7 @@ CREATE_QUERIES = {
         geom geometry(MultiPolygon,%(epsg)s)
     )
     """,
-    "equipment_data":
-    """CREATE TABLE IF NOT EXISTS equipment_data (
+    "equipment_data": """CREATE TABLE IF NOT EXISTS equipment_data (
     name VARCHAR(100) PRIMARY KEY,           -- Equipment name
     type VARCHAR(50),                        -- Equipment category: 'Substation', 'Transformer', 'Line'
     application_area INTEGER,                -- Defines to which settlement type the equipment belongs to
@@ -47,8 +46,8 @@ CREATE_QUERIES = {
     reactance_pu NUMERIC,                    -- Per-unit reactance
     no_load_losses_kw NUMERIC,               -- No-load (core) losses in kilowatts
     short_circuit_res_ohm NUMERIC,           -- Short-circuit resistance in ohms
-    r_ohm_per_km NUMERIC,                    -- Resistance per km in ohms 
-    x_ohm_per_km NUMERIC,                    -- Inductive reactance per km in ohms 
+    r_ohm_per_km NUMERIC,                    -- Resistance per km in ohms
+    x_ohm_per_km NUMERIC,                    -- Inductive reactance per km in ohms
     z_ohm_per_km NUMERIC,                    -- Impedance per km in ohms
     capacitance_nf_per_km NUMERIC,           -- Capacitance per km in nanofarads
     max_i_a INTEGER,                         -- Maximum current in amperes
@@ -58,7 +57,7 @@ CREATE_QUERIES = {
     """,
     "version": """CREATE TABLE IF NOT EXISTS version (
         version_id varchar(10) PRIMARY KEY,
-        version_comment varchar, 
+        version_comment varchar,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         consumer_categories varchar,
         other_parameters varchar
@@ -81,7 +80,7 @@ CREATE_QUERIES = {
     )
     """,
     "postcode_result": """
-    CREATE TABLE IF NOT EXISTS postcode_result (   
+    CREATE TABLE IF NOT EXISTS postcode_result (
         version_id varchar(10) NOT NULL,
         postcode_result_regional_identifier bigint NOT NULL,
         settlement_type integer,
@@ -130,7 +129,7 @@ CREATE_QUERIES = {
     CREATE INDEX idx_grid_result_v_reg_kcid_scid
         ON grid_result(version_id, regional_identifier, kcid, scid)
     """,
-        "lv_grid_result": """
+    "lv_grid_result": """
 
     CREATE TABLE IF NOT EXISTS lv_grid_result (
         lv_grid_result_id SERIAL PRIMARY KEY,
@@ -168,9 +167,6 @@ CREATE_QUERIES = {
     CREATE INDEX idx_lv_grid_result_parent
         ON lv_grid_result(parent_grid_result_id)
     """,
-
-
-
     "lines_result": """
     CREATE TABLE IF NOT EXISTS lines_result (
         lines_result_id SERIAL PRIMARY KEY,
@@ -204,7 +200,7 @@ CREATE_QUERIES = {
                 (grid_level = 'LV' AND lv_grid_result_id IS NOT NULL)
             )
     );
-    CREATE INDEX idx_lines_result_grid_level 
+    CREATE INDEX idx_lines_result_grid_level
         ON lines_result(grid_level);
     CREATE INDEX idx_lines_result_equipment_id
         ON lines_result(equipment_id)
@@ -256,10 +252,10 @@ CREATE_QUERIES = {
     """,
     "clustering_parameters": """CREATE TABLE IF NOT EXISTS clustering_parameters (
         grid_result_id bigint PRIMARY KEY,
-        
+
         no_connection_buses integer,
         no_branches integer,
-        
+
         no_house_connections integer,
         no_house_connections_per_branch numeric,
         no_households integer,
@@ -267,19 +263,19 @@ CREATE_QUERIES = {
         no_households_per_branch numeric,
         max_no_of_households_of_a_branch numeric,
         house_distance_km numeric,
-        
+
         transformer_mva numeric,
         osm_trafo bool,
-        
+
         max_trafo_dis numeric,
         avg_trafo_dis numeric,
-        
+
         cable_length_km numeric,
         cable_len_per_house numeric,
-        
+
         max_power_mw numeric,
         simultaneous_peak_load_mw numeric,
-        
+
         resistance numeric,
         reactance numeric,
         ratio numeric,
@@ -304,7 +300,6 @@ CREATE_QUERIES = {
         geom geometry(MultiPoint, %(epsg)s)
     )
     """,
-    
     "transformer_positions": """
     CREATE TABLE IF NOT EXISTS transformer_positions (
         position_id SERIAL PRIMARY KEY,
@@ -341,8 +336,6 @@ CREATE_QUERIES = {
             REFERENCES transformers (osm_id)
     )
     """,
-
-
     "fips_log": """
     CREATE TABLE IF NOT EXISTS fips_log (
         fips_code bigint PRIMARY KEY
@@ -451,12 +444,12 @@ CREATE_QUERIES = {
             lr.from_bus,
             lr.to_bus,
             lr.length_km,
-            gr.version_id, 
-            gr.kcid, 
-            gr.scid, 
+            gr.version_id,
+            gr.kcid,
+            gr.scid,
             gr.regional_identifier,
             lv.bcid,
-            CASE 
+            CASE
                 WHEN lr.grid_level = 'MV' THEN CONCAT('MV_K', gr.kcid, '_S', gr.scid)
                 WHEN lr.grid_level = 'LV' THEN CONCAT('LV_K', gr.kcid, '_S', gr.scid, '_B', lv.bcid)
                 ELSE 'Unknown'
@@ -465,7 +458,7 @@ CREATE_QUERIES = {
         JOIN grid_result gr ON lr.grid_result_id = gr.grid_result_id
         LEFT JOIN lv_grid_result lv ON lr.lv_grid_result_id = lv.lv_grid_result_id
     )
-    """
+    """,
 }
 
 TEMP_CREATE_QUERIES = {
@@ -474,7 +467,7 @@ TEMP_CREATE_QUERIES = {
         osm_id varchar,
         area numeric,
         type varchar(80),
-        grid_level_connection varchar(20), -- Either MV or LV     
+        grid_level_connection varchar(20), -- Either MV or LV
         houses_per_building integer,
         peak_load_in_kw numeric,
         regional_identifier bigint,

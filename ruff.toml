@@ -1,0 +1,76 @@
+# Ruff configuration
+# See https://docs.astral.sh/ruff/configuration/
+
+# Target Python 3.10+
+target-version = "py310"
+
+# Exclude common directories
+extend-exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
+    ".pytest_cache",
+    ".mypy_cache",
+    "docs",
+    "altdss_library_copy",
+]
+
+# Line length
+line-length = 120
+
+[lint]
+# Enable pycodestyle (`E`), pyflakes (`F`), isort (`I`), and more
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "N",     # pep8-naming
+    "UP",    # pyupgrade
+    "B",     # flake8-bugbear
+    "C4",    # flake8-comprehensions
+    "SIM",   # flake8-simplify
+    "TCH",   # flake8-type-checking
+]
+
+# Ignore specific rules
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults
+    "C901",   # too complex
+    "N803",   # argument name should be lowercase (for pandas df)
+    "N806",   # variable name should be lowercase (for pandas df)
+]
+
+# Allow autofix for all enabled rules
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[lint.per-file-ignores]
+# Ignore imports in __init__.py files
+"__init__.py" = ["F401", "E402"]
+# Ignore complexity in test files
+"tests/**/*.py" = ["C901"]
+
+[lint.isort]
+known-first-party = ["pylovo"]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+[format]
+# Use double quotes for strings
+quote-style = "double"
+
+# Indent with spaces
+indent-style = "space"
+
+# Respect magic trailing commas
+skip-magic-trailing-comma = false
+
+# Auto-detect line ending
+line-ending = "auto"

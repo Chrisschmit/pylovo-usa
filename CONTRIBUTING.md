@@ -18,24 +18,24 @@ This repository is following the [Contributor Covenant Code of Conduct](CODE_OF_
 Please be self-reflective and always maintain a good culture of discussion and active participation.
 
 ### A. Use
-Since the open license allows free use, no notification is required. 
-However, for the authors it is valuable information who uses the software for what purpose. 
-Indicators are `Watch`, `Fork` and `Starred` of the repository. 
+Since the open license allows free use, no notification is required.
+However, for the authors it is valuable information who uses the software for what purpose.
+Indicators are `Watch`, `Fork` and `Starred` of the repository.
 If you are a user, please add your name and details in [USERS.cff](USERS.cff).
 
 ### B. Comment
-You can give ideas, hints or report bugs in issues, in MR, at meetings or other channels. 
-This is no development but can be considered a notable contribution. 
+You can give ideas, hints or report bugs in issues, in MR, at meetings or other channels.
+This is no development but can be considered a notable contribution.
 If you wish, add your name and details to [CITATION.cff](CITATION.cff).
 
 ### C. Contribute and Review
-You add code and become an author of the repository. 
+You add code and become an author of the repository.
 You must follow the workflow!
 Add your name and details to [CITATION.cff](CITATION.cff).
 
 ### D. Maintain and Release
-You contribute and take care of the repository. 
-You review and answer questions. 
+You contribute and take care of the repository.
+You review and answer questions.
 You coordinate and carry out the release.
 Add your name and details to [CITATION.cff](CITATION.cff).
 
@@ -48,7 +48,7 @@ The workflow for contributing to this project has been inspired by the workflow 
 * see other types below
 
 ### 1. Describe the issue on GitLab
-Create [an issue](https://docs.gitlab.com/ee/user/project/issues/#create-an-issue) in the GitLab repository. 
+Create [an issue](https://docs.gitlab.com/ee/user/project/issues/#create-an-issue) in the GitLab repository.
 The `issue title` describes the problem you will address.  <br>
 This is an important step as it forces one to think about the "issue".
 Make a checklist for all needed steps if possible.
@@ -71,7 +71,7 @@ Naming convention for branches: `type`/`issue-nr`-`short-description`
 Note: The majority of the development will be done in `feature` branches.
 
 ##### `issue-nr`
-The `issueNumber` should be taken from Step 1. Do not use the "#". 
+The `issueNumber` should be taken from Step 1. Do not use the "#".
 
 ##### `short-description`
 Describe shortly what the branch is about. Usually, the title of the issue.
@@ -122,7 +122,7 @@ Check branch status:
 git status
 ```
 
-#### 2.3. Commit your changes 
+#### 2.3. Commit your changes
 If the file does not exist on the remote server yet, use:
 ```bash
 git add filename.md
@@ -139,7 +139,7 @@ Write a good `commit message`:
 - Keep the subject line [shorter than 50 characters](https://chris.beams.io/posts/git-commit/#limit-50)
 - Do not commit more than a few changes at the time: [atomic commits](https://en.wikipedia.org/wiki/Atomic_commit)
 - Use [imperative mood](https://chris.beams.io/posts/git-commit/#imperative)
-- Do not end the commit message with a [period](https://chris.beams.io/posts/git-commit/#end) ~~.~~ 
+- Do not end the commit message with a [period](https://chris.beams.io/posts/git-commit/#end) ~~.~~
 - Always end the commit message with the `issueNumber` including the "#"
 
 Examples of commit message: `Added function with some method #42` or `Update documentation for commit messages #1`
@@ -155,7 +155,7 @@ git commit --amend
 ### 3. Maintain code [TODO: apply in project]
 
 3.1. **Code Quality and Linting**:
-To ensure consistency in code style and to prevent potential issues, it’s recommended to use linters and formatters. 
+To ensure consistency in code style and to prevent potential issues, it’s recommended to use linters and formatters.
 - **Linting**: Use `flake8` to check for PEP 8 compliance and catch other common issues:
    ```bash
     pip install flake8
@@ -218,7 +218,7 @@ If you are the reviewer:
 - Check the changes in all corresponding files.
 - Checkout the branch and run code.
 - Comment if you would like to change something (Use `Request changes`)
-- If all tests pass and all changes are good, `Approve` the MR. 
+- If all tests pass and all changes are good, `Approve` the MR.
 - Leave a comment and some nice words!
 
 #### 5.2. Merge the MR and delete the feature branch
@@ -245,18 +245,18 @@ To maintain consistency and readability, please follow the coding standards outl
   - Indentation (4 spaces per level).
   - Line length (maximum 79 characters, or 72 characters for docstrings).
   - Naming conventions for variables, functions, and classes.
-  
+
 - **Linting Tools**: To help ensure compliance with PEP 8, use a linter such as `flake8` or `black`:
   ```bash
   pip install flake8
   flake8 path/to/your/code  # Run flake8 to check for style issues
-  
+
   # OR use black for auto-formatting
   pip install black
   black path/to/your/code  # Run black to automatically format code
 
 ### Documentation Style
-To ensure consistent and clear documentation, please follow the Google-style docstring format. 
+To ensure consistent and clear documentation, please follow the Google-style docstring format.
 This style is straightforward and well-suited for research projects, as it provides structured sections for describing parameters, return values, examples, and more.
 
 #### General Rules
@@ -278,10 +278,10 @@ This style is straightforward and well-suited for research projects, as it provi
 1. **Module-Level Docstring**
    ```python
    """Brief module description.
-    
+
     This module demonstrates the Google-style docstring format. It provides
     several examples of documenting different types of objects and methods.
-    
+
     Attributes:
         module_level_variable1 (int): Module level variables can be documented here.
         module_level_variable2 (str): An example of an inline attribute docstring.
@@ -292,14 +292,14 @@ This style is straightforward and well-suited for research projects, as it provi
     ```python
     def example_function(param1: int, param2: str = 'default') -> bool:
          """Summary of the function.
-         
+
          Args:
               param1 (int): The first parameter.
               param2 (str): The second parameter. Defaults to 'default'.
-         
+
          Returns:
               bool: A boolean value indicating success.
-         
+
          Raises:
               ValueError: If the parameter is invalid.
          """
@@ -309,28 +309,28 @@ This style is straightforward and well-suited for research projects, as it provi
     ```python
     def example_generator(param: int) -> Iterator[int]:
          """Summary of the generator function.
-         
+
          Args:
               param (int): The parameter for the generator.
-         
+
          Yields:
               int: The next value in the sequence.
          """
     ```
-   
+
 4. **Class Docstring with Attributes**
     ```python
     class ExampleClass:
     """A summary line for the class.
-    
+
         Attributes:
             attr1 (str): Description of `attr1`.
             attr2 (int, optional): Description of `attr2`, which is optional.
         """
-    
+
         def __init__(self, attr1: str, attr2: int = 0):
             """Initializes ExampleClass with specified attributes.
-    
+
             Args:
                 attr1 (str): Description of `attr1`.
                 attr2 (int, optional): Description of `attr2`. Defaults to 0.
@@ -343,11 +343,11 @@ This style is straightforward and well-suited for research projects, as it provi
     ```python
     class CustomError(Exception):
         """Exception raised for specific errors in ExampleClass.
-    
+
         Args:
             msg (str): Explanation of the error.
             code (int, optional): Error code, if applicable.
-    
+
         Attributes:
             msg (str): Explanation of the error.
             code (int): Error code.
@@ -396,16 +396,16 @@ The `CHANGELOG.md` file keeps a record of significant changes to the project and
   - Use the following structure for each new entry:
     ```markdown
     ## [Version] - [YYYY-MM-DD]
-    
+
     ### Added
     - Brief description of the new feature, referencing the issue or merge request number if applicable.
-    
+
     ### Changed
     - Description of any modifications to existing features.
-    
+
     ### Fixed
     - Description of bug fixes or corrections.
-    
+
     ### Removed
     - Deprecated features or removed functionality.
     ```
@@ -413,14 +413,14 @@ The `CHANGELOG.md` file keeps a record of significant changes to the project and
     - **New Feature**:
         ```markdown
         ## [1.0.0] - 2022-01-01
-        
+
         ### Added
         - Implemented new feature X (#42).
         ```
     - **Bug Fix**:
         ```markdown
         ## [1.0.1] - 2022-01-02
-        
+
         ### Fixed
         - Resolved issue with feature X not working correctly (#43).
         ```

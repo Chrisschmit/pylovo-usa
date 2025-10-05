@@ -30,6 +30,6 @@ EPSG: 5070
 # counties: Autauga County, 003 = Baldwin County, etc.
 # count_subdivisions: Autaugaville CCD,
 REGION:
-  STATE: "MA" 
-  COUNTY: "Middlesex County" 
+  STATE: "MA"
+  COUNTY: "Middlesex County"
   COUNTY_SUBDIVISION: "TRACT_352900"

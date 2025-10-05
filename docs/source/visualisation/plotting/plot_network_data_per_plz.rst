@@ -25,4 +25,3 @@ Plot Network Data per PLZ
 .. image:: ../../images/visualisation/cable_type_distribution.png
     :width: 600
     :alt: Default view
-

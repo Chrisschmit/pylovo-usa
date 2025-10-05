@@ -1,0 +1,25 @@
+# Development dependencies for pylovo-usa
+# Install with: uv pip install -r requirements-dev.txt
+
+# Include production dependencies
+-r requirements.txt
+
+# Linting and formatting
+ruff>=0.8.0
+
+# Pre-commit hooks
+pre-commit>=3.5.0
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
+
+# Type checking
+mypy>=1.11.0
+types-PyYAML
+types-requests
+
+# Documentation
+sphinx>=7.0.0
+sphinx-rtd-theme>=2.0.0
