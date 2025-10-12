@@ -6,7 +6,6 @@ from sqlalchemy import create_engine
 
 from src import utils
 from src.config_loader import *
-from src.database.analysis_mixin import AnalysisMixin
 from src.database.clustering_mixin import ClusteringMixin
 from src.database.grid_mixin import GridMixin
 from src.database.preprocessing_mixin import PreprocessingMixin
@@ -15,7 +14,7 @@ from src.database.utils_mixin import UtilsMixin
 warnings.simplefilter(action="ignore", category=UserWarning)
 
 
-class DatabaseClient(PreprocessingMixin, ClusteringMixin, GridMixin, AnalysisMixin, UtilsMixin):
+class DatabaseClient(PreprocessingMixin, ClusteringMixin, GridMixin, UtilsMixin):
     """Main database client handling connections."""
 
     def __init__(self, dbname=DBNAME, user=USER, pw=PASSWORD, host=HOST, port=PORT, **kwargs):

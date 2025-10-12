@@ -44,13 +44,10 @@ def import_buildings_for_single_regional_identifier(gg: GridGenerator):
             "shp",
         )
     )
-    print(data_path)
-    shapefiles_pattern = os.path.join(data_path, "*.shp")  # Pattern for shapefiles
-    print(shapefiles_pattern)
+    shapefiles_pattern = os.path.join(data_path, "*.shp")
 
     # Retrieve all matching shapefiles
     files_to_add = glob.glob(shapefiles_pattern, recursive=True)
-    print(files_to_add)
 
     # Handle cases where no matching files are found
     if not files_to_add:
