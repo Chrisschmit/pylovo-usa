@@ -9,6 +9,8 @@ algorithms from the specific electrical simulation software.
 from abc import ABC, abstractmethod
 from typing import Any
 
+from ..electrical_backend.component_specs import ComponentSpec
+
 
 class IElectricalBackend(ABC):
     """
@@ -31,7 +33,7 @@ class IElectricalBackend(ABC):
         """
 
     @abstractmethod
-    def create_component(self, spec: "ComponentSpec") -> Any:
+    def create_component(self, spec: ComponentSpec) -> Any:
         """
         Create electrical component from specification.
 

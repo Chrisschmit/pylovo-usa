@@ -78,7 +78,6 @@ class LoadSpec(ComponentSpec):
     n_phases: int = 3
     conn: str = "wye"  # Connection type
     load_type: str = "residential"
-    building_id: str | None = None
     coordinates: tuple[float, float] | None = None
     phase: str | None = None
     vertex_id: int | None = None

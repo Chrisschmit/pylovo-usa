@@ -22,7 +22,7 @@ from .component_specs import BusSpec, ComponentSpec, LineSpec, LoadSpec, Transfo
 try:
     import altdss
 except ImportError:
-    altdss = Noneƒ
+    altdss = None
 
 
 class AltDSSBackendError(Exception):

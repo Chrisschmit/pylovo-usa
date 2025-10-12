@@ -350,7 +350,7 @@ class ClusteringMixin(BaseMixin, ABC):
             # Python list of vertex ids that belong to the current
             # hierarchical-cluster
             vid_list = [localid2vid[lid[0]] for lid in np.argwhere(flat_groups == cluster_id)]
-            total_sim_load = utils.simultaneousPeakLoad(buildings, consumer_cat_df, vid_list)
+            total_sim_load = utils.simultaneous_peak_load(buildings, consumer_cat_df, vid_list)
 
             # Too large load and buildings count >5 --> invalid cluster
             if total_sim_load >= max(transformer_capacities) and len(vid_list) >= 5:
@@ -831,20 +831,6 @@ class ClusteringMixin(BaseMixin, ABC):
         kcid = self.cur.fetchone()[0]
         return kcid
 
-    def get_included_transformers(self, kcid: int) -> list:
-        """
-        Reads the vertice ids of transformers from a given kcid
-        :param kcid:
-        :return: list
-        """
-        query = """SELECT vertice_id
-                   FROM buildings_tem
-                   WHERE kcid = %(k)s
-                     AND type = 'Transformer';"""
-        self.cur.execute(query, {"k": kcid})
-        transformers_list = [t[0] for t in data] if (data := self.cur.fetchall()) else []
-        return transformers_list
-
     def clear_lv_grid_result_in_kmean_cluster(self, regional_identifier: int, kcid: int):
         # Remove old clustering at same postcode cluster
         clear_query = """DELETE
@@ -859,92 +845,6 @@ class ClusteringMixin(BaseMixin, ABC):
         self.logger.debug(
             f"Building clusters with regional_identifier = {regional_identifier}, k_mean cluster = {kcid} area cleared."
         )
-
-    def upsert_bcid(
-        self,
-        regional_identifier: int,
-        kcid: int,
-        bcid: int,
-        vertices: list,
-        transformer_rated_power: int,
-    ):
-        """
-        Assign buildings in buildings_tem the bcid and stores the cluster in lv_grid_result
-        Args:
-            regional_identifier: postcode cluster ID - regional_identifier
-            kcid: kmeans cluster ID
-            bcid: building cluster ID
-            vertices: List of vertice_id of selected buildings
-            transformer_rated_power: Apparent power of the selected transformer
-        """
-        # Insert references to building elements in which cluster they are.
-        building_query = """UPDATE buildings_tem
-                            SET bcid = %(bc)s
-                            WHERE regional_identifier = %(pc)s
-                              AND kcid = %(kc)s
-                              AND bcid ISNULL
-                              AND connection_point IN %(vid)s
-                              AND type != 'Transformer'; """
-
-        params = {
-            "v": VERSION_ID,
-            "pc": regional_identifier,
-            "bc": bcid,
-            "kc": kcid,
-            "vid": tuple(map(int, vertices)),
-        }
-        self.cur.execute(building_query, params)
-
-        # Insert new clustering
-        cluster_query = """INSERT INTO lv_grid_result (version_id, regional_identifier, kcid, bcid, dist_transformer_rated_power)
-                           VALUES (%(v)s, %(pc)s, %(kc)s, %(bc)s, %(s)s); """
-
-        params = {
-            "v": VERSION_ID,
-            "pc": regional_identifier,
-            "bc": bcid,
-            "kc": kcid,
-            "s": int(transformer_rated_power),
-        }
-        self.cur.execute(cluster_query, params)
-
-    def count_kmean_cluster_consumers(self, kcid: int) -> int:
-        query = """SELECT COUNT(DISTINCT vertice_id)
-                   FROM buildings_tem
-                   WHERE kcid = %(k)s
-                     AND type != 'Transformer'
-                     AND bcid ISNULL;"""
-        self.cur.execute(query, {"k": kcid})
-        count = self.cur.fetchone()[0]
-
-        return count
-
-    def delete_isolated_building(self, regional_identifier: int, kcid):
-        query = """DELETE
-                   FROM buildings_tem
-                   WHERE regional_identifier = %(p)s
-                     AND kcid = %(k)s
-                     AND bcid ISNULL;"""
-        self.cur.execute(query, {"p": regional_identifier, "k": kcid})
-
-    def get_greenfield_bcids(self, regional_identifier: int, kcid: int) -> list:
-        """
-        Args:
-            regional_identifier: loadarea cluster ID
-            kcid: kmeans cluster ID
-        Returns: A list of greenfield building clusters for a given regional_identifier
-        """
-        query = """SELECT DISTINCT bcid
-                   FROM lv_grid_result
-                   WHERE version_id = %(v)s
-                     AND kcid = %(kc)s
-                     AND regional_identifier = %(pc)s
-                     AND lv_model_status ISNULL
-                   ORDER BY bcid; """
-        params = {"v": VERSION_ID, "pc": regional_identifier, "kc": kcid}
-        self.cur.execute(query, params)
-        bcid_list = [t[0] for t in data] if (data := self.cur.fetchall()) else []
-        return bcid_list
 
     def get_buildings_from_bcid(self, regional_identifier: int, kcid: int, bcid: int, scid: int = None) -> pd.DataFrame:
         # Build query with optional scid filter for hierarchical structure
@@ -970,146 +870,6 @@ class ClusteringMixin(BaseMixin, ABC):
         self.logger.debug(f"{len(buildings_df)} building data fetched.")
 
         return buildings_df
-
-    def update_dist_transformer_rated_power(self, regional_identifier: int, kcid: int, bcid: int, note: int):
-        """
-        Update the transformer_rated_power (kVA) for a specific building cluster in lv_grid_result
-        according to the allowed catalog for the postcode's settlement type.
-
-        Behavior
-        - Determines the settlement type for the provided regional_identifier and loads the allowed
-          single-transformer sizes (ascending) via get_transformer_data.
-        - If note == 0:
-            Bump the currently stored transformer_rated_power to the next larger single size
-            from the catalog (no double-transformer options considered).
-        - If note != 0:
-            Consider both the single sizes and the double-transformer options (parallel units).
-            If the currently stored value already matches any allowed size, do nothing.
-            Otherwise normalize it by rounding up to the nearest 630 multiple and update.
-
-        Parameters
-        - regional_identifier: Postcode/area identifier of the cluster.
-        - kcid: K-means component identifier the cluster belongs to.
-        - bcid: Building cluster identifier to update.
-        - note: Mode flag controlling the update strategy.
-                0  -> Only single-transformer catalog bump to next larger size.
-                !=0 -> Include double-transformer combinations and normalize fallback sizes.
-
-        Returns
-        - None. Updates are written directly to lv_grid_result.
-
-        Side effects
-        - Updates lv_grid_result.dist_transformer_rated_power for the (version_id, regional_identifier, kcid, bcid) row.
-        - Emits a debug log when a double/multiple transformer group assignment occurs.
-        """
-        sdl = self.get_settlement_type_from_regional_identifier(regional_identifier)
-        transformer_capacities, _ = self.get_transformer_data(sdl, grid_level="LV")
-
-        if note == 0:
-            old_query = """SELECT dist_transformer_rated_power
-                           FROM lv_grid_result
-                           WHERE version_id = %(v)s
-                             AND regional_identifier = %(p)s
-                             AND kcid = %(k)s
-                             AND bcid = %(b)s;"""
-            self.cur.execute(
-                old_query,
-                {"v": VERSION_ID, "p": regional_identifier, "k": kcid, "b": bcid},
-            )
-            transformer_rated_power = self.cur.fetchone()[0]
-
-            new_transformer_rated_power = transformer_capacities[transformer_capacities > transformer_rated_power][
-                0
-            ].item()
-            update_query = """UPDATE lv_grid_result
-                              SET dist_transformer_rated_power = %(n)s
-                              WHERE version_id = %(v)s
-                                AND regional_identifier = %(p)s
-                                AND kcid = %(k)s
-                                AND bcid = %(b)s;"""
-            self.cur.execute(
-                update_query,
-                {
-                    "v": VERSION_ID,
-                    "p": regional_identifier,
-                    "k": kcid,
-                    "b": bcid,
-                    "n": new_transformer_rated_power,
-                },
-            )
-        else:
-            double_trans = np.multiply(transformer_capacities[2:4], 2)
-            combined = np.concatenate((transformer_capacities, double_trans), axis=None)
-            np.sort(combined, axis=None)
-            old_query = """SELECT dist_transformer_rated_power
-                           FROM lv_grid_result
-                           WHERE version_id = %(v)s
-                             AND regional_identifier = %(p)s
-                             AND kcid = %(k)s
-                             AND bcid = %(b)s;"""
-            self.cur.execute(
-                old_query,
-                {"v": VERSION_ID, "p": regional_identifier, "k": kcid, "b": bcid},
-            )
-            transformer_rated_power = self.cur.fetchone()[0]
-            if transformer_rated_power in combined.tolist():
-                return None
-            new_transformer_rated_power = np.ceil(transformer_rated_power / 630) * 630
-            update_query = """UPDATE lv_grid_result
-                              SET dist_transformer_rated_power = %(n)s
-                              WHERE version_id = %(v)s
-                                AND regional_identifier = %(p)s
-                                AND kcid = %(k)s
-                                AND bcid = %(b)s;"""
-            self.cur.execute(
-                update_query,
-                {
-                    "v": VERSION_ID,
-                    "p": regional_identifier,
-                    "k": kcid,
-                    "b": bcid,
-                    "n": new_transformer_rated_power,
-                },
-            )
-            self.logger.debug("double or multiple transformer group transformer_rated_power assigned")
-
-    def get_transformer_data(self, settlement_type: int = None, grid_level: str = "LV") -> tuple[np.array, dict]:
-        """
-        Args:
-            Settlement type: 1=City, 2=Village, 3=Rural
-        Returns: Typical transformer capacities and costs depending on the settlement type
-        """
-        if settlement_type == 1:
-            application_area_tuple = (1, 2, 3)
-        elif settlement_type == 2:
-            application_area_tuple = (2, 3, 4)
-        elif settlement_type == 3:
-            application_area_tuple = (3, 4, 5)
-        else:
-            self.logger.debug("Incorrect settlement type number specified.")
-            return
-
-        if grid_level == "LV":
-            transformer_type = "Transformer"
-        elif grid_level == "MV":
-            transformer_type = "Substation"
-
-        query = """SELECT equipment_data.s_max_kva, cost
-                   FROM equipment_data
-                   WHERE type = %(transformer_type)s \
-                     AND application_area IN %(tuple)s
-                   ORDER BY s_max_kva;"""
-
-        self.cur.execute(
-            query,
-            {"tuple": application_area_tuple, "transformer_type": transformer_type},
-        )
-        data = self.cur.fetchall()
-        capacities = [i[0] for i in data]
-        transformer2cost = {i[0]: i[1] for i in data}
-
-        self.logger.debug("Transformer data fetched.")
-        return np.array(capacities), transformer2cost
 
     def get_settlement_type_from_regional_identifier(self, regional_identifier) -> int:
         """

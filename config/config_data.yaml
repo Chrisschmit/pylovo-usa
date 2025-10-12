@@ -8,11 +8,6 @@ PASSWORD: postgres
 TARGET_SCHEMA: public
 DB_SUFFIX: usa
 
-# Toggles whether the results per regional_identifier are analyzed after grid generation (basic parameters, trafo analysis, cable counting)
-ANALYZE_GRIDS: True
-# Toggles whether the grid json files will be saved in a folder or just in the db
-SAVE_GRID_FOLDER: False
-
 # Logging configuration for PgReaderWriter & GridGenerator
 LOG_LEVEL: INFO
 LOG_FILE: "log.txt"

@@ -4,11 +4,6 @@ VERSION_ID: "1.0"
 # state here which parameters, queries are used to compute the grids with current VERSION_ID
 VERSION_COMMENT: base version
 
-# installed_power * (sim_factor + (1 - sim_factor) * (load_count ** (-3 / 4)))
-SIM_FACTOR: {Residential: 0.07, Public: 0.6, Commercial: 0.5}
-
-PEAK_LOAD_HOUSEHOLD: 30.00
-
 # Average apartment area in square meters
 AVG_APARTMENT_AREA: 75
 

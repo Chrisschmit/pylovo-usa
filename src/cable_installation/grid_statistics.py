@@ -1,67 +1,18 @@
 """
 Grid statistics calculator and plotter for component specs.
 
-This module provides statistics and visualization for electrical grids
-generated with OpenDss backend.
-
-MV/LV Classification Logic:
-- Loads: Uses load.kv (≥1.0 kV → MV), falls back to bus naming patterns
-- Lines: Uses cable_equipment.line_voltage or voltage_level, falls back to bus patterns
-- Buses: Pattern matching on name ("MV_", "SOURCE", "SubTx", etc.)
-
-Cable Lengths:
-- All cable lengths account for parallel conductors (length_km × parallel)
-
-Plots Generated:
-1. Transformer Distribution (pie + bar)
-2. Cable Distribution by Type (top-N bar, no unit mixing)
-3. MV vs LV Comparison (3 clean bar charts: cable km, load count, load kW)
-4. Network Overview (component counts)
 """
 
 import logging
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any
 
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 from ..electrical_backend.component_specs import BusSpec, ComponentSpec, LineSpec, LoadSpec, TransformerSpec
-
-
-class GridStats(TypedDict, total=False):
-    """Type definition for grid statistics dictionary."""
-
-    buses: int
-    lines: int
-    mv_buses: int
-    lv_buses: int
-    substation_transformers: int
-    distribution_transformers: int
-    mv_loads: int
-    lv_loads: int
-    total_loads: int
-    transformer_kvas: list[float]
-    kva_distribution: dict[int, int]
-    max_kva: float
-    avg_kva: float
-    total_kva: float
-    avg_lv_loads_per_dist_tx: float
-    total_cable_km: float
-    mv_cable_km: float
-    lv_cable_km: float
-    cable_type_lengths: dict[str, float]
-    cable_type_lengths_mv: dict[str, float]
-    cable_type_lengths_lv: dict[str, float]
-    cable_per_consumer: float
-    lv_cable_per_consumer: float
-    mv_cable_per_consumer: float
-    total_load_kw: float
-    mv_load_kw: float
-    lv_load_kw: float
-    avg_load_per_consumer: float
 
 
 def _is_mv_bus(name: str) -> bool:
@@ -377,7 +328,6 @@ def plot_grid_statistics(
     kcid: int,
     scid: int,
     output_dir: str = "statistics",
-    show_plots: bool = False,
     logger: logging.Logger | None = None,
 ) -> None:
     """
@@ -390,7 +340,6 @@ def plot_grid_statistics(
         kcid: K-means cluster ID
         scid: Substation cluster ID
         output_dir: Root directory (default: "statistics")
-        show_plots: Whether to display plots interactively
         logger: Optional logger instance
     """
     if logger is None:
@@ -515,7 +464,6 @@ def plot_grid_statistics(
     ]
 
     colors = ["#0065BD", "#A2AD00", "#E37222", "#98C6EA", "#DAD7CB", "#7F7F7F"]
-    bars = ax.bar(metrics, values, color=colors, edgecolor="black", alpha=0.8)
     ax.set_ylabel("Count (scaled for cables/loads)", fontsize=12)
     ax.set_title(f"Network Overview - K{kcid}_S{scid}", fontsize=14, fontweight="bold")
     ax.grid(axis="y", alpha=0.3)
@@ -564,6 +512,6 @@ def calculate_and_save_statistics(
 
     # Generate plots if requested
     if generate_plots:
-        plot_grid_statistics(stats, kcid, scid, output_dir, show_plots=False, logger=logger)
+        plot_grid_statistics(stats, kcid, scid, output_dir, logger=logger)
 
     return stats

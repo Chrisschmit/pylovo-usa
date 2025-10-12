@@ -115,8 +115,6 @@ class PhaseAllocator:
             self.lv_transformers: list[TransformerSpec] = []
             self.mv_lines: list[LineSpec] = []
             self.lv_lines: list[LineSpec] = []
-            # Cache for line MV/LV classification
-            self._mv_cache: dict[str, bool] = {}
 
     def _index(self, specs: list[ComponentSpec]) -> _Idx:
         """Build minimal indices (buses, lines, loads, transformers)."""
@@ -332,8 +330,6 @@ class PhaseAllocator:
         # Store per-transformer territory map for later balancing and
         # validation
         tx._territory_vertices = territory_vertices
-        tx._children = children
-        tx._parents = parents
         tx.required_at_vertex = required_at_vertex
 
     # ---------------
@@ -476,7 +472,7 @@ class PhaseAllocator:
         else:
             phase_counts = {"A": 0, "B": 0, "C": 0}
 
-        for ld, ph in best_assign:
+        for _ld, ph in best_assign:
             if ph in phase_counts:
                 phase_counts[ph] += 1
 
@@ -530,13 +526,12 @@ class PhaseAllocator:
         all_suffixes = {**mv_suffix, **lv_suffix}
 
         # Loads: single-phase wye bus suffix
-        for v, loads in idx.loads_by_vertex.items():
+        for _v, loads in idx.loads_by_vertex.items():
             for ld in loads:
                 if int(getattr(ld, "n_phases", 1)) == 1 and getattr(ld, "conn", "wye") == "wye":
                     ph = getattr(ld, "phase", None)
-                    if ph in all_suffixes:
-                        if not any(ld.bus.endswith(suf) for suf in all_suffixes.values()):
-                            ld.bus = ld.bus + all_suffixes[ph]
+                    if ph in all_suffixes and not any(ld.bus.endswith(suf) for suf in all_suffixes.values()):
+                        ld.bus = ld.bus + all_suffixes[ph]
 
         # Transformers: MV primary bus suffix for split-phase units with
         # assigned primary phase (use MV suffix for primary side)
@@ -688,7 +683,6 @@ class PhaseAllocator:
                     orphaned_loads.append(f"{load_name} (phase {phase}, bus {load_bus})")
                     # Diagnostic info for first few orphans
                     if len(orphan_diagnostics) < 5:
-                        all_tx_buses = mv_transformer_buses | lv_transformer_buses
                         orphan_diagnostics.append(
                             {
                                 "name": load_name,

@@ -43,10 +43,8 @@ class CablePlacementAlgorithm:
         # Initialize voltage-aware cable selector if database is available
         if dbc:
             self.cable_selector = CableSelector(dbc, logger=self.logger)
-            self.use_voltage_aware_selection = True
         else:
             self.cable_selector = None
-            self.use_voltage_aware_selection = False
             self.logger.warning("No database provided - falling back to static cable selection")
 
     def route_or_fallback(self, a: int, b: int, stub_m: float = 0.5) -> list[tuple[float, float]]:
@@ -350,7 +348,7 @@ class CablePlacementAlgorithm:
                     node_ids.append(int(lp.get("vertex_id", lp.get("connection_point", lp))))
                 else:
                     node_ids.append(int(lp))
-            sim_load_mw = utils.simultaneousPeakLoad(buildings_df, consumer_df, node_ids)
+            sim_load_mw = utils.simultaneous_peak_load(buildings_df, consumer_df, node_ids)
             return float(sim_load_mw / (VN * V_BAND_LOW * np.sqrt(3)))
 
         def lv_select_trunk(I_req: float, distance_km: float) -> tuple[CableEquipment | None, int]:
@@ -819,7 +817,7 @@ class CablePlacementAlgorithm:
             ].item()
 
             # Calculate simultaneous load in kW using diversity factor
-            simultaneous_load_kw[row.vertice_id] = utils.oneSimultaneousLoad(
+            simultaneous_load_kw[row.vertice_id] = utils.one_simultaneous_load(
                 row.peak_load_in_kw, row.houses_per_building, simultaneity_factor
             )
 
@@ -1001,7 +999,6 @@ class CablePlacementAlgorithm:
                     n_phases=3,
                     phase="ABC",
                     conn="wye",
-                    building_id=str(osm_id),
                     vertex_id=vid,
                 )
             )

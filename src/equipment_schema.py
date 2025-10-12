@@ -147,7 +147,7 @@ class LVLoadAggregator(LoadAggregator):
         self, nodes: list[int], buildings_df: pd.DataFrame, consumer_df: pd.DataFrame, **kwargs
     ) -> float:
         """Calculate simultaneous peak load for buildings in kW."""
-        return float(utils.simultaneousPeakLoad(buildings_df, consumer_df, nodes))
+        return float(utils.simultaneous_peak_load(buildings_df, consumer_df, nodes))
 
 
 class MVLoadAggregator(LoadAggregator):

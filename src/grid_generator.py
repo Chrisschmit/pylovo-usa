@@ -191,8 +191,8 @@ class GridGenerator:
         self.dbc.remove_zero_peak_load_buildings()
 
         # for debugging purposes: keep only n buildings for LV and MV
-        # self.dbc.keep_only_n_buildings_for_LV(n=10)
-        # self.dbc.keep_only_n_buildings_for_MV(n=10)
+        # self.dbc.keep_only_n_buildings_for_lv(n=10)
+        # self.dbc.keep_only_n_buildings_for_mv(n=10)
 
     def prepare_transformers(self):
         """
@@ -527,52 +527,6 @@ class GridGenerator:
             f"Parallel cable installation completed for regional_identifier {
                 self.regional_identifier}"
         )
-
-    def install_cables_sequential(self):
-        """
-        Sequential cable installation for testing and debugging.
-
-        This method processes clusters one by one without parallel processing,
-        making it easier to debug issues and test the new architecture.
-        """
-        cluster_list = self.dbc.get_list_from_regional_identifier(self.regional_identifier)
-
-        if not cluster_list:
-            self.logger.warning(
-                f"No clusters to process for regional_identifier {
-                    self.regional_identifier}"
-            )
-            return
-
-        self.logger.info(
-            f"Starting sequential cable installation for {
-                len(cluster_list)} clusters"
-        )
-
-        success_count = 0
-        error_count = 0
-
-        for kcid, scid in cluster_list:
-            try:
-                self.logger.info(f"Processing cluster K{kcid}_S{scid}")
-                success = self._install_cables_for_cluster(kcid, scid)
-
-                if success:
-                    success_count += 1
-                    self.logger.info(f"✓ Completed cluster K{kcid}_S{scid}")
-                else:
-                    error_count += 1
-                    self.logger.error(f"✗ Failed cluster K{kcid}_S{scid}")
-
-            except Exception as e:
-                error_count += 1
-                self.logger.error(
-                    f"✗ Exception in cluster K{kcid}_S{scid}: {
-                        str(e)}"
-                )
-                continue
-
-        self.logger.info(f"Sequential cable installation completed: {success_count} success, {error_count} errors")
 
     @staticmethod
     def _init_worker(regional_identifier):

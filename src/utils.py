@@ -2,9 +2,6 @@ import logging
 import sys
 from pathlib import Path
 
-import osm2geojson
-import requests
-
 
 def create_logger(name: str, log_level: int = logging.INFO, log_file: str | None = None) -> logging.Logger:
     """Create a configured logger instance.
@@ -43,7 +40,7 @@ def create_logger(name: str, log_level: int = logging.INFO, log_file: str | None
     return logger
 
 
-def simultaneousPeakLoad(buildings_df, consumer_df, vertice_ids):
+def simultaneous_peak_load(buildings_df, consumer_df, vertice_ids):
     # Calculates the simultaneous peak load of buildings with given vertice ids
     subset_df = buildings_df[buildings_df["connection_point"].isin(vertice_ids)]
     occurring_categories = (
@@ -70,7 +67,7 @@ def simultaneousPeakLoad(buildings_df, consumer_df, vertice_ids):
         sim_factor = category_row.iloc[0]["sim_factor"]  # g_inf
 
         # Calculate simultaneous load (Kerber.2011) Gl. 3.2 - S. 23
-        sim_load = oneSimultaneousLoad(installed_power, load_count, sim_factor)
+        sim_load = one_simultaneous_load(installed_power, load_count, sim_factor)
         category_load_dict[cat[0]] = sim_load
 
     # Calculate total sim load (Kiefer S. 142)
@@ -79,53 +76,10 @@ def simultaneousPeakLoad(buildings_df, consumer_df, vertice_ids):
     return total_sim_load
 
 
-def oneSimultaneousLoad(installed_power, load_count, sim_factor):
-    if isinstance(load_count, int):
-        if load_count == 0:
-            return 0
+def one_simultaneous_load(installed_power, load_count, sim_factor):
+    if isinstance(load_count, int) and load_count > 0:
+        return 0
 
     sim_load = installed_power * (sim_factor + (1 - sim_factor) * (load_count ** (-3 / 4)))
 
     return sim_load
-
-
-def osmjson_to_geojson(osmjson: dict[str, str]) -> dict[str, str]:
-    """Convert JSON dict received from overpass api to GeoJSON dictionary.
-
-    Args:
-        osmjson: JSON dictionary received from overpass api
-
-    Returns:
-        dict: GeoJSON representation of osmjson
-
-    """
-    geojson = osm2geojson.json2geojson(osmjson)
-
-    # put attributes in "tags" directly into "properties"
-    for feature in geojson["features"]:
-        if "tags" in feature["properties"]:
-            feature["properties"].update(feature["properties"].pop("tags"))
-
-    return geojson
-
-
-def query_overpass_for_geojson(overpass_url: str, query: str) -> dict[str, str]:
-    """Execute an overpass turbo query and convert results to GeoJSON.
-
-    Args:
-        overpass_url: Overpass API URL
-        query: Query string
-
-    Returns:
-        dict: GeoJSON representation of overpass results
-
-    """
-    # call api for data
-    response = requests.get(overpass_url, params={"data": query})
-    response.raise_for_status()
-
-    # convert JSON data to GeoJSON format
-    osmjson = response.json()
-    geojson = osmjson_to_geojson(osmjson)
-
-    return geojson

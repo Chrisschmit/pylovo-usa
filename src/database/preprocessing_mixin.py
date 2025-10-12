@@ -413,14 +413,6 @@ class PreprocessingMixin(BaseMixin, ABC):
 
         return count
 
-    def connect_unconnected_ways(self) -> None:
-        """
-        Updates ways_tem
-        :return:
-        """
-        query = """SELECT draw_way_connections();"""
-        self.cur.execute(query)
-
     def draw_building_connection(self) -> None:
         """
         Updates ways_tem, creates pgr network topology in new tables and performs component analysis:
@@ -439,57 +431,6 @@ class PreprocessingMixin(BaseMixin, ABC):
         analyze_query = """SELECT pgr_analyzeGraph('ways_tem', 0.01, the_geom:='geom', id:='way_id');"""
 
         self.cur.execute(analyze_query)
-
-    def _deduplicate_ways_table(self) -> None:
-        """
-        Remove duplicate geometries from ways_tem table before running home connections.
-        Reports the number of duplicates found and removed.
-        """
-        # Count duplicates before removal
-        count_query = """
-        WITH duplicate_groups AS (
-            SELECT geom, COUNT(*) as count
-            FROM ways_tem
-            GROUP BY geom
-            HAVING COUNT(*) > 1
-        )
-        SELECT
-            COUNT(*) as duplicate_groups,
-            SUM(count) as total_duplicate_segments,
-            SUM(count - 1) as segments_to_remove
-        FROM duplicate_groups
-        """
-
-        self.cur.execute(count_query)
-        result = self.cur.fetchone()
-
-        if result and result[0] > 0:
-            groups, total_segments, to_remove = result
-            self.logger.info(f"Found {groups} duplicate geometry groups with {total_segments} total segments")
-            self.logger.info(f"Removing {to_remove} duplicate segments (keeping 1 per group)")
-
-            # Remove duplicates - keep the one with the smallest way_id
-            remove_query = """
-            DELETE FROM ways_tem w1
-            USING ways_tem w2
-            WHERE w1.way_id > w2.way_id
-              AND ST_Equals(w1.geom, w2.geom)
-            """
-
-            self.cur.execute(remove_query)
-
-            # Get number of affected rows from cursor
-            removed_count = self.cur.rowcount
-
-            self.logger.info(f"Successfully removed {removed_count} duplicate segments")
-
-            # Final count
-            self.cur.execute("SELECT COUNT(*) FROM ways_tem")
-            final_count = self.cur.fetchone()[0]
-            self.logger.info(f"ways_tem now contains {final_count} unique segments")
-
-        else:
-            self.logger.info("No duplicate geometries found in ways_tem table")
 
     def update_ways_cost(self) -> None:
         """
@@ -543,8 +484,7 @@ class PreprocessingMixin(BaseMixin, ABC):
         )
         return df_query
 
-    # TODO: Remove this function
-    def keep_only_n_buildings_for_LV(self, n: int = 2) -> None:
+    def keep_only_n_buildings_for_lv(self, n: int = 2) -> None:
         """
         Debug function: Keep only n LV buildings in buildings_tem table
         :param n: Number of LV buildings to keep
@@ -565,7 +505,7 @@ class PreprocessingMixin(BaseMixin, ABC):
         self.cur.execute(query, {"n": n})
         self.logger.info(f"Kept only {n} LV buildings for debugging")
 
-    def keep_only_n_buildings_for_MV(self, n: int = 2) -> None:
+    def keep_only_n_buildings_for_mv(self, n: int = 2) -> None:
         """
         Debug function: Keep only n MV buildings in buildings_tem table
         :param n: Number of MV buildings to keep

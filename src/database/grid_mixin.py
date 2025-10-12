@@ -80,32 +80,6 @@ class GridMixin(BaseMixin, ABC):
 
         return vertex_distance_mapping, transformer
 
-    def get_transformer_geom_from_bcid(self, regional_identifier: int, kcid: int, bcid: int):
-        query = """SELECT ST_X(ST_Transform(geom, 4326)), ST_Y(ST_Transform(geom, 4326))
-                   FROM transformer_positions tp
-                            JOIN grid_result gr
-                                 ON tp.grid_result_id = gr.grid_result_id
-                   WHERE gr.version_id = %(v)s
-                     AND regional_identifier = %(p)s
-                     AND kcid = %(k)s
-                     AND bcid = %(b)s;"""
-        self.cur.execute(query, {"v": VERSION_ID, "p": regional_identifier, "k": kcid, "b": bcid})
-        geo = self.cur.fetchone()
-
-        return geo
-
-    def get_transformer_rated_power_from_bcid(self, regional_identifier: int, kcid: int, bcid: int) -> int:
-        query = """SELECT transformer_rated_power
-                   FROM grid_result
-                   WHERE version_id = %(v)s
-                     AND regional_identifier = %(p)s
-                     AND kcid = %(k)s
-                     AND bcid = %(b)s;"""
-        self.cur.execute(query, {"v": VERSION_ID, "p": regional_identifier, "k": kcid, "b": bcid})
-        transformer_rated_power = self.cur.fetchone()[0]
-
-        return transformer_rated_power
-
     def get_node_geom(self, vid: int):
         query = """SELECT ST_X(ST_Transform(the_geom, 4326)), ST_Y(ST_Transform(the_geom, 4326))
                    FROM ways_tem_vertices_pgr
@@ -302,35 +276,6 @@ class GridMixin(BaseMixin, ABC):
                 "geom": LineString(geom).wkb_hex,
                 "epsg": EPSG,
             },
-        )
-
-    # Legacy method - kept for backward compatibility but marked deprecated
-    def insert_lines(
-        self,
-        geom: list,
-        regional_identifier: int,
-        bcid: int,
-        kcid: int,
-        line_name: str,
-        std_type: str,
-        from_bus: int,
-        to_bus: int,
-        length_km: float,
-    ) -> None:
-        """DEPRECATED: Use insert_lv_line or insert_mv_line instead."""
-        self.logger.warning("insert_lines is deprecated. Use insert_lv_line() for LV networks.")
-        # Convert to new format - assume LV line if bcid is provided
-        scid = 0  # Default scid for legacy compatibility
-        self.insert_lv_line(
-            geom=geom,
-            kcid=kcid,
-            scid=scid,
-            bcid=bcid,
-            line_name=line_name,
-            equipment_id=std_type,
-            from_bus=from_bus,
-            to_bus=to_bus,
-            length_km=length_km,
         )
 
     def is_grid_generated(self, regional_identifier: int):
