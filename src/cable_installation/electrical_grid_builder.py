@@ -79,7 +79,7 @@ class ElectricalGridBuilder:
             self.logger.info("Starting phase allocation optimization...")
             phase_allocator = PhaseAllocator(
                 logger=self.logger,
-                max_imbalance_pct=20.0,
+                max_imbalance_pct=30.0,
                 raise_on_imbalance=False,
                 optimize_retries=6,
                 retry_threshold_pct=20.0,

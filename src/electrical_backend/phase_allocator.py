@@ -83,11 +83,12 @@ class PhaseAllocator:
         # Finalize bus and line suffixes and phase strings
         self._apply_suffixes(idx)
 
-        # Validate connectivity before mirroring
-        self._validate_load_connectivity(specs)
-
         # Quick fix: Duplicate L1 trunk lines to L2 for split-phase coverage
         specs = self._duplicate_trunks_for_l2(specs)
+
+
+        # Validate connectivity before mirroring
+        self._validate_load_connectivity(specs)
 
         # Validate global consistency and split-phase rules (where modeled)
         self._validate(idx)

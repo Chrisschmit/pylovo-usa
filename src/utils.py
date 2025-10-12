@@ -77,7 +77,7 @@ def simultaneous_peak_load(buildings_df, consumer_df, vertice_ids):
 
 
 def one_simultaneous_load(installed_power, load_count, sim_factor):
-    if isinstance(load_count, int) and load_count > 0:
+    if isinstance(load_count, int) and load_count == 0:
         return 0
 
     sim_load = installed_power * (sim_factor + (1 - sim_factor) * (load_count ** (-3 / 4)))

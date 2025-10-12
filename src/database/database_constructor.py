@@ -124,8 +124,6 @@ class DatabaseConstructor:
             if skip_failures:
                 command.append("-skipfailures")
 
-            print(f"  Running command: {' '.join(command[:3])} ... (database connection hidden)")
-            print("  This may take several minutes for large files...")
 
             if skip_failures:
                 # Capture stderr for error processing, but show stdout in real-time

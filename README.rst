@@ -53,7 +53,7 @@ complete synthetic distribution grids with hierarchical MV-LV topology.
 
 - Hierarchical MV-LV distribution grid generation with realistic topology
 - Region selection using US Census FIPS codes
-- Backend-agnostic electrical network modeling (supports pandapower and AltDSS)
+- Backend-agnostic electrical network modeling (supports pandapower and OpenDSS)
 - Three-phase split-phase transformer modeling (120V/240V residential, 277V/480V commercial)
 - Automated grid statistics and parameter analysis
 - QGIS visualization support
