@@ -1,7 +1,7 @@
 """Backend implementations for electrical simulation."""
 
-from .altdss_backend import AltDSSBackend, AltDSSBackendError
-from .altdss_component_factory import AltDSSComponentFactory
-from .base_backend import IElectricalBackend
+from .opendss_backend import OpenDSSBackend, OpenDSSBackendError
+from .opendss_component_factory import OpenDSSComponentFactory
+from .backend_interface import IElectricalBackend
 
-__all__ = ["IElectricalBackend", "AltDSSBackend", "AltDSSBackendError", "AltDSSComponentFactory"]
+__all__ = ["IElectricalBackend", "OpenDSSBackend", "OpenDSSBackendError", "OpenDSSComponentFactory"]

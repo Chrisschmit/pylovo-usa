@@ -1,9 +1,9 @@
 """
-AltDSS Component Factory for pylovo-usa.
+OpenDSS Component Factory for pylovo-usa.
 
-This module provides a centralized factory class for creating all AltDSS circuit components
-directly on an AltDSS instance using the pythonic interface. It focuses purely on component
-creation and does not manage the AltDSS instance lifecycle.
+This module provides a centralized factory class for creating all OpenDSS circuit components
+directly on an OpenDSS instance using the pythonic interface. It focuses purely on component
+creation and does not manage the OpenDSS instance lifecycle.
 
 Key responsibilities:
 - Bus creation and coordinate setting
@@ -15,8 +15,8 @@ Key responsibilities:
 - Component tracking and summary reporting
 
 Note:
-- AltDSS instance lifecycle (initialization, cleanup) is handled by AltDSSGridBuilder
-- This factory assumes an already initialized AltDSS instance
+- OpenDSS instance lifecycle (initialization, cleanup) is handled by OpenDSSGridBuilder
+- This factory assumes an already initialized OpenDSS instance
 """
 
 import logging
@@ -25,20 +25,20 @@ from typing import Any
 from ..equipment_schema import CableEquipment, TransformerEquipment
 
 
-class AltDSSComponentFactory:
+class OpenDSSComponentFactory:
     """
-    Factory class for creating AltDSS components directly on an AltDSS instance.
+    Factory class for creating OpenDSS components directly on an OpenDSS instance.
 
     This class centralizes all component creation logic and creates components
-    directly on the provided AltDSS instance using the pythonic interface.
+    directly on the provided OpenDSS instance using the pythonic interface.
     """
 
     def __init__(self, dss_instance: Any, logger: logging.Logger | None = None):
         """
-        Initialize the AltDSS component factory with an AltDSS instance.
+        Initialize the OpenDSS component factory with an OpenDSS instance.
 
         Args:
-            dss_instance: The AltDSS instance to create components on
+            dss_instance: The OpenDSS instance to create components on
             logger: Optional logger for debugging
         """
         self.dss = dss_instance
@@ -144,7 +144,7 @@ class AltDSSComponentFactory:
 
     def create_line_code(self, cable: CableEquipment) -> Any:
         """
-        Create an AltDSS line code from cable equipment data.
+        Create an OpenDSS line code from cable equipment data.
 
         Args:
             cable: CableEquipment object from database
@@ -233,7 +233,7 @@ class AltDSSComponentFactory:
         pf: float | None = None,
     ) -> Any:
         """
-        Create an AltDSS load.
+        Create an OpenDSS load.
 
         Args:
             name: Load name
@@ -295,7 +295,7 @@ class AltDSSComponentFactory:
         Create single-phase line on specified phase.
 
         Based on SINGLE_PHASE_LATERAL_IMPLEMENTATION_PLAN.md section 3.2.
-        Maps phase letters to AltDSS numeric notation.
+        Maps phase letters to OpenDSS numeric notation.
 
         Args:
             name: Line name
@@ -420,7 +420,7 @@ class AltDSSComponentFactory:
         self, name: str, bus: str, kw: float, kvar: float, kv: float, conn: str = "wye"
     ) -> Any:
         """
-        Create single-phase load with proper AltDSS bus notation.
+        Create single-phase load with proper OpenDSS bus notation.
 
         Args:
             name: Load name

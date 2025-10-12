@@ -13,7 +13,7 @@ from typing import Any
 
 from ..config_loader import *
 from ..database.database_client import DatabaseClient
-from ..electrical_backend.base_backend import IElectricalBackend
+from ..electrical_backend.backend_interface import IElectricalBackend
 from ..electrical_backend.component_specs import BusSpec, ComponentSpec, TransformerSpec
 from ..electrical_backend.phase_allocator import PhaseAllocator
 from .cable_placement import CablePlacementAlgorithm
@@ -117,7 +117,7 @@ class ElectricalGridBuilder:
                         created_components.add(spec_name)
                 except Exception as e:
                     if "Duplicate" in str(e) or "redefined" in str(e):
-                        self.logger.warning(f"AltDSS duplicate detected, skipping: {spec_name}")
+                        self.logger.warning(f"OpenDSS duplicate detected, skipping: {spec_name}")
                         skipped_duplicates += 1
                         if spec_name:
                             created_components.add(spec_name)

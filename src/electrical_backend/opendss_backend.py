@@ -1,8 +1,8 @@
 """
-AltDSS backend implementation for pylovo-usa.
+OpenDSS backend implementation for pylovo-usa.
 
-This module implements the IElectricalBackend interface using AltDSS as the electrical
-simulation engine. It handles AltDSS instance lifecycle, component creation, and
+This module implements the IElectricalBackend interface using OpenDSS as the electrical
+simulation engine. It handles OpenDSS instance lifecycle, component creation, and
 provides a clean interface for grid construction algorithms.
 """
 
@@ -14,33 +14,33 @@ import shutil
 from datetime import datetime
 from typing import Any
 
-from .altdss_component_factory import AltDSSComponentFactory
-from .base_backend import IElectricalBackend
+from .opendss_component_factory import OpenDSSComponentFactory
+from .backend_interface import IElectricalBackend
 from .component_specs import BusSpec, ComponentSpec, LineSpec, LoadSpec, TransformerSpec
 
-# Import AltDSS with fallback
+# Import Altdss with fallback
 try:
     import altdss
 except ImportError:
-    altdss = None
+    OpenDSS = None
 
 
-class AltDSSBackendError(Exception):
-    """Exception raised by AltDSS backend operations."""
+class OpenDSSBackendError(Exception):
+    """Exception raised by OpenDSS backend operations."""
 
 
-class AltDSSBackend(IElectricalBackend):
+class OpenDSSBackend(IElectricalBackend):
     """
-    AltDSS implementation of electrical backend interface.
+    OpenDSS implementation of electrical backend interface.
 
-    This backend uses AltDSS for electrical simulation and provides US distribution
-    standard settings. It manages the AltDSS instance lifecycle and coordinates
-    with the AltDSSComponentFactory for component creation.
+    This backend uses OpenDSS for electrical simulation and provides US distribution
+    standard settings. It manages the OpenDSS instance lifecycle and coordinates
+    with the OpenDSSComponentFactory for component creation.
     """
 
     def __init__(self, logger: logging.Logger | None = None):
         """
-        Initialize AltDSS backend.
+        Initialize OpenDSS backend.
 
         Args:
             logger: Optional logger instance
@@ -51,13 +51,13 @@ class AltDSSBackend(IElectricalBackend):
         self._circuit_name = None
 
         if altdss is None:
-            raise AltDSSBackendError("AltDSS not available. Please install altdss package.")
+            raise OpenDSSBackendError("OpenDSS not available. Please install OpenDSS package.")
 
     def initialize_circuit(self, name: str, source_bus: str, primary_kv: float) -> None:
         """
-        Initialize AltDSS circuit with US distribution standards.
+        Initialize OpenDSS circuit with US distribution standards.
 
-        Based on logic from AltDSSGridBuilder._init_altdss_circuit()
+        Based on logic from OpenDSSGridBuilder._init_OpenDSS_circuit()
 
         Args:
             name: Circuit name
@@ -87,31 +87,31 @@ class AltDSSBackend(IElectricalBackend):
             # Set US standard frequency
             altdss.altdss("Set DefaultBaseFrequency=60")
 
-            # Store AltDSS instance - use the altdss.altdss object
+            # Store OpenDSS instance - use the altdss.altdss object
             self.dss = altdss.altdss
             self._circuit_name = name
 
             # Initialize component factory
-            self.component_factory = AltDSSComponentFactory(self.dss, self.logger)
+            self.component_factory = OpenDSSComponentFactory(self.dss, self.logger)
 
             # Edit the existing Vsource (created by initialize_circuit) to set MVA levels
             # This avoids creating duplicate sources
             self.dss(
                 f"Edit Vsource.source basekv={primary_kv} pu=1.0 phases=3 bus1={source_bus} " f"MVASC3=1000 MVASC1=900"
             )
-            self.logger.info(f"✓ Initialized AltDSS circuit: {name}")
+            self.logger.info(f"✓ Initialized OpenDSS circuit: {name}")
             self.logger.debug(f"Voltage bases: {voltage_bases} kV")
 
         except Exception as e:
-            self.logger.error(f"Failed to initialize AltDSS circuit: {str(e)}")
-            raise AltDSSBackendError(
-                f"AltDSS initialization failed: {
+            self.logger.error(f"Failed to initialize OpenDSS circuit: {str(e)}")
+            raise OpenDSSBackendError(
+                f"OpenDSS initialization failed: {
                     str(e)}"
             ) from e
 
     def create_component(self, spec: ComponentSpec) -> Any:
         """
-        Create AltDSS component from specification.
+        Create OpenDSS component from specification.
 
         Routes component creation to appropriate factory methods based on spec type.
 
@@ -119,10 +119,10 @@ class AltDSSBackend(IElectricalBackend):
             spec: Component specification object
 
         Returns:
-            AltDSS component object
+            OpenDSS component object
         """
         if self.component_factory is None:
-            raise AltDSSBackendError("Backend not initialized. Call initialize_circuit() first.")
+            raise OpenDSSBackendError("Backend not initialized. Call initialize_circuit() first.")
 
         try:
             if isinstance(spec, TransformerSpec):
@@ -195,10 +195,10 @@ class AltDSSBackend(IElectricalBackend):
                         conn=spec.conn,
                     )
             elif isinstance(spec, BusSpec):
-                # No need to create a bus, AltDSS will create it implicitly
+                # No need to create a bus, OpenDSS will create it implicitly
                 return spec.name
             else:
-                raise AltDSSBackendError(
+                raise OpenDSSBackendError(
                     f"Unknown component spec type: {
                         type(spec)}"
                 )
@@ -209,22 +209,22 @@ class AltDSSBackend(IElectricalBackend):
                     spec.name}: {
                     str(e)}"
             )
-            raise AltDSSBackendError(
+            raise OpenDSSBackendError(
                 f"Component creation failed: {
                     str(e)}"
             ) from e
 
     def solve_power_flow(self) -> bool:
         """
-        Solve AltDSS power flow.
+        Solve OpenDSS power flow.
 
-        Based on logic from AltDSSGridBuilder._analyze_and_validate()
+        Based on logic from OpenDSSGridBuilder._analyze_and_validate()
 
         Returns:
             True if power flow converged, False otherwise
         """
         if self.dss is None:
-            raise AltDSSBackendError("No AltDSS instance available for analysis")
+            raise OpenDSSBackendError("No OpenDSS instance available for analysis")
 
         try:
             # CRITICAL: Calculate voltage bases before solving
@@ -405,16 +405,16 @@ class AltDSSBackend(IElectricalBackend):
         """
         Export to JSON with metadata.
 
-        Based on logic from AltDSSGridBuilder._export_to_json()
+        Based on logic from OpenDSSGridBuilder._export_to_json()
 
         Returns:
-            Dictionary containing complete AltDSS circuit in JSON format
+            Dictionary containing complete OpenDSS circuit in JSON format
         """
         if self.dss is None:
-            raise AltDSSBackendError("No AltDSS instance available for export")
+            raise OpenDSSBackendError("No OpenDSS instance available for export")
 
         try:
-            # Export using AltDSS built-in JSON functionality
+            # Export using OpenDSS built-in JSON functionality
             json_str = self.dss.to_json()
 
             self.logger.info("✓ Exported circuit to JSON format")
@@ -422,20 +422,20 @@ class AltDSSBackend(IElectricalBackend):
 
         except Exception as e:
             self.logger.error(f"JSON export failed: {str(e)}")
-            raise AltDSSBackendError(f"JSON export failed: {str(e)}") from e
+            raise OpenDSSBackendError(f"JSON export failed: {str(e)}") from e
 
     def cleanup(self) -> None:
         """
-        Clean up AltDSS resources and reset state.
+        Clean up OpenDSS resources and reset state.
 
-        Based on logic from AltDSSGridBuilder._cleanup_altdss()
+        Based on logic from OpenDSSGridBuilder._cleanup_OpenDSS()
         """
         if self.dss:
             try:
                 self.dss("Clear")
-                self.logger.debug("✓ Cleared AltDSS circuit")
+                self.logger.debug("✓ Cleared OpenDSS circuit")
             except Exception as e:
-                self.logger.warning(f"Error clearing AltDSS circuit: {str(e)}")
+                self.logger.warning(f"Error clearing OpenDSS circuit: {str(e)}")
             finally:
                 self.dss = None
 
@@ -454,13 +454,13 @@ class AltDSSBackend(IElectricalBackend):
         # Clear internal state
         self._circuit_name = None
 
-        self.logger.debug("✓ AltDSS cleanup completed")
+        self.logger.debug("✓ OpenDSS cleanup completed")
 
     def get_circuit_metrics(self) -> dict[str, Any]:
         """
         Get key circuit metrics after solving.
 
-        Based on logic from AltDSSGridBuilder._get_circuit_metrics()
+        Based on logic from OpenDSSGridBuilder._get_circuit_metrics()
 
         Returns:
             Dictionary with circuit performance metrics

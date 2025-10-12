@@ -8,7 +8,7 @@ import src.database.database_client as dbc
 from src import utils
 from src.cable_installation.electrical_grid_builder import ElectricalGridBuilder
 from src.config_loader import *
-from src.electrical_backend.altdss_backend import AltDSSBackend
+from src.electrical_backend.opendss_backend import OpenDSSBackend
 
 
 class ResultExistsError(Exception):
@@ -561,7 +561,7 @@ class GridGenerator:
             self.logger.debug(f"Building hierarchical grid for kcid {kcid}, scid {scid}")
 
             # Create backend and unified builder
-            backend = AltDSSBackend(logger=self.logger)
+            backend = OpenDSSBackend(logger=self.logger)
             builder = ElectricalGridBuilder(backend=backend, dbc=self.dbc, logger=self.logger)
 
             # Build entire hierarchical grid using new architecture
