@@ -125,7 +125,7 @@ class DatabaseConstructor:
                 command.append("-skipfailures")
 
             print(f"  Running command: {' '.join(command[:3])} ... (database connection hidden)")
-            print(f"  This may take several minutes for large files...")
+            print("  This may take several minutes for large files...")
 
             if skip_failures:
                 # Capture stderr for error processing, but show stdout in real-time
@@ -134,31 +134,23 @@ class DatabaseConstructor:
                     check=True,
                     shell=False,
                     stdout=None,  # Let stdout pass through for progress
-                    stderr=subprocess.PIPE)
+                    stderr=subprocess.PIPE,
+                )
 
                 error_list = result.stderr.decode().replace("\r", "").split("\n")
-                error_list = [e[e.find("ERROR: "):e.find("DETAIL: ")]
-                              for e in error_list]
-                error_list = [e.strip("\n")
-                              for e in error_list if "ERROR: " in e]
+                error_list = [e[e.find("ERROR: ") : e.find("DETAIL: ")] for e in error_list]
+                error_list = [e.strip("\n") for e in error_list if "ERROR: " in e]
                 error_set = set(error_list)
 
                 if error_set:
-                    print(
-                        f"Warning: Error(s) occurred while processing {file_name}:")
+                    print(f"Warning: Error(s) occurred while processing {file_name}:")
                     for error in error_set:
                         print("\t" + error)
                         if "duplicate key value violates unique constraint" in error:
-                            print(
-                                "\tThis is likely due to importing already existing data.")
+                            print("\tThis is likely due to importing already existing data.")
             else:
                 # No error capture needed, let all output pass through
-                result = subprocess.run(
-                    command,
-                    check=True,
-                    shell=False,
-                    stdout=None,
-                    stderr=None)
+                result = subprocess.run(command, check=True, shell=False, stdout=None, stderr=None)
 
             et = time.time()
             print(f"{file_name} is successfully imported to db in {int(et - st)} s")

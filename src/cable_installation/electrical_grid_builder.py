@@ -11,13 +11,13 @@ Based on the architecture defined in decoupled_grid_architecture_merged.md
 import logging
 from typing import Any
 
-from ..config_loader import *   
+from ..config_loader import *
 from ..database.database_client import DatabaseClient
 from ..electrical_backend.base_backend import IElectricalBackend
-from .grid_statistics import calculate_and_save_statistics
 from ..electrical_backend.component_specs import BusSpec, ComponentSpec, TransformerSpec
 from ..electrical_backend.phase_allocator import PhaseAllocator
 from .cable_placement import CablePlacementAlgorithm
+from .grid_statistics import calculate_and_save_statistics
 
 
 class ElectricalGridBuilder:

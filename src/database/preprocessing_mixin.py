@@ -542,6 +542,7 @@ class PreprocessingMixin(BaseMixin, ABC):
             con=self.conn,
         )
         return df_query
+
     # TODO: Remove this function
     def keep_only_n_buildings_for_LV(self, n: int = 2) -> None:
         """

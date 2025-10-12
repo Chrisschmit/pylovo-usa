@@ -6,16 +6,13 @@ simulation engine. It handles AltDSS instance lifecycle, component creation, and
 provides a clean interface for grid construction algorithms.
 """
 
+import json
 import logging
 import os
-import json
-from datetime import datetime
-
 import re
 import shutil
+from datetime import datetime
 from typing import Any
-
-from src.config_loader import ANALYZE_GRIDS
 
 from .altdss_component_factory import AltDSSComponentFactory
 from .base_backend import IElectricalBackend
@@ -245,7 +242,11 @@ class AltDSSBackend(IElectricalBackend):
                 self.logger.error("✗ Power flow did not converge")
 
             try:
-                report_filename = f"{self._circuit_name}_electrical_statistics.txt" if self._circuit_name else "electrical_statistics.txt"
+                report_filename = (
+                    f"{self._circuit_name}_electrical_statistics.txt"
+                    if self._circuit_name
+                    else "electrical_statistics.txt"
+                )
                 self.generate_electrical_statistics_report(report_filename)
             except Exception as diag_err:
                 self.logger.warning(f"Electrical statistics report generation failed: {str(diag_err)}")
@@ -303,7 +304,7 @@ class AltDSSBackend(IElectricalBackend):
         max_v = max(bus_vmags) if bus_vmags else None
         avg_v = (sum(bus_vmags) / len(bus_vmags)) if bus_vmags else None
         zero_voltage_buses: list[str] = []
-        for name, vpu in zip(bus_names, bus_vmags):
+        for name, vpu in zip(bus_names, bus_vmags, strict=False):
             try:
                 if abs(float(vpu)) < 1e-8:
                     zero_voltage_buses.append(name)
@@ -343,12 +344,15 @@ class AltDSSBackend(IElectricalBackend):
         json_snapshot_path = None
         try:
             json_str = self.dss.to_json()
-            json_basename = f"circuit_snapshot_{self._circuit_name}.json" if self._circuit_name else "circuit_snapshot.json"
+            json_basename = (
+                f"circuit_snapshot_{self._circuit_name}.json" if self._circuit_name else "circuit_snapshot.json"
+            )
             json_snapshot_path = os.path.abspath(os.path.join(out_dir, json_basename))
             with open(json_snapshot_path, "w") as f:
                 json.dump(json.loads(json_str), f, indent=2)
         except Exception:
             pass
+
         def _to_kw(value: Any) -> float | None:
             try:
                 if hasattr(value, "real"):
@@ -472,7 +476,7 @@ class AltDSSBackend(IElectricalBackend):
             metrics = {
                 "converged": self.dss.Solution.Converged,
                 "total_power_kw": total_power.real if total_power else 0,
-                "total_losses_kw": total_losses.real/1000 if total_losses else 0,
+                "total_losses_kw": total_losses.real / 1000 if total_losses else 0,
                 "num_buses": self.dss.NumBuses,
                 "num_elements": self.dss.NumCircuitElements,
             }
