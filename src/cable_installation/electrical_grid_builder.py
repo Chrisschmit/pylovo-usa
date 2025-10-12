@@ -9,13 +9,13 @@ Based on the architecture defined in decoupled_grid_architecture_merged.md
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
+from ..config_loader import *   
 from ..database.database_client import DatabaseClient
 from ..electrical_backend.base_backend import IElectricalBackend
-from ..electrical_backend.component_specs import (BusSpec, ComponentSpec,
-                                                  LineSpec, LoadSpec,
-                                                  TransformerSpec)
+from .grid_statistics import calculate_and_save_statistics
+from ..electrical_backend.component_specs import BusSpec, ComponentSpec, TransformerSpec
 from ..electrical_backend.phase_allocator import PhaseAllocator
 from .cable_placement import CablePlacementAlgorithm
 
@@ -31,13 +31,13 @@ class ElectricalGridBuilder:
         self,
         backend: IElectricalBackend,
         dbc: DatabaseClient,
-        logger: Optional[logging.Logger] = None,
+        logger: logging.Logger | None = None,
     ):
         """
         Initialize unified grid builder.
 
         Args:
-            backend: Electrical simulation backend (e.g., AltDSSBackend)
+            backend: Electrical simulation backend (e.g., OpenDssBackend)
             dbc: Database client for grid data access
             logger: Optional logger instance
         """
@@ -47,12 +47,9 @@ class ElectricalGridBuilder:
 
         # Initialize cable placement algorithm with dbc for voltage-aware
         # selection<
-        self.cable_algorithm = CablePlacementAlgorithm(
-            dbc=dbc, logger=self.logger)
+        self.cable_algorithm = CablePlacementAlgorithm(dbc=dbc, logger=self.logger)
 
-    def build_complete_grid_for_cluster(
-        self, kcid: int, scid: int, regional_identifier: int = 1
-    ) -> bool:
+    def build_complete_grid_for_cluster(self, kcid: int, scid: int, regional_identifier: int = 1) -> bool:
         """
         Build complete hierarchical grid for a single (kcid, scid) cluster.
 
@@ -67,114 +64,92 @@ class ElectricalGridBuilder:
             True if construction succeeded, False otherwise
         """
         try:
-            self.logger.info(
-                f"Starting hierarchical construction for K{kcid}_S{scid}")
+            self.logger.info(f"Starting hierarchical construction for K{kcid}_S{scid}")
 
-            # Store regional_identifier for use in helper methods
             self.current_regional_identifier = regional_identifier
-
-            # Build complete MV-LV hierarchy
             all_component_specs = []
 
-            # Phase 1: Build MV substation and feeders
-            self.logger.debug(
-                f"Building MV substation network for K{kcid}_S{scid}")
+            self.logger.debug(f"Building MV substation network for K{kcid}_S{scid}")
             mv_specs = self._build_mv_substation_network(kcid, scid)
-
             all_component_specs.extend(mv_specs)
 
-            # Create MV components and extract MV-only parameters
-            for spec in mv_specs:
-                self.backend.create_component(spec)
-
-            # Solve MV network and extract MV parameters
-            if self.backend.solve_power_flow():
-                # lOG CIRCUIT METRICS AFTER MV SOLVE
-                metrics = self.backend.get_circuit_metrics()
-                self.logger.info(f"Metrics after MV grid solve: {metrics}")
-            # Phase 2: Build all LV networks under this MV substation
             self.logger.debug(f"Building LV networks for K{kcid}_S{scid}")
             lv_specs = self._build_lv_networks_top_down(kcid, scid)
-
             all_component_specs.extend(lv_specs)
-
-            # NEW PHASE 3: Phase allocation at spec stage
             self.logger.info("Starting phase allocation optimization...")
-            # Use BFS allocator with relaxed imbalance handling for production
-            # runs
             phase_allocator = PhaseAllocator(
                 logger=self.logger,
-                max_imbalance_pct=15.0,  # tolerate higher imbalance on sparse split-phase territories
-                raise_on_imbalance=False,  # log warning instead of raising
-                optimize_retries=6,  # try multiple greedy starts per territory when above threshold
-                retry_threshold_pct=20.0,  # start retrying above this level
+                max_imbalance_pct=20.0,
+                raise_on_imbalance=False,
+                optimize_retries=6,
+                retry_threshold_pct=20.0,
             )
             all_component_specs = phase_allocator.allocate(all_component_specs)
 
-            # Report LV and MV balance summaries
             lv_imbalance = phase_allocator.get_phase_imbalance()
             mv_report = phase_allocator.get_mv_balance()
             self.logger.info(
-                f"Phase allocation completed. LV imbalance: {
-                    lv_imbalance:.1f}% | MV imbalance: {
-                    mv_report.get(
-                        'imbalance_pct',
-                        0.0):.1f}%"
+                f"Phase allocation completed. LV imbalance: {lv_imbalance:.1f}% | "
+                f"MV imbalance: {mv_report.get('imbalance_pct', 0.0):.1f}%"
             )
 
-            # Create remaining LV components in the backend
-            self.logger.info(
-                f"Creating {
-                    len(lv_specs)} LV components in backend"
+            calculate_and_save_statistics(
+                component_specs=all_component_specs,
+                kcid=kcid,
+                scid=scid,
+                output_dir="statistics",
+                generate_plots=True,
+                logger=self.logger,
             )
+            created_components = set()
+            skipped_duplicates = 0
 
-            for spec in lv_specs:
-                self.backend.create_component(spec)
+            for spec in all_component_specs:
+                spec_name = getattr(spec, "name", None)
+                if spec_name and spec_name in created_components:
+                    self.logger.warning(f"Skipping duplicate component: {spec_name}")
+                    skipped_duplicates += 1
+                    continue
 
-            # Stage C: Recalculate voltage bases after LV transformers are added
-            # This ensures proper kVBase assignment for new 0.416kV buses
-            self.logger.info(
-                "Recalculating voltage bases after LV transformer placement"
-            )
+                try:
+                    self.backend.create_component(spec)
+                    if spec_name:
+                        created_components.add(spec_name)
+                except Exception as e:
+                    if "Duplicate" in str(e) or "redefined" in str(e):
+                        self.logger.warning(f"AltDSS duplicate detected, skipping: {spec_name}")
+                        skipped_duplicates += 1
+                        if spec_name:
+                            created_components.add(spec_name)
+                    else:
+                        raise
+
+            if skipped_duplicates > 0:
+                self.logger.info(f"Skipped {skipped_duplicates} duplicate components")
+
             self.backend.dss("CalcVoltageBases")
 
             if self.backend.solve_power_flow():
-
                 metrics = self.backend.get_circuit_metrics()
-                self.logger.info(f"Metrics after MV+LV grid solve: {metrics}")
+                self.logger.info(f"Metrics after grid solve: {metrics}")
 
-                self.logger.info(
-                    f"✓ Grid construction and power flow successful for K{kcid}_S{scid}"
-                )
+                self.logger.info(f"✓ Grid construction and power flow successful for K{kcid}_S{scid}")
 
-                # Export results and save to dbc
                 grid_data = self.backend.export_to_format()
-                self._save_cluster_results(
-                    regional_identifier, kcid, scid, grid_data)
-
-                # Save line components to dbc for visualization
-                self._save_line_components_to_dbc(
-                    all_component_specs, kcid, scid)
-
+                self._save_cluster_results(regional_identifier, kcid, scid, grid_data)
+                self._save_line_components_to_dbc(all_component_specs, kcid, scid)
                 return True
             else:
-                self.logger.error(
-                    f"✗ Power flow did not converge for K{kcid}_S{scid}")
+                self.logger.error(f"✗ Power flow did not converge for K{kcid}_S{scid}")
                 return False
 
         except Exception as e:
-            self.logger.error(
-                f"Grid construction failed for K{kcid}_S{scid}: {
-                    str(e)}",
-                exc_info=True,
-            )
+            self.logger.error(f"Grid construction failed for K{kcid}_S{scid}: {str(e)}", exc_info=True)
             return False
         finally:
-
             self.backend.cleanup()
 
-    def _build_mv_substation_network(
-            self, kcid: int, scid: int) -> List[ComponentSpec]:
+    def _build_mv_substation_network(self, kcid: int, scid: int) -> list[ComponentSpec]:
         """
         Build MV substation network with feeders to LV transformers.
 
@@ -188,8 +163,7 @@ class ElectricalGridBuilder:
         component_specs = []
 
         # Get substation data with pre-selected equipment
-        substation, substation_vertice_id = self.dbc.get_substation_for_scid(
-            kcid, scid)
+        substation, substation_vertice_id = self.dbc.get_substation_for_scid(kcid, scid)
 
         if not substation:
             raise ValueError(f"No substation found for K{kcid}_S{scid}")
@@ -199,11 +173,9 @@ class ElectricalGridBuilder:
         # Initialize circuit with proper single source
         source_bus = f"Source_K{kcid}_S{scid}"
 
-        # Initialize AltDSS circuit with consistent bus naming
+        # Initialize OpenDss circuit with consistent bus naming
         circuit_name = f"Grid_K{kcid}_S{scid}"
-        self.backend.initialize_circuit(
-            circuit_name, source_bus, substation.primary_voltage_kv
-        )
+        self.backend.initialize_circuit(circuit_name, source_bus, substation.primary_voltage_kv)
 
         # MV main bus
         mv_main_bus = f"MV_Main_K{kcid}_S{scid}"
@@ -216,6 +188,8 @@ class ElectricalGridBuilder:
             equipment=substation,
             # Pre-selected during placement, contains number of phases
             kva=substation.s_max_kva if substation else None,
+            primary_phases="ABC",
+            secondary_phases="ABC",
             vertex_id=substation_vertice_id,
         )
         component_specs.append(substation_tx_spec)
@@ -247,8 +221,7 @@ class ElectricalGridBuilder:
         )
         return component_specs
 
-    def _build_lv_networks_top_down(
-            self, kcid: int, scid: int) -> List[ComponentSpec]:
+    def _build_lv_networks_top_down(self, kcid: int, scid: int) -> list[ComponentSpec]:
         """
         Build LV networks from each distribution transformer to buildings.
 
@@ -313,13 +286,10 @@ class ElectricalGridBuilder:
             component_specs.append(lv_tx_spec)
 
             #
-            network_data = self._prepare_lv_network_data(
-                self.current_regional_identifier, kcid, scid, bcid
-            )
+            network_data = self._prepare_lv_network_data(self.current_regional_identifier, kcid, scid, bcid)
 
             if not network_data:
-                self.logger.warning(
-                    f"No network data available for bcid {bcid}")
+                self.logger.warning(f"No network data available for bcid {bcid}")
                 continue
 
             # Apply cable placement algorithm to create LV network
@@ -352,9 +322,7 @@ class ElectricalGridBuilder:
         )
         return component_specs
 
-    def _prepare_lv_network_data(
-        self, regional_identifier: int, kcid: int, scid: int, bcid: int
-    ) -> Optional[tuple]:
+    def _prepare_lv_network_data(self, regional_identifier: int, kcid: int, scid: int, bcid: int) -> tuple | None:
         """
         Prepare network data for LV cable placement algorithm.
 
@@ -367,13 +335,11 @@ class ElectricalGridBuilder:
         """
         try:
             # Get vertices and distance information
-            vertex_distance_mapping, transformer_vertex = (
-                self.dbc.get_vertices_from_bcid(
-                    regional_identifier=regional_identifier,
-                    kcid=kcid,
-                    bcid=bcid,
-                    scid=scid,
-                )
+            vertex_distance_mapping, transformer_vertex = self.dbc.get_vertices_from_bcid(
+                regional_identifier=regional_identifier,
+                kcid=kcid,
+                bcid=bcid,
+                scid=scid,
             )
 
             # Get building information
@@ -387,10 +353,8 @@ class ElectricalGridBuilder:
             # Calculate connection nodes (non-building vertices)
             vertices_list = list(vertex_distance_mapping.keys())
             consumer_list = buildings_df.vertice_id.to_list()
-            consumer_list = list(
-                dict.fromkeys(consumer_list))  # Remove duplicates
-            connection_nodes = [
-                v for v in vertices_list if v not in consumer_list]
+            consumer_list = list(dict.fromkeys(consumer_list))  # Remove duplicates
+            connection_nodes = [v for v in vertices_list if v not in consumer_list]
 
             return (
                 vertex_distance_mapping,
@@ -407,9 +371,7 @@ class ElectricalGridBuilder:
             )
             return None
 
-    def _save_cluster_results(
-        self, regional_identifier: int, kcid: int, scid: int, grid_data: Dict[str, Any]
-    ) -> None:
+    def _save_cluster_results(self, regional_identifier: int, kcid: int, scid: int, grid_data: dict[str, Any]) -> None:
         """
         Save grid construction results for a single cluster to dbc.
 
@@ -419,7 +381,6 @@ class ElectricalGridBuilder:
             grid_data: Complete grid data from backend export
         """
         try:
-
             self.dbc.save_grid_cluster(
                 regional_identifier=regional_identifier,
                 kcid=kcid,
@@ -430,9 +391,7 @@ class ElectricalGridBuilder:
         except Exception as e:
             self.logger.error(f"Failed to save cluster grid results: {str(e)}")
 
-    def _save_line_components_to_dbc(
-        self, component_specs: List[ComponentSpec], kcid: int, scid: int
-    ) -> None:
+    def _save_line_components_to_dbc(self, component_specs: list[ComponentSpec], kcid: int, scid: int) -> None:
         """
         Save line components to dbc for visualization with MV/LV distinction.
 
@@ -446,8 +405,7 @@ class ElectricalGridBuilder:
 
             for spec in component_specs:
                 # Only process line specifications
-                if not hasattr(
-                        spec, "component_type") or spec.component_type != "line":
+                if not hasattr(spec, "component_type") or spec.component_type != "line":
                     continue
 
                 from ..electrical_backend.component_specs import LineSpec
@@ -469,11 +427,7 @@ class ElectricalGridBuilder:
                 grid_level = self._determine_line_voltage_level(spec)
 
                 # Get equipment information
-                equipment_id = (
-                    spec.cable_equipment.name
-                    if spec.cable_equipment
-                    else "unknown_cable"
-                )
+                equipment_id = spec.cable_equipment.name if spec.cable_equipment else "unknown_cable"
 
                 # Extract bus numbers from bus names (simplified)
                 # Simple hash-based bus numbering
@@ -550,18 +504,12 @@ class ElectricalGridBuilder:
 
         # MV indicators
         mv_indicators = ["MV_", "SOURCE", "69KV", "20KV", "SUB", "MAIN"]
-        if any(
-            indicator in bus1_name or indicator in bus2_name
-            for indicator in mv_indicators
-        ):
+        if any(indicator in bus1_name or indicator in bus2_name for indicator in mv_indicators):
             return "MV"
 
         # LV indicators
         lv_indicators = ["LV_", "400V", "BUILDING", "_B"]
-        if any(
-            indicator in bus1_name or indicator in bus2_name
-            for indicator in lv_indicators
-        ):
+        if any(indicator in bus1_name or indicator in bus2_name for indicator in lv_indicators):
             return "LV"
 
         # Check equipment voltage level if available
@@ -572,7 +520,7 @@ class ElectricalGridBuilder:
         # Default assumption - most lines are LV
         return "LV"
 
-    def _extract_bcid_from_line_name(self, line_name: str) -> Optional[int]:
+    def _extract_bcid_from_line_name(self, line_name: str) -> int | None:
         """
         Extract bcid from line name patterns like:
         - 'LV_Trunk_B5_Main_K1_S1_B1' -> bcid=1

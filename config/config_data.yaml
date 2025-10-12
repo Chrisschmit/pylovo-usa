@@ -1,10 +1,12 @@
 # Database connection configuration
+# Suffix for the database name
 DBNAME: pylovo_db_local
 USER: postgres
 HOST: localhost
 PORT: 5432
 PASSWORD: postgres
 TARGET_SCHEMA: public
+DB_SUFFIX: usa
 
 # Toggles whether the results per regional_identifier are analyzed after grid generation (basic parameters, trafo analysis, cable counting)
 ANALYZE_GRIDS: True
@@ -12,11 +14,9 @@ ANALYZE_GRIDS: True
 SAVE_GRID_FOLDER: False
 
 # Logging configuration for PgReaderWriter & GridGenerator
-LOG_LEVEL: DEBUG
+LOG_LEVEL: INFO
 LOG_FILE: "log.txt"
 
-# Suffix for the database name
-DB_SUFFIX: usa
 
 # EPSG code for spatial data.
 # 3035 is for Europe (ETRS89-extended / LAEA Europe)

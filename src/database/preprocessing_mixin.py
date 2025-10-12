@@ -45,23 +45,16 @@ class PreprocessingMixin(BaseMixin, ABC):
             insert_query = f"""INSERT INTO version (version_id, version_comment, consumer_categories, other_parameters) VALUES
                 ('{VERSION_ID}', '{VERSION_COMMENT}', '{consumer_categories_str}', '{other_paramters_str}')"""
             self.cur.execute(insert_query)
-            self.logger.info(
-                f"Version: {VERSION_ID} (created for the first time)")
+            self.logger.info(f"Version: {VERSION_ID} (created for the first time)")
 
-    def get_postcode_table_for_regional_identifier(
-        self, regional_identifier: int
-    ) -> pd.DataFrame:
+    def get_postcode_table_for_regional_identifier(self, regional_identifier: int) -> pd.DataFrame:
         """get postcode table for given regional_identifier"""
         query = """SELECT *
                    FROM postcode
                    WHERE regional_identifier = %(p)s;"""
-        df_postcode = pd.read_sql_query(
-            query, con=self.conn, params={"p": regional_identifier}
-        )
+        df_postcode = pd.read_sql_query(query, con=self.conn, params={"p": regional_identifier})
         if len(df_postcode) == 0:
-            raise ValueError(
-                f"No entry in postcode table found for regional_identifier: {regional_identifier}"
-            )
+            raise ValueError(f"No entry in postcode table found for regional_identifier: {regional_identifier}")
         return df_postcode
 
     def copy_postcode_result_table(self, regional_identifier: int) -> None:
@@ -98,9 +91,7 @@ class PreprocessingMixin(BaseMixin, ABC):
         UPDATE buildings_tem
         SET regional_identifier = %(regional_identifier)s
         WHERE regional_identifier ISNULL;"""
-        self.cur.execute(
-            query, {"v": VERSION_ID, "regional_identifier": regional_identifier}
-        )
+        self.cur.execute(query, {"v": VERSION_ID, "regional_identifier": regional_identifier})
 
     def set_other_buildings_table(self, regional_identifier: int):
         """
@@ -125,9 +116,7 @@ class PreprocessingMixin(BaseMixin, ABC):
         UPDATE buildings_tem
         SET floors = 1
         WHERE floors ISNULL;"""
-        self.cur.execute(
-            query, {"v": VERSION_ID, "regional_identifier": regional_identifier}
-        )
+        self.cur.execute(query, {"v": VERSION_ID, "regional_identifier": regional_identifier})
 
     def remove_duplicate_buildings(self):
         """
@@ -152,8 +141,7 @@ class PreprocessingMixin(BaseMixin, ABC):
                      AND osm_id LIKE '%copy%';"""
         self.cur.execute(query)
 
-    def set_regional_identifier_settlement_type(
-            self, regional_identifier: int) -> None:
+    def set_regional_identifier_settlement_type(self, regional_identifier: int) -> None:
         """
         Determine settlement_type in postcode_result table based on the load_density (MVA/km²) for the given regional_identifier
         :param regional_identifier: Regional identifier (FIPS code)
@@ -175,26 +163,19 @@ class PreprocessingMixin(BaseMixin, ABC):
         result = self.cur.fetchone()
 
         if not result or result[1] is None:
-            raise ValueError(
-                f"No area data found in postcode table for regional_identifier: {regional_identifier}"
-            )
+            raise ValueError(f"No area data found in postcode table for regional_identifier: {regional_identifier}")
 
         total_load_kw, area_km2 = result
 
-        total_load_kw = float(
-            total_load_kw) if total_load_kw is not None else 0.0
+        total_load_kw = float(total_load_kw) if total_load_kw is not None else 0.0
         area_km2 = float(area_km2) if area_km2 is not None else 0.0
 
         if area_km2 <= 0:
-            raise ValueError(
-                f"Invalid area ({area_km2}) for regional_identifier: {regional_identifier}"
-            )
+            raise ValueError(f"Invalid area ({area_km2}) for regional_identifier: {regional_identifier}")
 
         # Calculate load density in MVA/km² using power factor
         load_density_mva_km2 = total_load_kw / (POWER_FACTOR * 1000 * area_km2)
-        self.logger.info(
-            f"Load density for: {regional_identifier} is {load_density_mva_km2} MVA/km²"
-        )
+        self.logger.info(f"Load density for: {regional_identifier} is {load_density_mva_km2} MVA/km²")
 
         # Update database with load density and set settlement types based on
         # thresholds
@@ -301,13 +282,9 @@ class PreprocessingMixin(BaseMixin, ABC):
                 (SELECT COUNT(*) FROM mv)  AS mv_count,
                 (SELECT COUNT(*) FROM zeroed) AS zeroed_count;
         """
-        self.cur.execute(
-            query, {
-                "lower": LV_THRESHOLD_KW, "upper": MV_THRESHOLD_KW})
+        self.cur.execute(query, {"lower": LV_THRESHOLD_KW, "upper": MV_THRESHOLD_KW})
         lv_count, mv_count, zeroed_count = self.cur.fetchone()
-        self.logger.info(
-            f"Grid-level assignment: LV={lv_count}, MV={mv_count}, Zeroed={zeroed_count}"
-        )
+        self.logger.info(f"Grid-level assignment: LV={lv_count}, MV={mv_count}, Zeroed={zeroed_count}")
         return
 
     def remove_zero_peak_load_buildings(self) -> int:
@@ -355,8 +332,7 @@ class PreprocessingMixin(BaseMixin, ABC):
             if not updated:
                 break
 
-        self.logger.info(
-            f"Close-building zeroed (touching cascades): {total_zeroed}")
+        self.logger.info(f"Close-building zeroed (touching cascades): {total_zeroed}")
         return None
 
     def insert_transformers(self, regional_identifier: int) -> None:
@@ -387,9 +363,7 @@ class PreprocessingMixin(BaseMixin, ABC):
                        UPDATE buildings_tem
                        SET peak_load_in_kw = -1
                        WHERE peak_load_in_kw ISNULL;"""
-        self.cur.execute(
-            insert_query, {
-                "p": regional_identifier, "v": VERSION_ID})
+        self.cur.execute(insert_query, {"p": regional_identifier, "v": VERSION_ID})
 
     def count_indoor_transformers(self) -> None:
         """counts indoor transformers before deleting them"""
@@ -435,9 +409,7 @@ class PreprocessingMixin(BaseMixin, ABC):
         count = self.cur.fetchone()[0]
 
         if count == 0:
-            raise ValueError(
-                f"Ways table is empty for the given regional_identifier: {regional_identifier}"
-            )
+            raise ValueError(f"Ways table is empty for the given regional_identifier: {regional_identifier}")
 
         return count
 
@@ -493,12 +465,8 @@ class PreprocessingMixin(BaseMixin, ABC):
 
         if result and result[0] > 0:
             groups, total_segments, to_remove = result
-            self.logger.info(
-                f"Found {groups} duplicate geometry groups with {total_segments} total segments"
-            )
-            self.logger.info(
-                f"Removing {to_remove} duplicate segments (keeping 1 per group)"
-            )
+            self.logger.info(f"Found {groups} duplicate geometry groups with {total_segments} total segments")
+            self.logger.info(f"Removing {to_remove} duplicate segments (keeping 1 per group)")
 
             # Remove duplicates - keep the one with the smallest way_id
             remove_query = """
@@ -513,14 +481,12 @@ class PreprocessingMixin(BaseMixin, ABC):
             # Get number of affected rows from cursor
             removed_count = self.cur.rowcount
 
-            self.logger.info(
-                f"Successfully removed {removed_count} duplicate segments")
+            self.logger.info(f"Successfully removed {removed_count} duplicate segments")
 
             # Final count
             self.cur.execute("SELECT COUNT(*) FROM ways_tem")
             final_count = self.cur.fetchone()[0]
-            self.logger.info(
-                f"ways_tem now contains {final_count} unique segments")
+            self.logger.info(f"ways_tem now contains {final_count} unique segments")
 
         else:
             self.logger.info("No duplicate geometries found in ways_tem table")
@@ -576,3 +542,45 @@ class PreprocessingMixin(BaseMixin, ABC):
             con=self.conn,
         )
         return df_query
+    # TODO: Remove this function
+    def keep_only_n_buildings_for_LV(self, n: int = 2) -> None:
+        """
+        Debug function: Keep only n LV buildings in buildings_tem table
+        :param n: Number of LV buildings to keep
+        """
+        query = """
+        WITH lv_buildings AS (
+            SELECT osm_id
+            FROM buildings_tem
+            WHERE grid_level_connection = 'LV'
+              AND peak_load_in_kw > 0
+            ORDER BY osm_id
+            LIMIT %(n)s
+        )
+        DELETE FROM buildings_tem
+        WHERE grid_level_connection = 'LV'
+          AND osm_id NOT IN (SELECT osm_id FROM lv_buildings);
+        """
+        self.cur.execute(query, {"n": n})
+        self.logger.info(f"Kept only {n} LV buildings for debugging")
+
+    def keep_only_n_buildings_for_MV(self, n: int = 2) -> None:
+        """
+        Debug function: Keep only n MV buildings in buildings_tem table
+        :param n: Number of MV buildings to keep
+        """
+        query = """
+        WITH mv_buildings AS (
+            SELECT osm_id
+            FROM buildings_tem
+            WHERE grid_level_connection = 'MV'
+              AND peak_load_in_kw > 0
+            ORDER BY osm_id
+            LIMIT %(n)s
+        )
+        DELETE FROM buildings_tem
+        WHERE grid_level_connection = 'MV'
+          AND osm_id NOT IN (SELECT osm_id FROM mv_buildings);
+        """
+        self.cur.execute(query, {"n": n})
+        self.logger.info(f"Kept only {n} MV buildings for debugging")

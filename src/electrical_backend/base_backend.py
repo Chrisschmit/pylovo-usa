@@ -14,7 +14,7 @@ class IElectricalBackend(ABC):
     """
     Abstract interface for electrical simulation backends.
 
-    This interface defines the contract that all electrical backends (AltDSS, pandapower, etc.)
+    This interface defines the contract that all electrical backends (Opendss, pandapower, etc.)
     must implement. It ensures backend-agnostic grid construction where algorithms work
     with component specifications rather than specific electrical objects.
     """

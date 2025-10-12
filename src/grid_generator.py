@@ -136,9 +136,6 @@ class GridGenerator:
         self.prepare_ways()
 
         self.apply_kmeans_clustering()
-        # We are going to generate MV clusters for every kmeans cluster, currently each kmeans clsuter contains around ~1000 buildings.
-        # Prep buildings for the clustering: Above >LV Threshold will be directly
-        # connected to MV, below will be clustered.
 
         # First position LV_Transformers for each bcid cluster and buildings
         # with grid_level_connection = LV
@@ -191,11 +188,9 @@ class GridGenerator:
 
         self.dbc.assign_close_buildings()
 
-        # Remove all buildings from buildings_tem with peak load = 0
         self.dbc.remove_zero_peak_load_buildings()
 
-        # for debugging purposes, i want to keep only 2 buildings for LV and
-        # two for MV, please write me the function quick andd dirty
+        # for debugging purposes: keep only n buildings for LV and MV
         # self.dbc.keep_only_n_buildings_for_LV(n=10)
         # self.dbc.keep_only_n_buildings_for_MV(n=10)
 
@@ -219,7 +214,6 @@ class GridGenerator:
         """
         ways_count = self.dbc.set_ways_tem_table(self.regional_identifier)
         self.logger.info(f"The ways_tem table filled with {ways_count} ways")
-        # self.dbc.connect_unconnected_ways()
         self.logger.info("Connecting road_network to the buildings, this might take a while...")
         self.dbc.draw_building_connection()
         self.logger.info("Building connection finished in ways_tem")
@@ -453,7 +447,7 @@ class GridGenerator:
         Parallelized version of install_cables using multiprocessing.
         Installs electrical cables to connect buildings and transformers in power grid clusters.
 
-        This method creates a pandapower network for each building cluster (kcid, bcid) in the
+        This method creates a grid network for each building cluster (kcid, bcid) in the
         postal code area and connects the buildings with appropriate electrical cables. It follows
         a branch-by-branch approach, starting from the furthest nodes and working inward toward
         the transformer.
@@ -462,7 +456,7 @@ class GridGenerator:
         1. Retrieves all clusters (kcid, bcid) for the postal code area
         2. For each cluster:
            a. Prepares building and connection data
-           b. Creates an electrical network with pandapower
+           b. Creates an electrical network with OpenDSS
            c. Adds buses, transformers, and loads to the network
            d. Installs cables using a greedy algorithm that:
               - Starts from the furthest nodes from the transformer

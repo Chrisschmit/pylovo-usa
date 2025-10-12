@@ -20,8 +20,6 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 
 def main():
-    plot_results = False
-
     # Delete existing networks first
     print("Deleting existing networks...")
     try:
@@ -50,14 +48,6 @@ def main():
 
     # generate a grid for the specified region
     gg.generate_grid_for_single_regional_identifier(regional_identifier=regional_identifier)
-
-    if plot_results:
-        # plot data from the generated grids
-        cluster_list = gg.dbc.get_list_from_regional_identifier(regional_identifier)
-        print("The regional_identifier has", len(cluster_list), "grids.")
-        print(cluster_list)
-        plot_boxplot_regional_identifier(regional_identifier)
-        plot_pie_of_trafo_cables(regional_identifier)
 
     # End timing and print results
     elapsed_time = time.time() - start_time

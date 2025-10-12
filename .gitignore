@@ -8,6 +8,11 @@
 /raw_data/transformer_data/processed_trafos/*
 tutorials/.ipynb_checkpoints/
 log.txt
+
+# Statistics and output directories (centralized in statistics/)
+statistics/
+plots/
+
 ### Default .gitignore file for Python projects
 
 # Environments

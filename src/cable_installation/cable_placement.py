@@ -293,8 +293,9 @@ class CablePlacementAlgorithm:
 
             # Compute proper LV load parameters based on transformer
             # configuration
-            kw_val = simultaneous_load_kw[consumer_id]
-            kvar_val = float(kw_val) * float(np.tan(np.arccos(POWER_FACTOR)))
+            simult_factor = 0.2
+            kw_val = simultaneous_load_kw[consumer_id]*simult_factor
+            kvar_val = float(kw_val) * float(np.tan(np.arccos(POWER_FACTOR)))*simult_factor
 
             # Set voltage and connection based on phase configuration
             if n_phases == 1:
@@ -979,7 +980,9 @@ class CablePlacementAlgorithm:
             osm_id = b["osm_id"]
             vid = _get_vid(b)
             peak_kw = float(b["peak_load_kw"])
-
+            simult_factor = 0.2
+            peak_kw = peak_kw*simult_factor
+            kvar_val = float(peak_kw) * float(np.tan(np.arccos(POWER_FACTOR)))*simult_factor
             line_specs.append(
                 BusSpec(
                     name=f"mv_building_{osm_id}_{cluster_id}",
@@ -993,7 +996,7 @@ class CablePlacementAlgorithm:
                     name=f"mv_load_{osm_id}_{cluster_id}",
                     bus=f"mv_building_{osm_id}_{cluster_id}",
                     kw=peak_kw,
-                    kvar=peak_kw * 0.3,
+                    kvar=kvar_val,
                     kv=12.47,  # L-L for 3φ wye
                     n_phases=3,
                     phase="ABC",

@@ -31,7 +31,8 @@ class DatabaseConstructor:
         with self.dbc.conn.cursor() as cur:
             cur.execute(
                 """SELECT table_name FROM information_schema.tables
-                   WHERE table_schema = %s""", (TARGET_SCHEMA,)
+                   WHERE table_schema = %s""",
+                (TARGET_SCHEMA,),
             )
             table_name_list = [tup[0] for tup in cur.fetchall()]
 
@@ -85,8 +86,8 @@ class DatabaseConstructor:
 
     def ogr_to_db(self, ogr_file_list, skip_failures: bool = False):
         """
-            OGR/GDAL is a translator library for raster and vector geospatial data formats
-            inserts building data specified into database
+        OGR/GDAL is a translator library for raster and vector geospatial data formats
+        inserts building data specified into database
         """
 
         for file_dict in ogr_file_list:
@@ -97,7 +98,6 @@ class DatabaseConstructor:
             table_name = file_dict.get("table_name", file_name)
 
             table_exists = self.table_exists(table_name=table_name)
-            print("ogr working for table", table_name)
             command = [
                 "ogr2ogr",
                 "-append" if table_exists else "-overwrite",
@@ -105,7 +105,7 @@ class DatabaseConstructor:
                 "-f",
                 "PostgreSQL",
                 f"PG:dbname={DBNAME} user={USER} password={PASSWORD} host={HOST} port={PORT}",
-                file_path,
+                str(file_path),
                 "-nln",
                 # explicitly tells ogr2ogr where to append (for the case of
                 # table already existing)
@@ -118,17 +118,24 @@ class DatabaseConstructor:
                 "-lco",
                 "geometry_name=geom",
                 # ensures creation happens in correct schema
-                "-lco", f"SCHEMA={TARGET_SCHEMA}",
+                "-lco",
+                f"SCHEMA={TARGET_SCHEMA}",
             ]
             if skip_failures:
                 command.append("-skipfailures")
 
-            result = subprocess.run(
-                command,
-                check=True,
-                shell=False,
-                stderr=subprocess.PIPE if skip_failures else None)
+            print(f"  Running command: {' '.join(command[:3])} ... (database connection hidden)")
+            print(f"  This may take several minutes for large files...")
+
             if skip_failures:
+                # Capture stderr for error processing, but show stdout in real-time
+                result = subprocess.run(
+                    command,
+                    check=True,
+                    shell=False,
+                    stdout=None,  # Let stdout pass through for progress
+                    stderr=subprocess.PIPE)
+
                 error_list = result.stderr.decode().replace("\r", "").split("\n")
                 error_list = [e[e.find("ERROR: "):e.find("DETAIL: ")]
                               for e in error_list]
@@ -136,13 +143,22 @@ class DatabaseConstructor:
                               for e in error_list if "ERROR: " in e]
                 error_set = set(error_list)
 
-                print(
-                    f"Warning: Error(s) occurred while processing {file_name}:")
-                for error in error_set:
-                    print("\t" + error)
-                    if "duplicate key value violates unique constraint" in error:
-                        print(
-                            "\tThis is likely due to importing already existing data.")
+                if error_set:
+                    print(
+                        f"Warning: Error(s) occurred while processing {file_name}:")
+                    for error in error_set:
+                        print("\t" + error)
+                        if "duplicate key value violates unique constraint" in error:
+                            print(
+                                "\tThis is likely due to importing already existing data.")
+            else:
+                # No error capture needed, let all output pass through
+                result = subprocess.run(
+                    command,
+                    check=True,
+                    shell=False,
+                    stdout=None,
+                    stderr=None)
 
             et = time.time()
             print(f"{file_name} is successfully imported to db in {int(et - st)} s")
@@ -164,12 +180,7 @@ class DatabaseConstructor:
             return
 
         # Simply use ogr_to_db with the original file - it handles everything
-        trafo_dict = [
-            {
-                "path": geojson_path,
-                "table_name": "transformers"
-            }
-        ]
+        trafo_dict = [{"path": geojson_path, "table_name": "transformers"}]
 
         # ogr_to_db will handle CRS transformation and upsert
         self.ogr_to_db(trafo_dict, skip_failures=True)
@@ -220,11 +231,12 @@ class DatabaseConstructor:
             os.getcwd(),
             "raw_data",
             "imports",
-            REGION['STATE'].replace(' ', '_'),
-            REGION['COUNTY'].replace(' ', '_'),
-            REGION['COUNTY_SUBDIVISION'].replace(' ', '_'),
-            "STREET_NETWORK",
-            "ways_public_2po_4pgr.sql")
+            REGION["STATE"].replace(" ", "_"),
+            REGION["COUNTY"].replace(" ", "_"),
+            REGION["COUNTY_SUBDIVISION"].replace(" ", "_"),
+            "ROAD_NETWORK",
+            "road_network.sql",
+        )
 
         file_size = os.path.getsize(sc_path)
 
@@ -235,8 +247,8 @@ class DatabaseConstructor:
 
         leftover = ""  # Holds any partial statement that didn't end with a semicolon
 
-        print("\nStart inserting ways into public_2po_4pgr table.")
-        with open(sc_path, 'r', encoding='utf-8') as sc_file:
+        print("\nStart inserting ways into road_network table.")
+        with open(sc_path, encoding="utf-8") as sc_file:
             while True:
                 # Read next chunk
                 data = sc_file.read(chunk_size)
@@ -260,14 +272,13 @@ class DatabaseConstructor:
                     # Execute all statements except possibly the last
                     for stmt in statements[:-1]:
                         stmt = stmt.strip()
-                        if stmt and not stmt.startswith('--'):
+                        if stmt and not stmt.startswith("--"):
                             cur.execute(stmt)
                             self.dbc.conn.commit()
 
                     # Check if the last statement ends with a semicolon or not
                     last_stmt = statements[-1].strip()
-                    if last_stmt.endswith(
-                            ';') and not last_stmt.startswith('--'):
+                    if last_stmt.endswith(";") and not last_stmt.startswith("--"):
                         # It's a complete statement
                         cur.execute(last_stmt)
                         self.dbc.conn.commit()
@@ -279,7 +290,7 @@ class DatabaseConstructor:
                     if len(statements) == 1:
                         # Could be complete or incomplete
                         stmt = statements[0].strip()
-                        if stmt.endswith(';') and not stmt.startswith('--'):
+                        if stmt.endswith(";") and not stmt.startswith("--"):
                             # It's complete, execute it
                             cur.execute(stmt)
                             self.dbc.conn.commit()
@@ -291,7 +302,7 @@ class DatabaseConstructor:
                         # No statements found. This can happen if combined was empty or whitespace.
                         # Just continue reading next chunk
                         pass
-        print("\nInserted all ways into public_2po_4pgr table.")
+        print("\nInserted all ways into road_network table.")
 
     def ways_to_db(self):
         """This function transform the output of osm2po to the ways table, refer to the issue
@@ -310,11 +321,11 @@ class DatabaseConstructor:
                     reverse_cost,
                     id AS way_id,
                     ST_Transform(geom_way, %(epsg)s) as geom
-            FROM public_2po_4pgr"""
+            FROM road_network"""
         cur.execute(query, {"epsg": EPSG})
 
-        # Drop public_2po_4pgr table, as it is not needed anymore
-        query = "DROP TABLE public_2po_4pgr"
+        # Drop road_network table, as it is not needed anymore
+        query = "DROP TABLE road_network"
         cur.execute(query)
 
         self.dbc.conn.commit()
@@ -329,26 +340,21 @@ class DatabaseConstructor:
         cur = self.dbc.conn.cursor()
 
         # List of SQL function files to execute
-        sql_files = [
-            "postgres_dump_functions.sql",
-            "postgres_dump_functions_set_based.sql"
-        ]
+        sql_files = ["postgres_dump_functions.sql"]
 
         for sql_file in sql_files:
             sc_path = os.path.join(os.getcwd(), "src", sql_file)
 
             # Check if file exists before trying to execute
             if os.path.exists(sc_path):
-                with open(sc_path, 'r') as sc_file:
-                    print(
-                        f"Executing {sql_file} script with schema '{TARGET_SCHEMA}'.")
+                with open(sc_path) as sc_file:
+                    print(f"Executing {sql_file} script with schema '{TARGET_SCHEMA}'.")
                     sql = sc_file.read()
                     cur.execute(sql)
                     self.dbc.conn.commit()
                     print(f"Successfully executed {sql_file}")
             else:
-                print(
-                    f"Warning: {sql_file} not found at {sc_path}, skipping...")
+                print(f"Warning: {sql_file} not found at {sc_path}, skipping...")
 
     def drop_all_tables(self):
         """

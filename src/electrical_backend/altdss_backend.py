@@ -7,7 +7,15 @@ provides a clean interface for grid construction algorithms.
 """
 
 import logging
+import os
+import json
+from datetime import datetime
+
+import re
+import shutil
 from typing import Any
+
+from src.config_loader import ANALYZE_GRIDS
 
 from .altdss_component_factory import AltDSSComponentFactory
 from .base_backend import IElectricalBackend
@@ -17,7 +25,7 @@ from .component_specs import BusSpec, ComponentSpec, LineSpec, LoadSpec, Transfo
 try:
     import altdss
 except ImportError:
-    altdss = None
+    altdss = Noneƒ
 
 
 class AltDSSBackendError(Exception):
@@ -236,11 +244,158 @@ class AltDSSBackend(IElectricalBackend):
             else:
                 self.logger.error("✗ Power flow did not converge")
 
+            try:
+                report_filename = f"{self._circuit_name}_electrical_statistics.txt" if self._circuit_name else "electrical_statistics.txt"
+                self.generate_electrical_statistics_report(report_filename)
+            except Exception as diag_err:
+                self.logger.warning(f"Electrical statistics report generation failed: {str(diag_err)}")
+
             return converged
 
         except Exception as e:
             self.logger.error(f"Power flow solution failed: {str(e)}")
             return False
+
+    # ---------------------------------------------------------------------
+    # Diagnostics helpers
+    # ---------------------------------------------------------------------
+    def generate_electrical_statistics_report(self, output_filename: str = "electrical_statistics.txt") -> None:
+        """
+        Generate comprehensive electrical statistics report after power flow solve.
+
+        Creates a detailed text report including:
+        - Power flow convergence status
+        - Total power, losses, and loss percentage
+        - Voltage statistics (min/max/avg) and zero-voltage bus detection
+        - Exported CSV data files (voltages, currents, powers, losses, loads)
+        - Circuit JSON snapshot for reproducibility
+
+        All outputs are saved to: statistics/<circuit_name>/
+
+        Args:
+            output_filename: Name for the statistics report text file
+        """
+        if self.dss is None:
+            return
+
+        circuit_name = self._circuit_name or "unknown"
+        m = re.search(r"K\d+_S\d+", circuit_name or "")
+        subfolder = m.group(0) if m else circuit_name
+        stats_dir = os.path.abspath(os.path.join(os.getcwd(), "statistics", subfolder))
+        os.makedirs(stats_dir, exist_ok=True)
+        out_path = os.path.join(stats_dir, output_filename)
+        out_dir = stats_dir
+        converged = bool(self.dss.Solution.Converged)
+        total_power = self.dss.TotalPower()
+        total_losses = self.dss.Losses()
+        try:
+            raw_bus_names = self.dss.BusNames()
+            bus_names = list(raw_bus_names) if raw_bus_names is not None else []
+        except Exception:
+            bus_names = []
+        try:
+            raw_bus_vmags = self.dss.BusVMagPU()
+            bus_vmags = list(raw_bus_vmags) if raw_bus_vmags is not None else []
+        except Exception:
+            bus_vmags = []
+
+        min_v = min(bus_vmags) if bus_vmags else None
+        max_v = max(bus_vmags) if bus_vmags else None
+        avg_v = (sum(bus_vmags) / len(bus_vmags)) if bus_vmags else None
+        zero_voltage_buses: list[str] = []
+        for name, vpu in zip(bus_names, bus_vmags):
+            try:
+                if abs(float(vpu)) < 1e-8:
+                    zero_voltage_buses.append(name)
+            except Exception:
+                continue
+
+        # Export CSVs; then move/copy from repo root into statistics/<circuit>
+        export_types = ["Voltages", "Currents", "Powers", "Losses", "Loads"]
+        exported_files = []
+
+        for export_type in export_types:
+            try:
+                self.dss(f"Export {export_type}")
+
+                base_name = f"{export_type}.csv"
+                root_base = os.path.join(os.getcwd(), base_name)
+                stats_base = os.path.join(stats_dir, base_name)
+                tagged_name = f"{circuit_name}_EXP_{export_type.upper()}.csv"
+                stats_tagged = os.path.join(stats_dir, tagged_name)
+
+                if os.path.exists(root_base):
+                    # Move the root export into statistics as tagged file
+                    shutil.move(root_base, stats_tagged)
+                elif os.path.exists(stats_base):
+                    # DSS may have written directly into stats_dir; create tagged copy
+                    shutil.copy2(stats_base, stats_tagged)
+                else:
+                    # Nothing found; skip
+                    continue
+
+                exported_files.append(stats_tagged)
+                self.logger.debug(f"✓ Exported {export_type} → {stats_tagged}")
+            except Exception as e:
+                self.logger.warning(f"Failed to export {export_type}: {str(e)}")
+                continue
+
+        json_snapshot_path = None
+        try:
+            json_str = self.dss.to_json()
+            json_basename = f"circuit_snapshot_{self._circuit_name}.json" if self._circuit_name else "circuit_snapshot.json"
+            json_snapshot_path = os.path.abspath(os.path.join(out_dir, json_basename))
+            with open(json_snapshot_path, "w") as f:
+                json.dump(json.loads(json_str), f, indent=2)
+        except Exception:
+            pass
+        def _to_kw(value: Any) -> float | None:
+            try:
+                if hasattr(value, "real"):
+                    return float(value.real)
+                if isinstance(value, (list, tuple)) and len(value) > 0:
+                    return float(value[0])
+                return float(value)
+            except Exception:
+                return None
+
+        with open(out_path, "w") as f:
+            f.write("=" * 80 + "\n")
+            f.write("Electrical Statistics Report\n")
+            f.write("=" * 80 + "\n\n")
+            f.write(f"Timestamp: {datetime.utcnow().isoformat()}Z\n")
+            f.write(f"Circuit: {self._circuit_name or 'unknown'}\n")
+            f.write(f"Converged: {converged}\n")
+            tp_kw = _to_kw(total_power)
+            tl_w = _to_kw(total_losses)
+            tl_kw = (tl_w / 1000.0) if tl_w is not None else None
+            if tp_kw is not None:
+                f.write(f"Total Power kW: {tp_kw:.3f}\n")
+            if tl_kw is not None:
+                f.write(f"Total Losses kW: {tl_kw:.3f}\n")
+
+            f.write("\nVoltage stats (pu):\n")
+            f.write(f"  min: {min_v if min_v is not None else 'n/a'}\n")
+            f.write(f"  avg: {avg_v if avg_v is not None else 'n/a'}\n")
+            f.write(f"  max: {max_v if max_v is not None else 'n/a'}\n")
+
+            if zero_voltage_buses:
+                f.write(f"\nZero-voltage buses ({len(zero_voltage_buses)}):\n")
+                # cap list to avoid huge files
+                preview = zero_voltage_buses[:200]
+                for b in preview:
+                    f.write(f"  - {b}\n")
+                if len(zero_voltage_buses) > len(preview):
+                    f.write(f"  ... and {len(zero_voltage_buses) - len(preview)} more\n")
+            else:
+                f.write("\nZero-voltage buses: none\n")
+
+            f.write("\nExported files:\n")
+            for p in exported_files:
+                f.write(f"  - {p}\n")
+
+            if json_snapshot_path:
+                f.write(f"\nJSON snapshot: {json_snapshot_path}\n")
 
     def export_to_format(self) -> dict[str, Any]:
         """
@@ -317,7 +472,7 @@ class AltDSSBackend(IElectricalBackend):
             metrics = {
                 "converged": self.dss.Solution.Converged,
                 "total_power_kw": total_power.real if total_power else 0,
-                "total_losses_kw": total_losses.real if total_losses else 0,
+                "total_losses_kw": total_losses.real/1000 if total_losses else 0,
                 "num_buses": self.dss.NumBuses,
                 "num_elements": self.dss.NumCircuitElements,
             }

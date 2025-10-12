@@ -81,17 +81,6 @@ class AnalysisMixin(BaseMixin, ABC):
         )
         self.logger.debug("per trafo analysis finished")
 
-    def save_pp_net_with_json(self, regional_identifier: int, kcid: int, bcid: int, json_string: str) -> None:
-        insert_query = """UPDATE grid_result
-                           SET grid = %s
-                           WHERE version_id = %s
-                             AND regional_identifier = %s
-                             AND kcid = %s
-                             AND bcid = %s;"""
-        self.cur.execute(
-            insert_query,
-            vars=(json_string, VERSION_ID, regional_identifier, kcid, bcid),
-        )
 
     def count_clustering_parameters(self, regional_identifier: int) -> int:
         """
@@ -175,66 +164,6 @@ class AnalysisMixin(BaseMixin, ABC):
         net = pp.from_json_string(grid_json_string)
 
         return net
-
-    def insert_clustering_parameters(self, params: dict) -> None:
-        """Insert calculated grid parameters into clustering_parameters table."""
-
-        insert_query = """INSERT INTO clustering_parameters (
-                   grid_result_id,
-                   no_connection_buses,
-                   no_branches,
-                   no_house_connections,
-                   no_house_connections_per_branch,
-                   no_households,
-                   no_household_equ,
-                   no_households_per_branch,
-                   max_no_of_households_of_a_branch,
-                   house_distance_km,
-                   transformer_mva,
-                   osm_trafo,
-                   max_trafo_dis,
-                   avg_trafo_dis,
-                   cable_length_km,
-                   cable_len_per_house,
-                   max_power_mw,
-                   simultaneous_peak_load_mw,
-                   resistance,
-                   reactance,
-                   ratio,
-                   vsw_per_branch,
-                   max_vsw_of_a_branch,
-                   mv_parameters,
-                   lv_parameters
-                  )
-                  VALUES (
-                  (SELECT grid_result_id FROM grid_result WHERE version_id = %(version_id)s AND regional_identifier = %(regional_identifier)s AND scid = %(scid)s AND kcid = %(kcid)s),
-                  %(no_connection_buses)s,
-                  %(no_branches)s,
-                  %(no_house_connections)s,
-                  %(no_house_connections_per_branch)s,
-                  %(no_households)s,
-                  %(no_household_equ)s,
-                  %(no_households_per_branch)s,
-                  %(max_no_of_households_of_a_branch)s,
-                  %(house_distance_km)s,
-                  %(transformer_mva)s,
-                  %(osm_trafo)s,
-                  %(max_trafo_dis)s,
-                  %(avg_trafo_dis)s,
-                  %(cable_length_km)s,
-                  %(cable_len_per_house)s,
-                  %(max_power_mw)s,
-                  %(simultaneous_peak_load_mw)s,
-                  %(resistance)s,
-                  %(reactance)s,
-                  %(ratio)s,
-                  %(vsw_per_branch)s,
-                  %(max_vsw_of_a_branch)s,
-                  %(mv_parameters)s,
-                  %(lv_parameters)s);"""
-
-        self.cur.execute(insert_query, params)
-        self.conn.commit()
 
     def get_geo_df(
         self,
